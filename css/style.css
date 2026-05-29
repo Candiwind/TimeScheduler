@@ -368,11 +368,19 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .task-item {
   display: flex; align-items: center; gap: 6px; padding: 7px 10px; margin: 2px 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  cursor: grab; transition: all var(--t); font-size: 13px;
+  cursor: grab; transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast), opacity var(--t);
+  font-size: 13px;
 }
-.task-item:hover { border-color: var(--border2); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-.task-item.completed .task-text { text-decoration: line-through; opacity: 0.6; }
-.task-item.dragging { opacity: 0.4; transform: scale(0.97); }
+.task-item:hover {
+  border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateX(2px);
+}
+.task-item.completed .task-text { text-decoration: line-through; opacity: 0.55; }
+.task-item.completed {
+  opacity: 0.75;
+}
+.task-item.dragging { opacity: 0.35; transform: scale(0.98); }
+.task-item:active { cursor: grabbing; }
 
 /* Completed task gets quadrant color */
 .quadrant-i .task-item.completed { background: linear-gradient(135deg, #ffe0e0, #ffd0d0); border-color: #f0b0b0; }
@@ -412,9 +420,14 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .task-progress-wrap { flex-shrink: 0; }
 .task-progress-btn {
   font-size: 10px; padding: 2px 6px; border: 1px solid var(--border2); border-radius: 4px;
-  background: var(--surface2); cursor: pointer; color: var(--text2); transition: all var(--t);
+  background: var(--surface2); cursor: pointer; color: var(--text2); transition: all var(--t-fast);
+  white-space: nowrap;
 }
 .task-progress-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.bigtask-card-progress-fill {
+  height: 100%; border-radius: 3px; background: linear-gradient(90deg, #5cb85c, #6cc06c);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 /* ============ Task Block ============ */
 .task-block {
@@ -436,19 +449,20 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 
 /* ============ Subtask ============ */
 .subtask-item {
-  display: flex; align-items: center; gap: 5px; padding: 4px 8px; margin: 2px 0;
+  display: flex; align-items: center; gap: 5px; padding: 5px 8px; margin: 2px 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
-  cursor: grab; font-size: 12px; transition: all var(--t); user-select: none;
+  cursor: grab; font-size: 12px; transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast);
+  user-select: none;
 }
-.subtask-item:hover { border-color: var(--border2); }
+.subtask-item:hover {
+  border-color: var(--accent);
+  transform: translateX(1px);
+}
 .subtask-item .task-text { user-select: none; }
-.subtask-drag-handle {
-  font-size: 10px; color: var(--text3); cursor: grab; letter-spacing: -2px;
-  padding: 0 2px; user-select: none; flex-shrink: 0; line-height: 1;
-}
-.subtask-drag-handle:active { cursor: grabbing; }
-.subtask-item.completed .task-text { text-decoration: line-through; opacity: 0.6; }
-.subtask-item.dragging { opacity: 0.4; outline: 2px dashed var(--accent); }
+.subtask-item.completed .task-text { text-decoration: line-through; opacity: 0.55; }
+.subtask-item.completed { opacity: 0.7; }
+.subtask-item.dragging { opacity: 0.3; outline: 2px dashed var(--accent); transform: scale(0.98); }
+.subtask-item:active { cursor: grabbing; }
 
 .quadrant-i .subtask-item.completed { background: rgba(255,179,179,0.4); border-color: #f0b0b0; }
 .quadrant-ii .subtask-item.completed { background: rgba(179,212,255,0.4); border-color: #a0c0e8; }

@@ -431,21 +431,25 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 
 /* ============ Task Block ============ */
 .task-block {
-  margin: 5px 0; border: 2px solid var(--block-border); border-radius: 10px;
+  margin: 5px 0; border: 1.5px solid var(--block-border); border-radius: 10px;
   background: var(--block-bg); cursor: grab; transition: all var(--t);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
-.task-block:hover { border-color: #bbb; }
-.task-block.dragging { opacity: 0.4; }
+.task-block:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.task-block.dragging { opacity: 0.35; transform: scale(0.98); }
 .block-header {
-  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
-  background: var(--block-header-bg); border-radius: 8px 8px 0 0; transition: background var(--t);
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  background: var(--block-header-bg); border-radius: 9px 9px 0 0;
+  border-bottom: 1px solid var(--border); transition: background var(--t);
 }
 .block-name {
   flex: 1; font-weight: 600; font-size: 13px; cursor: pointer;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.block-name::before { content: '📦 '; font-size: 11px; opacity: 0.6; }
 .block-name:hover { color: var(--accent); }
-.block-tasks { padding: 5px 8px; min-height: 20px; }
+.block-tasks { padding: 6px 8px; min-height: 20px; }
+.block-tasks .subtask-item { margin-left: 4px; }
 
 /* ============ Subtask ============ */
 .subtask-item {
@@ -473,14 +477,16 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 [data-theme="dark"] .quadrant-iii .subtask-item.completed { background: rgba(255,240,150,0.15); border-color: rgba(255,240,150,0.25); }
 [data-theme="dark"] .quadrant-iv .subtask-item.completed { background: rgba(150,240,150,0.15); border-color: rgba(150,240,150,0.25); }
 .add-subtask-btn {
-  width: 100%; padding: 5px; border: 1px dashed var(--border2); background: transparent;
-  color: var(--text3); font-size: 11px; cursor: pointer; border-radius: 0 0 8px 8px;
+  width: 100%; padding: 6px; border: 1px dashed var(--border2); background: transparent;
+  color: var(--text3); font-size: 11px; cursor: pointer; border-radius: 0 0 9px 9px;
   transition: all var(--t);
 }
 .add-subtask-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
 
 /* ============ Empty Hint ============ */
-.empty-hint { text-align: center; color: var(--text3); font-size: 12px; padding: 25px 10px; pointer-events: none; }
+.empty-hint { text-align: center; color: var(--text3); font-size: 12px; padding: 30px 10px; pointer-events: none; }
+.empty-hint::before { content: ''; display: block; width: 40px; height: 40px; margin: 0 auto 10px;
+  background: var(--border); border-radius: 50%; opacity: 0.3; }
 
 /* ============ Drag States ============ */
 .drag-over {

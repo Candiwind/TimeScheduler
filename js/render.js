@@ -55,11 +55,14 @@ function renderQuadrant(key, items) {
 
   // Update count badge
   var countEl = document.getElementById('count-' + key);
+  var totalCount = countAllTasks(items);
   if (countEl) {
-    var totalCount = countAllTasks(items);
     countEl.textContent = totalCount;
     countEl.style.display = totalCount > 0 ? '' : 'none';
   }
+  // Toggle has-tasks class for footer auto-hide (point 7)
+  var quadrant = document.getElementById('quadrant-' + key);
+  if (quadrant) quadrant.classList.toggle('has-tasks', totalCount > 0);
 
   // Filter by search term
   var filtered = items;
@@ -643,15 +646,13 @@ function showTimeSlotPicker(anchorEl, quadrantKey, taskId, blockId) {
   }, 10);
 }
 
-// ============ Plan Task Panel Rendering (generic for future/week/month) ============
+// ============ Unified Plan Pool Panel (tab切换: 待办/周/月) ============
 
-// Pool configurations for the three plan panels
+var activePlanPool = 'future';
+
 var PLAN_POOL_CONFIGS = {
   future: {
     poolKey: FUTURE_TASK_KEY,
-    listId: 'futureTaskList',
-    countId: 'futureTaskCount',
-    emptyId: 'futureTaskEmpty',
     emptyText: '暂无待办任务，点击下方按钮添加。设定日期和象限后，到期自动加入日程表。',
     deleteConfirm: '确定删除该待办任务？',
     loadFn: loadFutureTasks,
@@ -659,14 +660,10 @@ var PLAN_POOL_CONFIGS = {
     deleteFn: deleteFutureTask,
     editSubFn: editFutureSubtaskField,
     deleteSubFn: deleteFutureSubtask,
-    addSubFn: addFutureSubtask,
-    renderFn: renderFutureTaskPanel
+    addSubFn: addFutureSubtask
   },
   week: {
     poolKey: WEEK_TASK_KEY,
-    listId: 'weekTaskList',
-    countId: 'weekTaskCount',
-    emptyId: 'weekTaskEmpty',
     emptyText: '暂无周计划任务，点击下方按钮添加。设定日期和象限后，当周自动加入日程表。',
     deleteConfirm: '确定删除该周计划任务？',
     loadFn: loadWeekTasks,
@@ -674,14 +671,10 @@ var PLAN_POOL_CONFIGS = {
     deleteFn: deleteWeekTask,
     editSubFn: editWeekSubtaskField,
     deleteSubFn: deleteWeekSubtask,
-    addSubFn: addWeekSubtask,
-    renderFn: renderWeekTaskPanel
+    addSubFn: addWeekSubtask
   },
   month: {
     poolKey: MONTH_TASK_KEY,
-    listId: 'monthTaskList',
-    countId: 'monthTaskCount',
-    emptyId: 'monthTaskEmpty',
     emptyText: '暂无月计划任务，点击下方按钮添加。设定日期和象限后，当月自动加入日程表。',
     deleteConfirm: '确定删除该月计划任务？',
     loadFn: loadMonthTasks,
@@ -689,30 +682,32 @@ var PLAN_POOL_CONFIGS = {
     deleteFn: deleteMonthTask,
     editSubFn: editMonthSubtaskField,
     deleteSubFn: deleteMonthSubtask,
-    addSubFn: addMonthSubtask,
-    renderFn: renderMonthTaskPanel
+    addSubFn: addMonthSubtask
   }
 };
 
-// Generic render for any plan pool
-function renderPlanTaskPanel(cfg) {
+function renderPlanPoolPanel() {
+  var cfg = PLAN_POOL_CONFIGS[activePlanPool];
+  if (!cfg) return;
   var ptasks = cfg.loadFn();
-  var listEl = document.getElementById(cfg.listId);
-  var countEl = document.getElementById(cfg.countId);
-  var emptyEl = document.getElementById(cfg.emptyId);
+  var listEl = document.getElementById('planPoolList');
+  var countEl = document.getElementById('planPoolTotalCount');
+  var emptyEl = document.getElementById('planPoolEmpty');
 
-  if (countEl) countEl.textContent = ptasks.length;
+  var allCount = loadFutureTasks().length + loadWeekTasks().length + loadMonthTasks().length;
+  if (countEl) countEl.textContent = allCount;
 
   if (!listEl) return;
 
   if (ptasks.length === 0) {
-    if (emptyEl) {
-      listEl.innerHTML = '';
-      listEl.appendChild(emptyEl);
-    } else {
-      listEl.innerHTML = '<div class="empty-hint">' + cfg.emptyText + '</div>';
-    }
+    listEl.innerHTML = '';
+    if (emptyEl) { listEl.appendChild(emptyEl); emptyEl.textContent = cfg.emptyText; }
     return;
+  }
+
+  var panel = document.getElementById('planPoolPanel');
+  if (panel && panel.classList.contains('collapsed') && ptasks.length > 0) {
+    panel.classList.remove('collapsed');
   }
 
   var html = '';
@@ -725,32 +720,29 @@ function renderPlanTaskPanel(cfg) {
   });
   listEl.innerHTML = html;
 
-  // Bind task text editing
-  listEl.querySelectorAll('.futuretask-item-text').forEach(function(el) {
+  listEl.querySelectorAll('.planpool-item-text').forEach(function(el) {
     el.addEventListener('dblclick', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
       startEdit(this, this.textContent, function(newVal) {
         cfg.updateFn(ftId, { text: newVal });
-        cfg.renderFn();
+        renderPlanPoolPanel();
       });
     });
   });
 
-  // Bind task date editing
-  listEl.querySelectorAll('.futuretask-item-date').forEach(function(el) {
+  listEl.querySelectorAll('.planpool-item-date').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
       var input = createDateTextInput(this.dataset.value, function(newVal) {
         cfg.updateFn(ftId, { scheduledDate: newVal });
-      }, function() { cfg.renderFn(); });
+      }, function() { renderPlanPoolPanel(); });
       this.innerHTML = ''; this.appendChild(input); input.focus();
     });
   });
 
-  // Bind task quadrant editing
-  listEl.querySelectorAll('.futuretask-item-quad').forEach(function(el) {
+  listEl.querySelectorAll('.planpool-item-quad').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
@@ -758,84 +750,78 @@ function renderPlanTaskPanel(cfg) {
       startSelectEdit(this, curVal || '选择象限', ['I', 'II', 'III', 'IV', '（未指定）'], function(newVal) {
         var quadKey = newVal === '（未指定）' ? '' : newVal;
         cfg.updateFn(ftId, { targetQuadrant: quadKey });
-        cfg.renderFn();
+        renderPlanPoolPanel();
       });
     });
   });
 
-  // Bind delete buttons
-  listEl.querySelectorAll('.futuretask-delete-btn').forEach(function(btn) {
+  listEl.querySelectorAll('.planpool-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       if (confirm(cfg.deleteConfirm)) {
         cfg.deleteFn(this.dataset.ftId);
-        cfg.renderFn();
+        renderPlanPoolPanel();
       }
     });
   });
 
-  // Bind block name editing
-  listEl.querySelectorAll('.futuretask-block-name').forEach(function(el) {
+  listEl.querySelectorAll('.planpool-block-name').forEach(function(el) {
     el.addEventListener('dblclick', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
       startEdit(this, this.textContent, function(newVal) {
         cfg.updateFn(ftId, { blockName: newVal });
-        cfg.renderFn();
+        renderPlanPoolPanel();
       });
     });
   });
 
-  // Bind block date/quadrant
-  listEl.querySelectorAll('.ft-block-date, .ft-block-quad').forEach(function(el) {
+  listEl.querySelectorAll('.pp-block-date, .pp-block-quad').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
-      var field = this.classList.contains('ft-block-date') ? 'scheduledDate' : 'targetQuadrant';
+      var field = this.classList.contains('pp-block-date') ? 'scheduledDate' : 'targetQuadrant';
       if (field === 'scheduledDate') {
         var input = createDateTextInput(this.dataset.value, function(newVal) {
           cfg.updateFn(ftId, { scheduledDate: newVal });
-        }, function() { cfg.renderFn(); });
+        }, function() { renderPlanPoolPanel(); });
         this.innerHTML = ''; this.appendChild(input); input.focus();
       } else {
         var curVal = this.dataset.value || '';
         startSelectEdit(this, curVal || '选择象限', ['I', 'II', 'III', 'IV', '（未指定）'], function(newVal) {
           var quadKey = newVal === '（未指定）' ? '' : newVal;
           cfg.updateFn(ftId, { targetQuadrant: quadKey });
-          cfg.renderFn();
+          renderPlanPoolPanel();
         });
       }
     });
   });
 
-  // Bind subtask text editing
-  listEl.querySelectorAll('.futuresubtask-text').forEach(function(el) {
+  listEl.querySelectorAll('.planpool-subtask-text').forEach(function(el) {
     el.addEventListener('dblclick', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
       var stId = this.dataset.stId;
       startEdit(this, this.textContent, function(newVal) {
         cfg.editSubFn(ftId, stId, 'text', newVal);
-        cfg.renderFn();
+        renderPlanPoolPanel();
       });
     });
   });
 
-  // Bind subtask date editing
-  listEl.querySelectorAll('.fst-date').forEach(function(el) {
+  listEl.querySelectorAll('.pp-st-date').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
       var stId = this.dataset.stId;
       var input = createDateTextInput(this.dataset.value, function(newVal) {
         cfg.editSubFn(ftId, stId, 'scheduledDate', newVal);
-      }, function() { cfg.renderFn(); });
+      }, function() { renderPlanPoolPanel(); });
       this.innerHTML = ''; this.appendChild(input); input.focus();
     });
   });
 
-  // Bind subtask quadrant editing
-  listEl.querySelectorAll('.fst-quad').forEach(function(el) {
+  listEl.querySelectorAll('.pp-st-quad').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
@@ -844,46 +830,51 @@ function renderPlanTaskPanel(cfg) {
       startSelectEdit(this, curVal || '选择象限', ['I', 'II', 'III', 'IV', '（未指定）'], function(newVal) {
         var quadKey = newVal === '（未指定）' ? '' : newVal;
         cfg.editSubFn(ftId, stId, 'targetQuadrant', quadKey);
-        cfg.renderFn();
+        renderPlanPoolPanel();
       });
     });
   });
 
-  // Bind subtask delete
-  listEl.querySelectorAll('.fst-delete-btn').forEach(function(btn) {
+  listEl.querySelectorAll('.pp-st-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       if (!confirm('删除该子任务？')) return;
       cfg.deleteSubFn(this.dataset.ftId, this.dataset.stId);
-      cfg.renderFn();
+      renderPlanPoolPanel();
     });
   });
 
-  // Bind add subtask buttons
-  listEl.querySelectorAll('.ft-add-st-btn').forEach(function(btn) {
+  listEl.querySelectorAll('.pp-add-st-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       var ftId = this.dataset.ftId;
       var text = prompt('子任务内容：');
       if (!text) return;
       cfg.addSubFn(ftId, text);
-      cfg.renderFn();
+      renderPlanPoolPanel();
     });
   });
 
-  // Bind drag for plan task items (draggable to quadrants)
-  listEl.querySelectorAll('.futuretask-draggable, .futuresubtask-draggable').forEach(function(el) {
+  listEl.querySelectorAll('.planpool-draggable').forEach(function(el) {
     el.addEventListener('dragstart', handleFutureDragStart);
     el.addEventListener('dragend', handleFutureDragEnd);
   });
 }
 
-// Concrete render functions for each pool
-function renderFutureTaskPanel() { renderPlanTaskPanel(PLAN_POOL_CONFIGS.future); }
-function renderWeekTaskPanel() { renderPlanTaskPanel(PLAN_POOL_CONFIGS.week); }
-function renderMonthTaskPanel() { renderPlanTaskPanel(PLAN_POOL_CONFIGS.month); }
+function switchPlanPoolTab(poolName) {
+  if (activePlanPool === poolName) return;
+  activePlanPool = poolName;
+  var tabs = document.querySelectorAll('.planpool-tab');
+  tabs.forEach(function(t) {
+    t.classList.toggle('active', t.dataset.pool === poolName);
+  });
+  renderPlanPoolPanel();
+}
 
-// Shared HTML generators (used by all plan pools)
+function renderFutureTaskPanel() { if (activePlanPool === 'future') renderPlanPoolPanel(); }
+function renderWeekTaskPanel() { if (activePlanPool === 'week') renderPlanPoolPanel(); }
+function renderMonthTaskPanel() { if (activePlanPool === 'month') renderPlanPoolPanel(); }
+
 function _renderPlanTaskHTML(ft) {
   var dateDisplay = ft.scheduledDate || '📅 设定日期';
   var quadDisplay = QUADRANTS[ft.targetQuadrant] ? QUADRANTS[ft.targetQuadrant].icon + ' ' + QUADRANTS[ft.targetQuadrant].label : '选择象限';
@@ -891,11 +882,11 @@ function _renderPlanTaskHTML(ft) {
   var today = new Date().toISOString().split('T')[0];
   var dateClass = (ft.scheduledDate && ft.scheduledDate === today) ? ' arrived' : '';
 
-  return '<div class="futuretask-item futuretask-draggable" draggable="true" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '">' +
-    '<span class="futuretask-item-text" data-ft-id="' + ft.id + '" title="双击编辑内容">' + renderTaskText(ft.text || '新待办任务') + '</span>' +
-    '<span class="futuretask-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>' +
-    '<span class="futuretask-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>' +
-    '<button class="task-delete-btn futuretask-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>' +
+  return '<div class="planpool-item planpool-draggable" draggable="true" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '">' +
+    '<span class="planpool-item-text" data-ft-id="' + ft.id + '" title="双击编辑内容">' + renderTaskText(ft.text || '新任务') + '</span>' +
+    '<span class="planpool-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>' +
+    '<span class="planpool-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>' +
+    '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>' +
     '</div>';
 }
 
@@ -905,38 +896,36 @@ function _renderPlanBlockHTML(ft) {
   var today = new Date().toISOString().split('T')[0];
   var dateClass = (ft.scheduledDate && ft.scheduledDate === today) ? ' arrived' : '';
 
-  var h = '<div class="futuretask-block">';
-  h += '<div class="futuretask-block-header">';
-  h += '<span class="futuretask-block-name" data-ft-id="' + ft.id + '" title="双击编辑名称">📦 ' + escHtml(ft.blockName || '新待办任务块') + '</span>';
-  h += '<div class="futuretask-block-meta">';
-  h += '<span class="futuretask-item-date ft-block-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>';
-  h += '<span class="futuretask-item-quad ft-block-quad" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>';
+  var h = '<div class="planpool-block">';
+  h += '<div class="planpool-block-header">';
+  h += '<span class="planpool-block-name" data-ft-id="' + ft.id + '" title="双击编辑名称">📦 ' + escHtml(ft.blockName || '新任务块') + '</span>';
+  h += '<div class="planpool-block-meta">';
+  h += '<span class="planpool-item-date pp-block-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>';
+  h += '<span class="planpool-item-quad pp-block-quad" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>';
   h += '</div>';
-  h += '<button class="task-delete-btn futuretask-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
+  h += '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
   h += '</div>';
 
-  h += '<div class="futuretask-block-tasks">';
+  h += '<div class="planpool-block-tasks">';
   if (ft.tasks && ft.tasks.length > 0) {
     ft.tasks.forEach(function(st) {
       var stDateDisplay = st.scheduledDate || '📅';
       var stQuadDisplay = QUADRANTS[st.targetQuadrant] ? QUADRANTS[st.targetQuadrant].icon : '';
-      h += '<div class="futuresubtask-item futuresubtask-draggable" draggable="true" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '">';
-      h += '<span class="futuresubtask-text" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="双击编辑内容">' + renderTaskText(st.text) + '</span>';
-      h += '<span class="futuretask-item-date fst-date" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.scheduledDate || '') + '" title="点击设定日期">' + stDateDisplay + '</span>';
-      h += '<span class="futuretask-item-quad fst-quad" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.targetQuadrant || '') + '" title="点击选择象限">' + (stQuadDisplay || '选择象限') + '</span>';
-      h += '<button class="task-delete-btn fst-delete-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="删除子任务" style="width:18px;height:18px;font-size:12px;">&times;</button>';
+      h += '<div class="planpool-subtask-item planpool-draggable" draggable="true" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '">';
+      h += '<span class="planpool-subtask-text" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="双击编辑内容">' + renderTaskText(st.text) + '</span>';
+      h += '<span class="planpool-item-date pp-st-date" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.scheduledDate || '') + '" title="点击设定日期">' + stDateDisplay + '</span>';
+      h += '<span class="planpool-item-quad pp-st-quad" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.targetQuadrant || '') + '" title="点击选择象限">' + (stQuadDisplay || '选择象限') + '</span>';
+      h += '<button class="task-delete-btn pp-st-delete-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="删除子任务" style="width:18px;height:18px;font-size:12px;">&times;</button>';
       h += '</div>';
     });
   } else {
     h += '<div style="font-size:11px;color:var(--text3);padding:4px;">（无子任务）</div>';
   }
-  h += '<button class="add-subtask-btn ft-add-st-btn" data-ft-id="' + ft.id + '" style="border-radius:6px;margin-top:2px;">+ 添加子任务</button>';
+  h += '<button class="add-subtask-btn pp-add-st-btn" data-ft-id="' + ft.id + '" style="border-radius:6px;margin-top:2px;">+ 添加子任务</button>';
   h += '</div>';
   h += '</div>';
   return h;
 }
-
-// ---- Plan Task / Subtask Helpers (generic) ----
 
 function _editPlanSubtaskField(poolKey, saveFn, ftId, stId, field, value) {
   var tasks = loadPlanTasks(poolKey);
@@ -981,17 +970,14 @@ function _addPlanSubtask(poolKey, saveFn, ftId, text) {
   }
 }
 
-// Backward-compat aliases for future task subtask helpers
 function editFutureSubtaskField(ftId, stId, field, value) { _editPlanSubtaskField(FUTURE_TASK_KEY, saveFutureTasks, ftId, stId, field, value); }
 function deleteFutureSubtask(ftId, stId) { _deletePlanSubtask(FUTURE_TASK_KEY, saveFutureTasks, ftId, stId); }
 function addFutureSubtask(ftId, text) { _addPlanSubtask(FUTURE_TASK_KEY, saveFutureTasks, ftId, text); }
 
-// Week task subtask helpers
 function editWeekSubtaskField(ftId, stId, field, value) { _editPlanSubtaskField(WEEK_TASK_KEY, saveWeekTasks, ftId, stId, field, value); }
 function deleteWeekSubtask(ftId, stId) { _deletePlanSubtask(WEEK_TASK_KEY, saveWeekTasks, ftId, stId); }
 function addWeekSubtask(ftId, text) { _addPlanSubtask(WEEK_TASK_KEY, saveWeekTasks, ftId, text); }
 
-// Month task subtask helpers
 function editMonthSubtaskField(ftId, stId, field, value) { _editPlanSubtaskField(MONTH_TASK_KEY, saveMonthTasks, ftId, stId, field, value); }
 function deleteMonthSubtask(ftId, stId) { _deletePlanSubtask(MONTH_TASK_KEY, saveMonthTasks, ftId, stId); }
 function addMonthSubtask(ftId, text) { _addPlanSubtask(MONTH_TASK_KEY, saveMonthTasks, ftId, text); }

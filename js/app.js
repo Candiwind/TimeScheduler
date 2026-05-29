@@ -16,17 +16,14 @@ function initApp() {
   setupStatsButton();
   setupDailyReport();
   setupBigTaskPanel();
-  setupFutureTaskPanel();
-  setupWeekTaskPanel();
-  setupMonthTaskPanel();
+  setupPlanPoolPanel();
+  setupHintBar();
   migrateFutureTasks(today);
   migrateWeekTasks(today);
   migrateMonthTasks(today);
   renderAll(today);
   renderBigTaskPanel();
-  renderFutureTaskPanel();
-  renderWeekTaskPanel();
-  renderMonthTaskPanel();
+  renderPlanPoolPanel();
 
   setTimeout(function() {
     autoSyncFromDevice();
@@ -39,6 +36,24 @@ function initApp() {
 }
 
 // ============ Theme ============
+// Hint bar dismiss (point 2)
+function setupHintBar() {
+  var hintBar = document.getElementById('hintBar');
+  if (!hintBar) return;
+  if (localStorage.getItem('hint_bar_dismissed') === '1') {
+    hintBar.style.display = 'none';
+    return;
+  }
+  var closeBtn = hintBar.querySelector('.hint-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      hintBar.style.display = 'none';
+      localStorage.setItem('hint_bar_dismissed', '1');
+    });
+  }
+}
+
 function loadTheme() {
   var theme = localStorage.getItem('quadrant_theme') || 'light';
   document.documentElement.setAttribute('data-theme', theme);
@@ -256,9 +271,7 @@ renderAll = function(date) {
   migrateBigTaskSubtasks(date);
   _originalRenderAll(date);
   renderBigTaskPanel();
-  renderFutureTaskPanel();
-  renderWeekTaskPanel();
-  renderMonthTaskPanel();
+  renderPlanPoolPanel();
 };
 
 // ============ Start ============

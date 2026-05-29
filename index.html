@@ -43,8 +43,9 @@
   </div>
 
   <!-- Hint Bar -->
-  <div class="hint-bar">
+  <div class="hint-bar" id="hintBar">
     💡 <strong>长期进步要重视 II 象限（重要不紧急）任务</strong> — 这是拉开差距的关键。选中任务文字后 <kbd>Ctrl+Q</kbd> 或右键可高亮重点信息。
+    <button class="hint-close" title="不再显示">×</button>
   </div>
 
   <!-- Stats Bar -->
@@ -102,8 +103,8 @@
       </div>
       <div class="quadrant-tasks"></div>
       <div class="quadrant-footer">
-        <button class="btn btn-sm btn-primary" id="btnAddTask-I">+ 任务 <kbd>N</kbd></button>
-        <button class="btn btn-sm btn-info" id="btnAddBlock-I">+ 任务块</button>
+        <button class="btn btn-sm btn-primary btn-add-task" id="btnAddTask-I">+ 任务</button>
+        <button class="btn btn-sm btn-info btn-add-block" id="btnAddBlock-I" title="添加任务块">📦</button>
       </div>
     </div>
 
@@ -117,8 +118,8 @@
       </div>
       <div class="quadrant-tasks"></div>
       <div class="quadrant-footer">
-        <button class="btn btn-sm btn-primary" id="btnAddTask-II">+ 任务 <kbd>N</kbd></button>
-        <button class="btn btn-sm btn-info" id="btnAddBlock-II">+ 任务块</button>
+        <button class="btn btn-sm btn-primary btn-add-task" id="btnAddTask-II">+ 任务</button>
+        <button class="btn btn-sm btn-info btn-add-block" id="btnAddBlock-II" title="添加任务块">📦</button>
       </div>
     </div>
 
@@ -132,8 +133,8 @@
       </div>
       <div class="quadrant-tasks"></div>
       <div class="quadrant-footer">
-        <button class="btn btn-sm btn-primary" id="btnAddTask-III">+ 任务 <kbd>N</kbd></button>
-        <button class="btn btn-sm btn-info" id="btnAddBlock-III">+ 任务块</button>
+        <button class="btn btn-sm btn-primary btn-add-task" id="btnAddTask-III">+ 任务</button>
+        <button class="btn btn-sm btn-info btn-add-block" id="btnAddBlock-III" title="添加任务块">📦</button>
       </div>
     </div>
 
@@ -147,60 +148,31 @@
       </div>
       <div class="quadrant-tasks"></div>
       <div class="quadrant-footer">
-        <button class="btn btn-sm btn-primary" id="btnAddTask-IV">+ 任务 <kbd>N</kbd></button>
-        <button class="btn btn-sm btn-info" id="btnAddBlock-IV">+ 任务块</button>
+        <button class="btn btn-sm btn-primary btn-add-task" id="btnAddTask-IV">+ 任务</button>
+        <button class="btn btn-sm btn-info btn-add-block" id="btnAddBlock-IV" title="添加任务块">📦</button>
       </div>
     </div>
 
   </div><!-- /quadrant-grid -->
 
-  <!-- Future Task Panel -->
-  <div class="futuretask-panel" id="futureTaskPanel">
-    <div class="futuretask-panel-header" id="futureTaskPanelToggle">
-      <span>📅 待办任务池 (<span id="futureTaskCount">0</span>)</span>
-      <span class="futuretask-toggle-icon">▼</span>
-    </div>
-    <div class="futuretask-panel-body" id="futureTaskPanelBody">
-      <div class="futuretask-list" id="futureTaskList">
-        <div class="empty-hint" id="futureTaskEmpty">暂无待办任务，点击下方按钮添加。设定日期和象限后，到期自动加入日程表。</div>
+  <!-- Unified Plan Pool Panel (Tab: 待办/本周/本月) -->
+  <div class="planpool-panel" id="planPoolPanel">
+    <div class="planpool-panel-header" id="planPoolPanelToggle">
+      <span>📋 计划池 (<span id="planPoolTotalCount">0</span>)</span>
+      <div class="planpool-tabs" id="planPoolTabs">
+        <button class="planpool-tab active" data-pool="future">待办</button>
+        <button class="planpool-tab" data-pool="week">本周</button>
+        <button class="planpool-tab" data-pool="month">本月</button>
       </div>
-      <div class="futuretask-actions">
-        <button class="btn btn-sm btn-primary" id="btnAddFutureTask">+ 添加待办任务</button>
-        <button class="btn btn-sm btn-info" id="btnAddFutureBlock">+ 添加待办任务块</button>
-      </div>
+      <span class="planpool-toggle-icon">▼</span>
     </div>
-  </div>
-
-  <!-- Week Plan Panel -->
-  <div class="plantask-panel plantask-week" id="weekTaskPanel">
-    <div class="plantask-panel-header" id="weekTaskPanelToggle">
-      <span>🗓️ 周计划 (<span id="weekTaskCount">0</span>)</span>
-      <span class="plantask-toggle-icon">▼</span>
-    </div>
-    <div class="plantask-panel-body" id="weekTaskPanelBody">
-      <div class="plantask-list" id="weekTaskList">
-        <div class="empty-hint" id="weekTaskEmpty">暂无周计划任务，点击下方按钮添加。设定日期和象限后，当周自动加入日程表。</div>
+    <div class="planpool-panel-body" id="planPoolPanelBody">
+      <div class="planpool-list" id="planPoolList">
+        <div class="empty-hint" id="planPoolEmpty">暂无计划任务，点击下方按钮添加。</div>
       </div>
-      <div class="plantask-actions">
-        <button class="btn btn-sm btn-primary" id="btnAddWeekTask">+ 添加周计划任务</button>
-        <button class="btn btn-sm btn-info" id="btnAddWeekBlock">+ 添加周计划任务块</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Month Plan Panel -->
-  <div class="plantask-panel plantask-month" id="monthTaskPanel">
-    <div class="plantask-panel-header" id="monthTaskPanelToggle">
-      <span>📆 月计划 (<span id="monthTaskCount">0</span>)</span>
-      <span class="plantask-toggle-icon">▼</span>
-    </div>
-    <div class="plantask-panel-body" id="monthTaskPanelBody">
-      <div class="plantask-list" id="monthTaskList">
-        <div class="empty-hint" id="monthTaskEmpty">暂无月计划任务，点击下方按钮添加。设定日期和象限后，当月自动加入日程表。</div>
-      </div>
-      <div class="plantask-actions">
-        <button class="btn btn-sm btn-primary" id="btnAddMonthTask">+ 添加月计划任务</button>
-        <button class="btn btn-sm btn-info" id="btnAddMonthBlock">+ 添加月计划任务块</button>
+      <div class="planpool-actions">
+        <button class="btn btn-sm btn-primary" id="btnAddPlanTask">+ 添加任务</button>
+        <button class="btn btn-sm btn-info" id="btnAddPlanBlock">+ 添加任务块</button>
       </div>
     </div>
   </div>

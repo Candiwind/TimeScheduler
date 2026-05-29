@@ -103,27 +103,37 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 
 /* ============ Hint Bar ============ */
 .hint-bar {
-  padding: 8px 14px; margin-bottom: 8px; border-radius: 8px;
+  padding: 8px 36px 8px 14px; margin-bottom: 8px; border-radius: 8px;
   background: linear-gradient(135deg, #e8f4fd, #dceefb); color: #3a6d8c;
   font-size: 12px; text-align: center; line-height: 1.6;
-  border: 1px solid #cce0ff;
+  border: 1px solid #cce0ff; position: relative;
 }
+.hint-bar .hint-close {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border: none; background: rgba(0,0,0,0.1);
+  border-radius: 50%; cursor: pointer; font-size: 13px; line-height: 1;
+  color: #3a6d8c; display: flex; align-items: center; justify-content: center;
+}
+.hint-bar .hint-close:hover { background: rgba(0,0,0,0.2); }
 [data-theme="dark"] .hint-bar {
   background: linear-gradient(135deg, #1e3050, #1a2840); color: #8cb8d4;
   border-color: #2a4060;
 }
+[data-theme="dark"] .hint-bar .hint-close { color: #8cb8d4; background: rgba(255,255,255,0.1); }
+[data-theme="dark"] .hint-bar .hint-close:hover { background: rgba(255,255,255,0.2); }
 
 /* ============ Stats Bar ============ */
 .stats-bar {
-  display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;
-}
-.stat-card {
-  flex: 1; min-width: 100px; padding: 10px 14px; background: var(--surface);
-  border-radius: var(--radius); box-shadow: var(--shadow); text-align: center;
+  display: flex; gap: 16px; margin-bottom: 10px; flex-wrap: wrap;
+  padding: 5px 16px; background: var(--surface); border-radius: 8px;
+  box-shadow: var(--shadow); font-size: 12px; align-items: center;
   transition: background var(--t);
 }
-.stat-card .stat-value { font-size: 22px; font-weight: 700; color: var(--accent); }
-.stat-card .stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.stat-card {
+  display: flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.stat-card .stat-value { font-weight: 700; color: var(--accent); }
+.stat-card .stat-label { color: var(--text2); }
 
 /* ============ Big Task Panel ============ */
 .bigtask-panel {
@@ -310,11 +320,23 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 
 /* ============ Quadrant Footer ============ */
 .quadrant-footer {
-  padding: 7px 10px; display: flex; gap: 5px;
+  padding: 4px 8px; display: flex; gap: 4px; align-items: center;
   border-top: 1px solid var(--border); background: var(--surface2); flex-shrink: 0;
-  transition: background var(--t);
+  transition: all var(--t);
 }
-.quadrant-footer .btn { flex: 1; font-size: 11px; padding: 5px 8px; justify-content: center; }
+.quadrant-footer .btn-add-task { flex: 1; font-size: 11px; padding: 5px 8px; justify-content: center; }
+.quadrant-footer .btn-add-block {
+  width: 28px; height: 28px; padding: 0; font-size: 15px; border-radius: 6px;
+  flex-shrink: 0; justify-content: center;
+}
+/* Collapsed footer: when quadrant has tasks, footer becomes minimal */
+.quadrant.has-tasks .quadrant-footer {
+  padding: 2px 8px; border-top: 1px dashed var(--border); background: transparent;
+}
+.quadrant.has-tasks .quadrant-footer .btn-add-task {
+  font-size: 10px; padding: 3px 6px; opacity: 0.45;
+}
+.quadrant.has-tasks .quadrant-footer .btn-add-task:hover { opacity: 1; }
 
 /* ============ Task Item ============ */
 .task-item {
@@ -523,128 +545,109 @@ kbd {
   pointer-events: none; z-index: 500;
 }
 
-/* ============ Future Task Panel ============ */
-.futuretask-panel {
+/* ============ Unified Plan Pool Panel (tabs: 待办/周/月) ============ */
+.planpool-panel {
   background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
   margin-top: 12px; transition: background var(--t); overflow: hidden;
 }
-.futuretask-panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; cursor: pointer; font-weight: 700; font-size: 14px;
-  background: linear-gradient(135deg, #e0f0e8, #e8f8f0); color: #3a7a5b;
+.planpool-panel-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 16px; cursor: pointer; font-weight: 700; font-size: 14px;
+  background: linear-gradient(135deg, #e0ecf0, #e8f0f4); color: #3a5a6a;
   user-select: none; transition: background var(--t);
 }
-[data-theme="dark"] .futuretask-panel-header {
-  background: linear-gradient(135deg, #1e3040, #263848); color: #80c0a0;
+[data-theme="dark"] .planpool-panel-header {
+  background: linear-gradient(135deg, #1e2830, #263038); color: #8cb0c0;
 }
-.futuretask-panel-header:hover { filter: brightness(0.97); }
-.futuretask-toggle-icon { font-size: 12px; transition: transform var(--t); }
-.futuretask-panel.collapsed .futuretask-toggle-icon { transform: rotate(-90deg); }
-.futuretask-panel.collapsed .futuretask-panel-body { display: none; }
+.planpool-panel-header:hover { filter: brightness(0.97); }
 
-.futuretask-panel-body { padding: 12px 16px; }
-.futuretask-list { display: flex; flex-direction: column; gap: 8px; }
+/* Tabs inside header */
+.planpool-tabs { display: flex; gap: 2px; flex: 1; justify-content: center; }
+.planpool-tab {
+  padding: 3px 14px; border: 1px solid rgba(0,0,0,0.1); border-radius: 14px;
+  background: transparent; color: inherit; font-size: 12px; cursor: pointer;
+  transition: all var(--t); white-space: nowrap; font-weight: 500;
+}
+.planpool-tab:hover { background: rgba(255,255,255,0.3); }
+.planpool-tab.active {
+  background: rgba(255,255,255,0.6); font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] .planpool-tab { border-color: rgba(255,255,255,0.1); }
+[data-theme="dark"] .planpool-tab:hover { background: rgba(255,255,255,0.1); }
+[data-theme="dark"] .planpool-tab.active {
+  background: rgba(255,255,255,0.2); box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
 
-/* Future Task Item */
-.futuretask-item {
+.planpool-toggle-icon { font-size: 12px; transition: transform var(--t); flex-shrink: 0; }
+.planpool-panel.collapsed .planpool-toggle-icon { transform: rotate(-90deg); }
+.planpool-panel.collapsed .planpool-panel-body { display: none; }
+.planpool-panel-body { padding: 12px 16px; }
+.planpool-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* Plan pool item */
+.planpool-item {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px;
   background: var(--surface3); border: 1px solid var(--border); border-radius: 8px;
   transition: all var(--t);
 }
-.futuretask-item:hover { border-color: var(--border2); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
-.futuretask-item-text {
+.planpool-item:hover { border-color: var(--border2); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.planpool-item-text {
   flex: 1; font-size: 13px; cursor: pointer; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap;
 }
-.futuretask-item-text:hover { color: var(--accent); }
-.futuretask-item-date {
+.planpool-item-text:hover { color: var(--accent); }
+.planpool-item-date {
   font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border); color: var(--text2);
   white-space: nowrap;
 }
-.futuretask-item-date:hover { border-color: var(--accent); color: var(--accent); }
-.futuretask-item-date.arrived { color: #5cb85c; border-color: #5cb85c; font-weight: 600; }
-.futuretask-item-quad {
+.planpool-item-date:hover { border-color: var(--accent); color: var(--accent); }
+.planpool-item-date.arrived { color: #5cb85c; border-color: #5cb85c; font-weight: 600; }
+.planpool-item-quad {
   font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--border); color: var(--text2);
   white-space: nowrap;
 }
-.futuretask-item-quad:hover { border-color: var(--accent); color: var(--accent); }
-.futuretask-item-quad.set { font-weight: 600; }
+.planpool-item-quad:hover { border-color: var(--accent); color: var(--accent); }
+.planpool-item-quad.set { font-weight: 600; }
 
-/* Future Task Block */
-.futuretask-block {
+/* Plan pool block */
+.planpool-block {
   border: 2px solid var(--block-border); border-radius: 10px;
   background: var(--block-bg); overflow: hidden; transition: all var(--t);
 }
-.futuretask-block:hover { border-color: #bbb; }
-.futuretask-block-header {
+.planpool-block:hover { border-color: #bbb; }
+.planpool-block-header {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px;
   background: var(--block-header-bg); transition: background var(--t);
 }
-.futuretask-block-name {
+.planpool-block-name {
   flex: 1; font-weight: 600; font-size: 13px; cursor: pointer;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.futuretask-block-name:hover { color: var(--accent); }
-.futuretask-block-meta {
+.planpool-block-name:hover { color: var(--accent); }
+.planpool-block-meta {
   display: flex; align-items: center; gap: 4px; flex-shrink: 0;
 }
-.futuretask-block-tasks { padding: 5px 10px; }
+.planpool-block-tasks { padding: 5px 10px; }
 
-/* Future Subtask */
-.futuresubtask-item {
+/* Plan pool subtask */
+.planpool-subtask-item {
   display: flex; align-items: center; gap: 6px; padding: 4px 8px; margin: 2px 0;
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   font-size: 12px; transition: all var(--t);
 }
-.futuresubtask-item:hover { border-color: var(--border2); }
-.futuresubtask-text {
+.planpool-subtask-item:hover { border-color: var(--border2); }
+.planpool-subtask-text {
   flex: 1; font-size: 12px; cursor: pointer; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap;
 }
-.futuresubtask-text:hover { color: var(--accent); }
+.planpool-subtask-text:hover { color: var(--accent); }
 
-.futuretask-actions {
+.planpool-actions {
   display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;
   border-top: 1px solid var(--border);
-}
-
-/* ============ Week / Month Plan Panels ============ */
-.plantask-panel {
-  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
-  margin-top: 12px; transition: background var(--t); overflow: hidden;
-}
-.plantask-panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px; cursor: pointer; font-weight: 700; font-size: 14px;
-  user-select: none; transition: background var(--t);
-}
-.plantask-panel-header:hover { filter: brightness(0.97); }
-.plantask-toggle-icon { font-size: 12px; transition: transform var(--t); }
-.plantask-panel.collapsed .plantask-toggle-icon { transform: rotate(-90deg); }
-.plantask-panel.collapsed .plantask-panel-body { display: none; }
-.plantask-panel-body { padding: 12px 16px; }
-.plantask-list { display: flex; flex-direction: column; gap: 8px; }
-.plantask-actions {
-  display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-/* Week Plan - purple tint */
-.plantask-week .plantask-panel-header {
-  background: linear-gradient(135deg, #e8e0f0, #f0e8f8); color: #5b3a7a;
-}
-[data-theme="dark"] .plantask-week .plantask-panel-header {
-  background: linear-gradient(135deg, #2a2040, #302848); color: #b8a0d8;
-}
-
-/* Month Plan - orange tint */
-.plantask-month .plantask-panel-header {
-  background: linear-gradient(135deg, #f0e8d8, #f8f0e0); color: #7a5a2a;
-}
-[data-theme="dark"] .plantask-month .plantask-panel-header {
-  background: linear-gradient(135deg, #302818, #383020); color: #d8b880;
 }
 
 /* ============ Defer Button ============ */
@@ -709,9 +712,10 @@ kbd {
 @media (max-width: 1000px) {
   .quadrant-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
   .quadrant { min-height: 200px; }
-  .stats-bar { gap: 6px; }
-  .stat-card { padding: 8px 10px; }
-  .stat-card .stat-value { font-size: 18px; }
+  .stats-bar { gap: 8px; flex-wrap: wrap; font-size: 11px; }
+  .stat-card .stat-value { font-size: 12px; }
+  .planpool-tabs { gap: 1px; }
+  .planpool-tab { padding: 2px 8px; font-size: 11px; }
 }
 @media (max-width: 600px) {
   #app { padding: 6px; }

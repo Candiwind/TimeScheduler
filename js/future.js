@@ -1,132 +1,61 @@
-// future.js - Plan task pool panel setup and operations (future/week/month)
-var _futureTaskPanelInit = false;
-var _weekTaskPanelInit = false;
-var _monthTaskPanelInit = false;
+// future.js - Unified Plan Pool panel setup (tabs: 待办/周/月)
+var _planPoolPanelInit = false;
 
-function setupFutureTaskPanel() {
-  if (_futureTaskPanelInit) return;
-  _futureTaskPanelInit = true;
+function setupPlanPoolPanel() {
+  if (_planPoolPanelInit) return;
+  _planPoolPanelInit = true;
 
-  document.getElementById('futureTaskPanelToggle').addEventListener('click', function() {
-    document.getElementById('futureTaskPanel').classList.toggle('collapsed');
+  document.getElementById('planPoolPanelToggle').addEventListener('click', function() {
+    document.getElementById('planPoolPanel').classList.toggle('collapsed');
   });
 
-  document.getElementById('btnAddFutureTask').addEventListener('click', addFutureTaskItem);
-  document.getElementById('btnAddFutureBlock').addEventListener('click', addFutureBlockItem);
-}
-
-function setupWeekTaskPanel() {
-  if (_weekTaskPanelInit) return;
-  _weekTaskPanelInit = true;
-
-  document.getElementById('weekTaskPanelToggle').addEventListener('click', function() {
-    document.getElementById('weekTaskPanel').classList.toggle('collapsed');
+  document.querySelectorAll('.planpool-tab').forEach(function(tab) {
+    tab.addEventListener('click', function(e) {
+      e.stopPropagation();
+      switchPlanPoolTab(this.dataset.pool);
+    });
   });
 
-  document.getElementById('btnAddWeekTask').addEventListener('click', addWeekTaskItem);
-  document.getElementById('btnAddWeekBlock').addEventListener('click', addWeekBlockItem);
-}
-
-function setupMonthTaskPanel() {
-  if (_monthTaskPanelInit) return;
-  _monthTaskPanelInit = true;
-
-  document.getElementById('monthTaskPanelToggle').addEventListener('click', function() {
-    document.getElementById('monthTaskPanel').classList.toggle('collapsed');
+  document.getElementById('btnAddPlanTask').addEventListener('click', function() {
+    var names = { future: '待办', week: '周计划', month: '月计划' };
+    var text = prompt('添加' + (names[activePlanPool] || '') + '任务：');
+    if (!text) return;
+    var idPrefix = { future: 'ft_', week: 'wt_', month: 'mt_' };
+    var addFn = { future: addFutureTask, week: addWeekTask, month: addMonthTask };
+    var task = {
+      id: (idPrefix[activePlanPool] || 'pt_') + generateId(),
+      type: 'task',
+      text: text,
+      scheduledDate: '',
+      targetQuadrant: ''
+    };
+    (addFn[activePlanPool] || addFutureTask)(task);
+    renderPlanPoolPanel();
   });
 
-  document.getElementById('btnAddMonthTask').addEventListener('click', addMonthTaskItem);
-  document.getElementById('btnAddMonthBlock').addEventListener('click', addMonthBlockItem);
+  document.getElementById('btnAddPlanBlock').addEventListener('click', function() {
+    var names = { future: '待办', week: '周计划', month: '月计划' };
+    var name = prompt('添加' + (names[activePlanPool] || '') + '任务块名称：');
+    if (!name) return;
+    var idPrefix = { future: 'ftb_', week: 'wb_', month: 'mb_' };
+    var addFn = { future: addFutureTask, week: addWeekTask, month: addMonthTask };
+    var block = {
+      id: (idPrefix[activePlanPool] || 'pb_') + generateId(),
+      type: 'block',
+      blockName: name,
+      scheduledDate: '',
+      targetQuadrant: '',
+      tasks: []
+    };
+    (addFn[activePlanPool] || addFutureTask)(block);
+    renderPlanPoolPanel();
+  });
 }
 
-// ---- Add items for each pool ----
-
-function addFutureTaskItem() {
-  var text = prompt('待办任务内容：');
-  if (!text) return;
-  var task = {
-    id: 'ft_' + generateId(),
-    type: 'task',
-    text: text,
-    scheduledDate: '',
-    targetQuadrant: ''
-  };
-  addFutureTask(task);
-  renderFutureTaskPanel();
-}
-
-function addFutureBlockItem() {
-  var name = prompt('待办任务块名称：');
-  if (!name) return;
-  var block = {
-    id: 'ftb_' + generateId(),
-    type: 'block',
-    blockName: name,
-    scheduledDate: '',
-    targetQuadrant: '',
-    tasks: []
-  };
-  addFutureTask(block);
-  renderFutureTaskPanel();
-}
-
-function addWeekTaskItem() {
-  var text = prompt('周计划任务内容：');
-  if (!text) return;
-  var task = {
-    id: 'wt_' + generateId(),
-    type: 'task',
-    text: text,
-    scheduledDate: '',
-    targetQuadrant: ''
-  };
-  addWeekTask(task);
-  renderWeekTaskPanel();
-}
-
-function addWeekBlockItem() {
-  var name = prompt('周计划任务块名称：');
-  if (!name) return;
-  var block = {
-    id: 'wb_' + generateId(),
-    type: 'block',
-    blockName: name,
-    scheduledDate: '',
-    targetQuadrant: '',
-    tasks: []
-  };
-  addWeekTask(block);
-  renderWeekTaskPanel();
-}
-
-function addMonthTaskItem() {
-  var text = prompt('月计划任务内容：');
-  if (!text) return;
-  var task = {
-    id: 'mt_' + generateId(),
-    type: 'task',
-    text: text,
-    scheduledDate: '',
-    targetQuadrant: ''
-  };
-  addMonthTask(task);
-  renderMonthTaskPanel();
-}
-
-function addMonthBlockItem() {
-  var name = prompt('月计划任务块名称：');
-  if (!name) return;
-  var block = {
-    id: 'mb_' + generateId(),
-    type: 'block',
-    blockName: name,
-    scheduledDate: '',
-    targetQuadrant: '',
-    tasks: []
-  };
-  addMonthTask(block);
-  renderMonthTaskPanel();
-}
+// Backward compat stubs
+function setupFutureTaskPanel() { setupPlanPoolPanel(); }
+function setupWeekTaskPanel() { /* handled by setupPlanPoolPanel */ }
+function setupMonthTaskPanel() { /* handled by setupPlanPoolPanel */ }
 
 // ---- Import Big Task Subtask to Today ----
 

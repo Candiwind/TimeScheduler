@@ -111,13 +111,6 @@ mark {
   display: flex; align-items: center; justify-content: center; transition: all var(--t);
 }
 .btn-icon:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
-.btn-toggle-more {
-  padding: 5px 10px; font-size: 12px; border-radius: 4px;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text2);
-  cursor: pointer; transition: all var(--t); white-space: nowrap;
-}
-.btn-toggle-more:hover { background: var(--accent-light); border-color: var(--accent); }
-
 /* ============ Form Inputs ============ */
 input[type="date"], input[type="text"].search-input {
   padding: 6px 10px; border: 1px solid var(--border2); border-radius: 6px;
@@ -414,10 +407,6 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--t);
 }
 .task-delete-btn:hover { color: var(--danger); background: var(--danger-bg); }
-.task-meta {
-  display: flex; align-items: center; gap: 4px; flex-shrink: 0; font-size: 10px; color: var(--text3);
-}
-
 /* ============ Due Date on Tasks ============ */
 .task-due {
   font-size: 10px; padding: 1px 6px; border-radius: 4px; white-space: nowrap;
@@ -767,25 +756,48 @@ kbd {
   background: var(--accent-light); color: var(--accent);
 }
 
+/* ============ Performance ============ */
+.quadrant-grid { contain: layout style; }
+.quadrant { contain: layout style paint; }
+.task-item, .subtask-item { will-change: transform; }
+.task-block { will-change: transform; }
+
 /* ============ Responsive ============ */
+@media (max-width: 1200px) {
+  .quadrant-grid { gap: 10px; }
+}
 @media (max-width: 1000px) {
   .quadrant-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
-  .quadrant { min-height: 200px; }
+  .quadrant { min-height: 160px; }
+  .quadrant-tasks { max-height: 40vh; }
   .stats-bar { gap: 8px; flex-wrap: wrap; font-size: 11px; }
   .stat-card .stat-value { font-size: 12px; }
   .planpool-tabs { gap: 1px; }
-  .planpool-tab { padding: 2px 8px; font-size: 11px; }
+  .planpool-tab { padding: 3px 10px; font-size: 11px; }
+  .planpool-panel-header { font-size: 12px; }
+  .app-header h1 { font-size: 16px; }
 }
 @media (max-width: 600px) {
-  #app { padding: 6px; }
-  .app-header { flex-direction: column; align-items: flex-start; }
-  .app-header h1 { font-size: 17px; }
-  .toolbar { flex-direction: column; align-items: flex-start; }
-  .btn { font-size: 11px; padding: 5px 10px; }
+  #app { padding: 4px; }
+  .app-header { flex-direction: column; align-items: stretch; padding: 8px 10px; }
+  .app-header h1 { font-size: 15px; text-align: center; margin-right: 0; }
+  .header-actions { justify-content: center; }
+  .toolbar { flex-direction: column; align-items: stretch; padding: 6px 10px; }
+  .btn { font-size: 11px; padding: 6px 12px; }
+  .btn-sm { padding: 6px 10px; font-size: 11px; }
   .stats-grid { grid-template-columns: 1fr; }
   .search-input { width: 100%; }
-  .bigtask-card-header { gap: 4px; padding: 8px; }
+  .bigtask-card-header { gap: 4px; padding: 6px 8px; }
   .bigtask-card-info { flex: 1 1 100%; }
   .bigtask-card-progress-bar { width: 60px; }
-  .bigtask-list { max-height: 55vh; }
+  .bigtask-list { max-height: 50vh; }
+  .quadrant-grid { gap: 8px; }
+  .quadrant { min-height: 150px; border-radius: 8px; }
+  .quadrant-tasks { max-height: 35vh; padding: 6px; }
+  .task-item { padding: 8px 10px; font-size: 13px; }
+  .subtask-item { padding: 6px 8px; font-size: 12px; }
+  .task-checkbox { width: 18px; height: 18px; }
+  .task-delete-btn, .task-defer-btn, .task-extra-btn { width: 26px; height: 26px; font-size: 15px; }
+  .quadrant-footer .btn-add-block { width: 32px; height: 32px; }
+  .planpool-tab { padding: 4px 10px; font-size: 11px; }
 }

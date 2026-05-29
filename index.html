@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="任务管理">
+<meta name="theme-color" content="#4a90d9">
+<link rel="manifest" href="manifest.json">
+<title>四象限任务管理器 v4</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Header (merged: always-visible controls + collapsible secondary) -->
+  <header class="app-header">
+    <h1>📊 四象限任务管理器</h1>
+    <div class="header-actions">
+      <input type="date" id="datePicker" title="选择日期">
+      <button class="btn btn-info btn-sm" id="btnToday">今天</button>
+      <button class="btn btn-primary btn-sm" id="btnCacheSave">缓存当前</button>
+      <button class="btn btn-info btn-sm" id="btnCacheLoad">导入缓存</button>
+      <button class="btn btn-info btn-sm" id="btnShowStats">📈 统计</button>
+      <button class="btn btn-sm" id="btnDailyReport" style="background:#5b9bd5;color:#fff;" title="生成日报">📋 日报</button>
+      <button class="btn-icon" id="btnDarkMode" data-tooltip="切换暗色模式" title="暗色模式 (Ctrl+D)">🌙</button>
+      <button class="btn btn-sm btn-cancel" id="btnToggleMore" title="展开/折叠更多功能">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Collapsible secondary toolbar -->
+  <div class="toolbar" id="secondaryToolbar" style="display:none;">
+    <span class="toolbar-label">🔍 搜索：</span>
+    <input type="text" class="search-input" id="searchInput" placeholder="搜索任务... (Ctrl+F)">
+    <span class="toolbar-label" id="searchResult" style="margin-left:4px;"></span>
+    <span style="flex:1;"></span>
+    <button class="btn btn-success btn-sm" id="btnExportMd">📥 导出MD</button>
+    <button class="btn btn-warning btn-sm" id="btnImportMd">📤 导入MD</button>
+    <input type="file" id="importFileInput" accept=".md,.txt" style="display:none">
+    <button class="btn btn-primary btn-sm" id="btnExportJson">📦 导出JSON</button>
+    <button class="btn btn-cancel btn-sm" id="btnImportJson">📥 导入JSON</button>
+    <input type="file" id="importJsonInput" accept=".json" style="display:none">
+  </div>
+
+  <!-- Hint Bar -->
+  <div class="hint-bar">
+    💡 <strong>长期进步要重视 II 象限（重要不紧急）任务</strong> — 这是拉开差距的关键。选中任务文字后 <kbd>Ctrl+Q</kbd> 或右键可高亮重点信息。
+  </div>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card">
+      <div class="stat-value" id="statTotal">0</div>
+      <div class="stat-label">总任务数</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statDone">0</div>
+      <div class="stat-label">已完成</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="statRate" title="加权完成率 (I×0.35 + II×0.3 + III×0.2 + IV×0.15)">0%</div>
+      <div class="stat-label">加权完成率</div>
+    </div>
+    <div class="stat-card" id="statDeferredLabel" style="display:none;">
+      <div class="stat-value" id="statDeferred">0</div>
+      <div class="stat-label">今日推迟</div>
+    </div>
+  </div>
+
+  <!-- Big Task Panel -->
+  <div class="bigtask-panel" id="bigTaskPanel">
+    <div class="bigtask-panel-header" id="bigTaskPanelToggle">
+      <span>🎯 大任务规划 (<span id="bigTaskCount">0</span>/5，建议≤3)</span>
+      <span class="bigtask-toggle-icon">▼</span>
+    </div>
+    <div class="bigtask-panel-body" id="bigTaskPanelBody">
+      <div class="bigtask-list" id="bigTaskList">
+        <div class="empty-hint" id="bigTaskEmpty">暂无大任务，点击下方按钮创建</div>
+      </div>
+      <!-- Today's Task Pool -->
+      <div class="bigtask-pool" id="bigTaskPool" style="display:none;">
+        <div class="bigtask-pool-title">📥 今日任务池（可拖入四象限）</div>
+        <div class="bigtask-pool-items" id="bigTaskPoolItems"></div>
+      </div>
+      <div class="bigtask-actions">
+        <button class="btn btn-sm btn-primary" id="btnAddBigTask">+ 新建大任务</button>
+        <button class="btn btn-sm btn-info" id="btnClaudePlan" data-tooltip="用 AI 调研规划大任务">🤖 AI 规划</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quadrant Grid -->
+  <div class="quadrant-grid">
+
+    <!-- Quadrant I -->
+    <div class="quadrant quadrant-i" id="quadrant-I" data-key="I">
+      <div class="quadrant-header">
+        <span class="quadrant-icon">🔥</span>
+        <span class="quadrant-title">I. 重要紧急</span>
+        <span class="quadrant-label">立即处理</span>
+        <span class="task-count" id="count-I">0</span>
+      </div>
+      <div class="quadrant-tasks"></div>
+      <div class="quadrant-footer">
+        <button class="btn btn-sm btn-primary" id="btnAddTask-I">+ 任务 <kbd>N</kbd></button>
+        <button class="btn btn-sm btn-info" id="btnAddBlock-I">+ 任务块</button>
+      </div>
+    </div>
+
+    <!-- Quadrant II -->
+    <div class="quadrant quadrant-ii" id="quadrant-II" data-key="II">
+      <div class="quadrant-header">
+        <span class="quadrant-icon">📋</span>
+        <span class="quadrant-title">II. 重要不紧急</span>
+        <span class="quadrant-label">计划安排</span>
+        <span class="task-count" id="count-II">0</span>
+      </div>
+      <div class="quadrant-tasks"></div>
+      <div class="quadrant-footer">
+        <button class="btn btn-sm btn-primary" id="btnAddTask-II">+ 任务 <kbd>N</kbd></button>
+        <button class="btn btn-sm btn-info" id="btnAddBlock-II">+ 任务块</button>
+      </div>
+    </div>
+
+    <!-- Quadrant III -->
+    <div class="quadrant quadrant-iii" id="quadrant-III" data-key="III">
+      <div class="quadrant-header">
+        <span class="quadrant-icon">⚡</span>
+        <span class="quadrant-title">III. 不重要紧急</span>
+        <span class="quadrant-label">委派处理</span>
+        <span class="task-count" id="count-III">0</span>
+      </div>
+      <div class="quadrant-tasks"></div>
+      <div class="quadrant-footer">
+        <button class="btn btn-sm btn-primary" id="btnAddTask-III">+ 任务 <kbd>N</kbd></button>
+        <button class="btn btn-sm btn-info" id="btnAddBlock-III">+ 任务块</button>
+      </div>
+    </div>
+
+    <!-- Quadrant IV -->
+    <div class="quadrant quadrant-iv" id="quadrant-IV" data-key="IV">
+      <div class="quadrant-header">
+        <span class="quadrant-icon">🌿</span>
+        <span class="quadrant-title">IV. 不重要不紧急</span>
+        <span class="quadrant-label">尽量减少</span>
+        <span class="task-count" id="count-IV">0</span>
+      </div>
+      <div class="quadrant-tasks"></div>
+      <div class="quadrant-footer">
+        <button class="btn btn-sm btn-primary" id="btnAddTask-IV">+ 任务 <kbd>N</kbd></button>
+        <button class="btn btn-sm btn-info" id="btnAddBlock-IV">+ 任务块</button>
+      </div>
+    </div>
+
+  </div><!-- /quadrant-grid -->
+
+  <!-- Future Task Panel -->
+  <div class="futuretask-panel" id="futureTaskPanel">
+    <div class="futuretask-panel-header" id="futureTaskPanelToggle">
+      <span>📅 待办任务池 (<span id="futureTaskCount">0</span>)</span>
+      <span class="futuretask-toggle-icon">▼</span>
+    </div>
+    <div class="futuretask-panel-body" id="futureTaskPanelBody">
+      <div class="futuretask-list" id="futureTaskList">
+        <div class="empty-hint" id="futureTaskEmpty">暂无待办任务，点击下方按钮添加。设定日期和象限后，到期自动加入日程表。</div>
+      </div>
+      <div class="futuretask-actions">
+        <button class="btn btn-sm btn-primary" id="btnAddFutureTask">+ 添加待办任务</button>
+        <button class="btn btn-sm btn-info" id="btnAddFutureBlock">+ 添加待办任务块</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Week Plan Panel -->
+  <div class="plantask-panel plantask-week" id="weekTaskPanel">
+    <div class="plantask-panel-header" id="weekTaskPanelToggle">
+      <span>🗓️ 周计划 (<span id="weekTaskCount">0</span>)</span>
+      <span class="plantask-toggle-icon">▼</span>
+    </div>
+    <div class="plantask-panel-body" id="weekTaskPanelBody">
+      <div class="plantask-list" id="weekTaskList">
+        <div class="empty-hint" id="weekTaskEmpty">暂无周计划任务，点击下方按钮添加。设定日期和象限后，当周自动加入日程表。</div>
+      </div>
+      <div class="plantask-actions">
+        <button class="btn btn-sm btn-primary" id="btnAddWeekTask">+ 添加周计划任务</button>
+        <button class="btn btn-sm btn-info" id="btnAddWeekBlock">+ 添加周计划任务块</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Month Plan Panel -->
+  <div class="plantask-panel plantask-month" id="monthTaskPanel">
+    <div class="plantask-panel-header" id="monthTaskPanelToggle">
+      <span>📆 月计划 (<span id="monthTaskCount">0</span>)</span>
+      <span class="plantask-toggle-icon">▼</span>
+    </div>
+    <div class="plantask-panel-body" id="monthTaskPanelBody">
+      <div class="plantask-list" id="monthTaskList">
+        <div class="empty-hint" id="monthTaskEmpty">暂无月计划任务，点击下方按钮添加。设定日期和象限后，当月自动加入日程表。</div>
+      </div>
+      <div class="plantask-actions">
+        <button class="btn btn-sm btn-primary" id="btnAddMonthTask">+ 添加月计划任务</button>
+        <button class="btn btn-sm btn-info" id="btnAddMonthBlock">+ 添加月计划任务块</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js');
+  }
+</script>
+<script src="js/util.js"></script>
+<script src="js/config.js"></script>
+<script src="js/store.js"></script>
+<script src="js/edit.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/highlight.js"></script>
+<script src="js/timeslot.js"></script>
+<script src="js/render.js"></script>
+<script src="js/drag.js"></script>
+<script src="js/markdown.js"></script>
+<script src="js/json-io.js"></script>
+<script src="js/cache-ui.js"></script>
+<script src="js/stats-ui.js"></script>
+<script src="js/shortcuts.js"></script>
+<script src="js/quadrant-ops.js"></script>
+<script src="js/defer.js"></script>
+<script src="js/future.js"></script>
+<script src="js/bigtask.js"></script>
+<script src="js/daily-report.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

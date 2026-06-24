@@ -543,8 +543,9 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   transition: all var(--t); margin-left: 2px;
 }
 .split-stages-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
-/* Stages container inside a subtask */
-.subtask-item.has-stages { flex-wrap: wrap; }
+/* Stages container inside a subtask or standalone task */
+.subtask-item.has-stages,
+.task-item.has-stages { flex-wrap: wrap; }
 .subtask-stages {
   width: 100%; margin-top: 4px; padding-top: 4px;
   border-top: 1px dashed var(--border);

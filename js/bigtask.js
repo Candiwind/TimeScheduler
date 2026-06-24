@@ -227,6 +227,59 @@ function renderBigTaskPanel() {
     el.addEventListener('drop', handleBigtaskSubDrop);
   });
 
+  // Bind big task subtask stage operations
+  listEl.querySelectorAll('.bt-st-split-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      splitBigSubtaskIntoStages(this.dataset.btId, this.dataset.stId);
+    });
+  });
+  listEl.querySelectorAll('[data-bt-stage]').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      toggleBigSubtaskStage(this.dataset.btId, this.dataset.stId, this.dataset.stageId, this.checked);
+    });
+  });
+  listEl.querySelectorAll('.bt-stage-del').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      deleteBigSubtaskStage(this.dataset.btId, this.dataset.stId, this.dataset.stageId);
+    });
+  });
+  listEl.querySelectorAll('.bt-add-stage-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      addBigSubtaskStage(this.dataset.btId, this.dataset.stId);
+    });
+  });
+  listEl.querySelectorAll('.bt-stage-text').forEach(function(el) {
+    el.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      var btId = this.dataset.btId;
+      var stId = this.dataset.stId;
+      var stageId = this.dataset.stageId;
+      var self = this;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = this.textContent;
+      input.style.cssText = 'width:100%;font-size:11px;padding:1px 4px;border:1px solid var(--accent);border-radius:3px;';
+      input.addEventListener('blur', function() {
+        var newVal = this.value.trim();
+        if (newVal && newVal !== self.textContent) {
+          updateBigSubtaskStageText(btId, stId, stageId, newVal);
+        } else {
+          renderBigTaskPanel();
+        }
+      });
+      input.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') { this.blur(); }
+        if (ev.key === 'Escape') { renderBigTaskPanel(); }
+      });
+      this.innerHTML = '';
+      this.appendChild(input);
+      input.focus();
+    });
+  });
+
   // Restore expanded card states
   listEl.querySelectorAll('.bigtask-card').forEach(function(card) {
     var nameEl = card.querySelector('.bt-editable-name');
@@ -302,7 +355,19 @@ function renderBigTaskCardHTML(bt, idx) {
           h += '<span class="bigtask-subtask-weight st-editable-weight" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.weight || 5) + '" title="点击修改参考权重" style="cursor:pointer;">' + (t.weight || 5) + '%</span>';
           h += '<button class="task-defer-btn st-import-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务" style="width:18px;height:18px;font-size:11px;">📥</button>';
           h += '<button class="task-delete-btn st-delete-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="删除子任务" style="width:16px;height:16px;font-size:12px;">&times;</button>';
+          h += '<button class="split-stages-btn bt-st-split-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" title="拆分为阶段" style="width:18px;height:18px;font-size:10px;">⊞</button>';
           h += '</div>';
+          // Stages for this big task subtask
+          if (t.stages && t.stages.length > 0) {
+            t.stages.forEach(function(s) {
+              h += '<div class="bigtask-subtask-stage' + (s.completed ? ' completed' : '') + '" style="display:flex;align-items:center;gap:4px;padding:2px 6px 2px 28px;font-size:11px;">';
+              h += '<input type="checkbox" class="task-checkbox" style="width:14px;height:14px;" data-bt-stage="1" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" ' + (s.completed ? 'checked' : '') + '>';
+              h += '<span class="bt-stage-text" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" title="双击编辑" style="flex:1;">' + Util.escHtml(s.text) + '</span>';
+              h += '<button class="task-delete-btn bt-stage-del" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" style="width:14px;height:14px;font-size:10px;">&times;</button>';
+              h += '</div>';
+            });
+            h += '<button class="add-stage-btn bt-add-stage-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" style="margin-left:28px;width:calc(100% - 28px);">+ 阶段</button>';
+          }
         });
       } else {
         h += '<div style="font-size:11px;color:var(--text3);padding:4px;">（无子任务）</div>';

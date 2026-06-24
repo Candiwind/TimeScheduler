@@ -119,7 +119,11 @@ function countAllTasks(items) {
         });
       }
     } else {
-      count++;
+      if (item.stages && item.stages.length > 0) {
+        count += item.stages.length;
+      } else {
+        count++;
+      }
     }
   });
   return count;
@@ -229,6 +233,45 @@ function createTaskElement(item, quadrantKey, index) {
   [hlBtn, bonusBtn, deferBtn, timeSlotBtn, delBtn].forEach(function(innerEl) {
     if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
   });
+
+  // Split into stages button
+  var splitBtn = document.createElement('button');
+  splitBtn.className = 'split-stages-btn';
+  splitBtn.innerHTML = '⊞';
+  splitBtn.title = '拆分为阶段';
+  splitBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    splitTaskIntoStages(quadrantKey, item.id);
+  });
+  splitBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+  el.appendChild(splitBtn);
+
+  // Stages container
+  if (item.stages && item.stages.length > 0) {
+    var stagesContainer = document.createElement('div');
+    stagesContainer.className = 'subtask-stages';
+    el.classList.add('has-stages');
+    var allStagesDone = item.stages.every(function(s) { return s.completed; });
+    if (item.completed !== allStagesDone) {
+      item.completed = allStagesDone;
+      checkbox.checked = allStagesDone;
+      if (allStagesDone) { el.classList.add('completed'); } else { el.classList.remove('completed'); }
+    }
+    item.stages.forEach(function(stage) {
+      var stageEl = createStageElementForTask(stage, quadrantKey, item.id);
+      stagesContainer.appendChild(stageEl);
+    });
+    var addStageBtn = document.createElement('button');
+    addStageBtn.className = 'add-stage-btn';
+    addStageBtn.innerHTML = '+ 阶段';
+    addStageBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      addTaskStage(quadrantKey, item.id);
+    });
+    addStageBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    stagesContainer.appendChild(addStageBtn);
+    el.appendChild(stagesContainer);
+  }
 
   // Bind drag handlers directly
   el.addEventListener('dragstart', handleDragStart);
@@ -533,6 +576,47 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
   return stageRow;
 }
 
+function createStageElementForTask(stage, quadrantKey, taskId) {
+  var stageRow = document.createElement('div');
+  stageRow.className = 'subtask-stage-item';
+  if (stage.completed) stageRow.classList.add('completed');
+
+  var stageCheckbox = document.createElement('input');
+  stageCheckbox.type = 'checkbox';
+  stageCheckbox.className = 'task-checkbox stage-checkbox';
+  stageCheckbox.checked = stage.completed;
+  stageCheckbox.addEventListener('change', function(e) {
+    e.stopPropagation();
+    toggleTaskStageComplete(quadrantKey, taskId, stage.id, stageCheckbox.checked);
+  });
+  stageCheckbox.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+
+  var stageText = document.createElement('span');
+  stageText.className = 'task-text stage-text';
+  stageText.textContent = stage.text || '';
+  stageText.addEventListener('dblclick', function(e) {
+    e.stopPropagation();
+    startEdit(stageText, stageText.textContent, function(newVal) {
+      updateTaskStageText(quadrantKey, taskId, stage.id, newVal);
+    });
+  });
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'task-delete-btn stage-del-btn';
+  delBtn.innerHTML = '&times;';
+  delBtn.title = '删除阶段';
+  delBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    deleteTaskStage(quadrantKey, taskId, stage.id);
+  });
+  delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+
+  stageRow.appendChild(stageCheckbox);
+  stageRow.appendChild(stageText);
+  stageRow.appendChild(delBtn);
+  return stageRow;
+}
+
 function updateDateDisplay(date) {
   var picker = document.getElementById('datePicker');
   if (picker) picker.value = date;
@@ -557,8 +641,12 @@ function calcQuadrantCompletion(items) {
         });
       }
     } else {
-      total++;
-      if (item.completed) done++;
+      if (item.stages && item.stages.length > 0) {
+        item.stages.forEach(function(s) { total++; if (s.completed) done++; });
+      } else {
+        total++;
+        if (item.completed) done++;
+      }
     }
   });
   return { total: total, done: done, rate: total > 0 ? done / total : 0 };

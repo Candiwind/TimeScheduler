@@ -372,6 +372,125 @@ function toggleBigSubtaskComplete(bigTaskId, subtaskId, completed) {
   return null;
 }
 
+// ============ Big Task Subtask Stage Operations ============
+
+function toggleBigSubtaskStage(bigTaskId, subtaskId, stageId, completed) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === bigTaskId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === subtaskId && t.stages) {
+              t.stages.forEach(function(s) {
+                if (s.id === stageId) { s.completed = completed; }
+              });
+              t.completed = t.stages.every(function(s) { return s.completed; });
+            }
+          });
+        }
+      });
+      recalcBigTaskProgress(tasks[i]);
+      saveBigTasks(tasks);
+      return;
+    }
+  }
+}
+
+function splitBigSubtaskIntoStages(bigTaskId, subtaskId) {
+  var tasks = loadBigTasks();
+  var subtask = null;
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === bigTaskId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === subtaskId) { subtask = t; }
+          });
+        }
+      });
+    }
+  }
+  if (!subtask) return;
+  if (subtask.stages && subtask.stages.length > 0) { alert('该子任务已拆分为阶段'); return; }
+  var input = prompt('请输入阶段名称（用逗号分隔，如"设计,编码,测试"）：\n原任务名：' + (subtask.text || ''));
+  if (!input) return;
+  var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
+  if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
+  subtask.stages = stageNames.map(function(name) {
+    return { id: generateId(), text: name, completed: false };
+  });
+  subtask.completed = false;
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
+function addBigSubtaskStage(bigTaskId, subtaskId) {
+  var text = prompt('请输入新阶段名称：');
+  if (!text) return;
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === bigTaskId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === subtaskId) {
+              if (!t.stages) t.stages = [];
+              t.stages.push({ id: generateId(), text: text, completed: false });
+              t.completed = false;
+            }
+          });
+        }
+      });
+    }
+  }
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
+function updateBigSubtaskStageText(bigTaskId, subtaskId, stageId, newText) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === bigTaskId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === subtaskId && t.stages) {
+              t.stages.forEach(function(s) {
+                if (s.id === stageId) { s.text = newText; }
+              });
+            }
+          });
+        }
+      });
+    }
+  }
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
+function deleteBigSubtaskStage(bigTaskId, subtaskId, stageId) {
+  if (!confirm('确定删除该阶段？')) return;
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === bigTaskId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === subtaskId && t.stages) {
+              t.stages = t.stages.filter(function(s) { return s.id !== stageId; });
+              if (t.stages.length === 0) { delete t.stages; t.completed = false; }
+              else { t.completed = t.stages.every(function(s) { return s.completed; }); }
+            }
+          });
+        }
+      });
+    }
+  }
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
 // ============ Plan Task Pools (待办/周计划/月计划) ============
 var FUTURE_TASK_KEY = 'quadrant_future_tasks';
 var WEEK_TASK_KEY = 'quadrant_week_tasks';

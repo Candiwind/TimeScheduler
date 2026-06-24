@@ -402,3 +402,91 @@ function updateStageText(quadrantKey, blockId, subtaskId, stageId, newText) {
   saveDateData(currentDate, data);
   renderQuadrantOnly(quadrantKey);
 }
+
+// ============ Task-level Stage Operations ============
+
+function splitTaskIntoStages(quadrantKey, taskId) {
+  var data = loadDateData(currentDate);
+  var task = null;
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName) {
+      task = data[quadrantKey][i]; break;
+    }
+  }
+  if (!task) return;
+  if (task.stages && task.stages.length > 0) { alert('该任务已拆分为阶段'); return; }
+  var input = prompt('请输入阶段名称（用逗号分隔，如"设计,编码,测试"）：\n原任务名：' + (task.text || ''));
+  if (!input) return;
+  var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
+  if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
+  task.stages = stageNames.map(function(name) {
+    return { id: generateId(), text: name, completed: false };
+  });
+  task.completed = false;
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function toggleTaskStageComplete(quadrantKey, taskId, stageId, completed) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages.forEach(function(s) {
+        if (s.id === stageId) { s.completed = completed; }
+      });
+      data[quadrantKey][i].completed = data[quadrantKey][i].stages.every(function(s) { return s.completed; });
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function addTaskStage(quadrantKey, taskId) {
+  var text = prompt('请输入新阶段名称：');
+  if (!text) return;
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName) {
+      if (!data[quadrantKey][i].stages) data[quadrantKey][i].stages = [];
+      data[quadrantKey][i].stages.push({ id: generateId(), text: text, completed: false });
+      data[quadrantKey][i].completed = false;
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function deleteTaskStage(quadrantKey, taskId, stageId) {
+  if (!confirm('确定删除该阶段？')) return;
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages = data[quadrantKey][i].stages.filter(function(s) { return s.id !== stageId; });
+      if (data[quadrantKey][i].stages.length === 0) {
+        delete data[quadrantKey][i].stages;
+        data[quadrantKey][i].completed = false;
+      } else {
+        data[quadrantKey][i].completed = data[quadrantKey][i].stages.every(function(s) { return s.completed; });
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function updateTaskStageText(quadrantKey, taskId, stageId, newText) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages.forEach(function(s) {
+        if (s.id === stageId) { s.text = newText; }
+      });
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderQuadrantOnly(quadrantKey);
+}

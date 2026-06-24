@@ -51,6 +51,32 @@ function showStatsModal() {
 
   content.appendChild(grid);
 
+  // Time slot completion breakdown
+  var slotStats = calcTimeSlotCompletion(data);
+  var slotTitle = document.createElement('h3');
+  slotTitle.textContent = '⏰ 分时段完成情况';
+  slotTitle.style.cssText = 'margin-top:16px;margin-bottom:8px;';
+  content.appendChild(slotTitle);
+
+  var slotGroups = [
+    { label: '早晨 + 上午', keys: ['early_morn', 'forenoon'] },
+    { label: '中午 + 下午', keys: ['noon', 'afternoon'] },
+    { label: '傍晚 + 晚上', keys: ['dusk', 'night'] }
+  ];
+
+  slotGroups.forEach(function(g) {
+    var gd = slotStats[g.label];
+    var rate = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:6px;background:var(--surface3);border-radius:8px;font-size:13px;';
+    row.innerHTML =
+      '<span style="font-size:16px;width:60px;text-align:center;">' + g.icons + '</span>' +
+      '<span style="flex:1;font-weight:600;">' + g.label + '</span>' +
+      '<span style="color:var(--accent);font-weight:700;">' + gd.done + '/' + gd.total + '</span>' +
+      '<span style="font-weight:700;min-width:42px;text-align:right;">' + rate + '%</span>';
+    content.appendChild(row);
+  });
+
   var overall = document.createElement('p');
   overall.style.cssText = 'text-align:center;padding:12px;background:var(--surface3);border-radius:8px;margin-top:10px;font-size:14px;';
   overall.innerHTML =
@@ -111,4 +137,38 @@ function buildRecentHistoryHTML(today) {
   });
   html += '</table>';
   return html;
+}
+
+// Time slot completion: group by pairs
+function calcTimeSlotCompletion(data) {
+  var groups = {
+    '早晨 + 上午': { total: 0, done: 0, icons: '🌄🕘' },
+    '中午 + 下午': { total: 0, done: 0, icons: '☀️🕒' },
+    '傍晚 + 晚上': { total: 0, done: 0, icons: '🌇🌙' }
+  };
+  var slotToGroup = {
+    'early_morn': '早晨 + 上午',
+    'forenoon': '早晨 + 上午',
+    'noon': '中午 + 下午',
+    'afternoon': '中午 + 下午',
+    'dusk': '傍晚 + 晚上',
+    'night': '傍晚 + 晚上'
+  };
+  QUADRANT_KEYS.forEach(function(key) {
+    var items = data[key] || [];
+    items.forEach(function(item) {
+      if (item.blockName !== undefined) {
+        if (item.tasks) {
+          item.tasks.forEach(function(t) {
+            var g = slotToGroup[t.timeSlot];
+            if (g) { groups[g].total++; if (t.completed) groups[g].done++; }
+          });
+        }
+      } else {
+        var g = slotToGroup[item.timeSlot];
+        if (g) { groups[g].total++; if (item.completed) groups[g].done++; }
+      }
+    });
+  });
+  return groups;
 }

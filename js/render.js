@@ -246,8 +246,10 @@ function createTaskElement(item, quadrantKey, index) {
   splitBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
   el.appendChild(splitBtn);
 
-  // Stages (flat inline rows, matching big task subtask stage rendering)
+  // Stages container
   if (item.stages && item.stages.length > 0) {
+    var stagesContainer = document.createElement('div');
+    stagesContainer.className = 'subtask-stages';
     el.classList.add('has-stages');
     var allStagesDone = item.stages.every(function(s) { return s.completed; });
     if (item.completed !== allStagesDone) {
@@ -256,57 +258,19 @@ function createTaskElement(item, quadrantKey, index) {
       if (allStagesDone) { el.classList.add('completed'); } else { el.classList.remove('completed'); }
     }
     item.stages.forEach(function(stage) {
-      var stageRow = document.createElement('div');
-      stageRow.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 6px 2px 28px;font-size:11px;width:100%;';
-      if (stage.completed) stageRow.style.textDecoration = 'line-through;opacity:0.55;';
-
-      var scb = document.createElement('input');
-      scb.type = 'checkbox';
-      scb.className = 'task-checkbox';
-      scb.style.cssText = 'width:14px;height:14px;';
-      scb.checked = stage.completed;
-      scb.addEventListener('change', function(e) {
-        e.stopPropagation();
-        toggleTaskStageComplete(quadrantKey, item.id, stage.id, scb.checked);
-      });
-      scb.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
-      stageRow.appendChild(scb);
-
-      var stxt = document.createElement('span');
-      stxt.style.cssText = 'flex:1;';
-      stxt.textContent = stage.text || '';
-      stxt.addEventListener('dblclick', function(e) {
-        e.stopPropagation();
-        startEdit(stxt, stxt.textContent, function(newVal) {
-          updateTaskStageText(quadrantKey, item.id, stage.id, newVal);
-        });
-      });
-      stageRow.appendChild(stxt);
-
-      var sdel = document.createElement('button');
-      sdel.className = 'task-delete-btn';
-      sdel.style.cssText = 'width:16px;height:16px;font-size:11px;';
-      sdel.innerHTML = '&times;';
-      sdel.addEventListener('click', function(e) {
-        e.stopPropagation();
-        deleteTaskStage(quadrantKey, item.id, stage.id);
-      });
-      sdel.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
-      stageRow.appendChild(sdel);
-
-      el.appendChild(stageRow);
+      var stageEl = createStageElementForTask(stage, quadrantKey, item.id);
+      stagesContainer.appendChild(stageEl);
     });
-    // Add stage button
     var addStageBtn = document.createElement('button');
     addStageBtn.className = 'add-stage-btn';
     addStageBtn.innerHTML = '+ 阶段';
-    addStageBtn.style.cssText = 'margin-left:28px;width:calc(100% - 28px);';
     addStageBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       addTaskStage(quadrantKey, item.id);
     });
     addStageBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
-    el.appendChild(addStageBtn);
+    stagesContainer.appendChild(addStageBtn);
+    el.appendChild(stagesContainer);
   }
 
   // Bind drag handlers directly
@@ -603,6 +567,47 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
   delBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     deleteStage(quadrantKey, blockId, subtaskId, stage.id);
+  });
+  delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+
+  stageRow.appendChild(stageCheckbox);
+  stageRow.appendChild(stageText);
+  stageRow.appendChild(delBtn);
+  return stageRow;
+}
+
+function createStageElementForTask(stage, quadrantKey, taskId) {
+  var stageRow = document.createElement('div');
+  stageRow.className = 'subtask-stage-item';
+  if (stage.completed) stageRow.classList.add('completed');
+
+  var stageCheckbox = document.createElement('input');
+  stageCheckbox.type = 'checkbox';
+  stageCheckbox.className = 'task-checkbox stage-checkbox';
+  stageCheckbox.checked = stage.completed;
+  stageCheckbox.addEventListener('change', function(e) {
+    e.stopPropagation();
+    toggleTaskStageComplete(quadrantKey, taskId, stage.id, stageCheckbox.checked);
+  });
+  stageCheckbox.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+
+  var stageText = document.createElement('span');
+  stageText.className = 'task-text stage-text';
+  stageText.textContent = stage.text || '';
+  stageText.addEventListener('dblclick', function(e) {
+    e.stopPropagation();
+    startEdit(stageText, stageText.textContent, function(newVal) {
+      updateTaskStageText(quadrantKey, taskId, stage.id, newVal);
+    });
+  });
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'task-delete-btn stage-del-btn';
+  delBtn.innerHTML = '&times;';
+  delBtn.title = '删除阶段';
+  delBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    deleteTaskStage(quadrantKey, taskId, stage.id);
   });
   delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
 

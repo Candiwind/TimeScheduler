@@ -587,31 +587,19 @@ function calcWeightedCompletion(data) {
 
 function updateStatsBar(data) {
   var stats = calcWeightedCompletion(data);
-  document.getElementById('statTotal').textContent = stats.total;
-  document.getElementById('statDone').textContent = stats.done;
-  document.getElementById('statRate').textContent = stats.weightedRate + '%';
-  var rateEl = document.getElementById('statRate');
-  if (rateEl) {
-    rateEl.title = '加权完成率（所有任务权重均等，自动合计100%）| 简单完成率: ' + stats.simpleRate + '%';
-  }
-  // Show deferred count
-  var deferCount = data._deferred || 0;
-  var deferEl = document.getElementById('statDeferred');
-  if (deferEl) {
-    deferEl.textContent = deferCount;
-    deferEl.style.display = deferCount > 0 ? '' : 'none';
-  }
-  var deferLabel = document.getElementById('statDeferredLabel');
-  if (deferLabel) {
-    deferLabel.style.display = deferCount > 0 ? '' : 'none';
-  }
-  // Update header completion badge
+  // Update header completion badge (only stats display now)
   var hcDone = document.getElementById('hcDone');
   var hcTotal = document.getElementById('hcTotal');
   var hcRate = document.getElementById('hcRate');
   if (hcDone) hcDone.textContent = stats.done;
   if (hcTotal) hcTotal.textContent = stats.total;
   if (hcRate) hcRate.textContent = stats.weightedRate + '%';
+  // Show deferred count in header if any
+  var deferCount = data._deferred || 0;
+  var hcEl = document.getElementById('headerCompletion');
+  if (hcEl) {
+    hcEl.title = '今日整体完成情况' + (deferCount > 0 ? ' | 今日推迟: ' + deferCount + ' 个' : '');
+  }
 }
 
 function setSearchTerm(term) {

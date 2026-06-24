@@ -154,19 +154,6 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 [data-theme="dark"] .hint-bar .hint-close { color: #8cb8d4; background: rgba(255,255,255,0.1); }
 [data-theme="dark"] .hint-bar .hint-close:hover { background: rgba(255,255,255,0.2); }
 
-/* ============ Stats Bar ============ */
-.stats-bar {
-  display: flex; gap: 16px; margin-bottom: 10px; flex-wrap: wrap;
-  padding: 5px 16px; background: var(--surface); border-radius: 8px;
-  box-shadow: var(--shadow); font-size: 12px; align-items: center;
-  transition: background var(--t);
-}
-.stat-card {
-  display: flex; align-items: center; gap: 4px; white-space: nowrap;
-}
-.stat-card .stat-value { font-weight: 700; color: var(--accent); }
-.stat-card .stat-label { color: var(--text2); }
-
 /* ============ Big Task Panel ============ */
 .bigtask-panel {
   background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
@@ -861,8 +848,6 @@ kbd {
   .quadrant-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
   .quadrant { min-height: 160px; }
   .quadrant-tasks { max-height: 40vh; }
-  .stats-bar { gap: 8px; flex-wrap: wrap; font-size: 11px; }
-  .stat-card .stat-value { font-size: 12px; }
   .planpool-tabs { gap: 1px; }
   .planpool-tab { padding: 3px 10px; font-size: 11px; }
   .planpool-panel-header { font-size: 12px; }

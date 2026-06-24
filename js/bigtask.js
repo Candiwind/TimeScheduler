@@ -280,6 +280,39 @@ function renderBigTaskPanel() {
     });
   });
 
+  // Bind highlight toggle for big task subtasks
+  listEl.querySelectorAll('.bt-st-hl-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleBigSubtaskHighlight(this.dataset.btId, this.dataset.stId);
+    });
+  });
+
+  // Bind highlight toggle for big task stages
+  listEl.querySelectorAll('.bt-stage-hl-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleBigSubtaskStageHighlight(this.dataset.btId, this.dataset.stId, this.dataset.stageId);
+    });
+  });
+
+  // Bind stage date editing
+  listEl.querySelectorAll('.bt-stage-date').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var btId = this.dataset.btId;
+      var stId = this.dataset.stId;
+      var stageId = this.dataset.stageId;
+      var curVal = this.dataset.value;
+      var input = createDateTextInput(curVal, function(newVal) {
+        editBigSubtaskStageDate(btId, stId, stageId, newVal);
+      }, function() { renderBigTaskPanel(); });
+      this.innerHTML = '';
+      this.appendChild(input);
+      input.focus();
+    });
+  });
+
   // Restore expanded card states
   listEl.querySelectorAll('.bigtask-card').forEach(function(card) {
     var nameEl = card.querySelector('.bt-editable-name');
@@ -333,7 +366,16 @@ function renderBigTaskCardHTML(bt, idx) {
   if (bt.milestones && bt.milestones.length > 0) {
     bt.milestones.forEach(function(ms) {
       var msDone = 0, msTotal = 0;
-      if (ms.tasks) { ms.tasks.forEach(function(t) { msTotal++; if (t.completed) msDone++; }); }
+      if (ms.tasks) {
+        ms.tasks.forEach(function(t) {
+          if (t.stages && t.stages.length > 0) {
+            t.stages.forEach(function(s) { msTotal++; if (s.completed) msDone++; });
+          } else {
+            msTotal++;
+            if (t.completed) msDone++;
+          }
+        });
+      }
       var msRate = msTotal > 0 ? Math.round(msDone / msTotal * 100) : 0;
       var datesStr = ms.dateRange ? ms.dateRange[0] + ' ~ ' + ms.dateRange[1] : '';
       h += '<div class="bigtask-milestone">';
@@ -351,21 +393,26 @@ function renderBigTaskCardHTML(bt, idx) {
           var btHasStages = t.stages && t.stages.length > 0;
           h += '<div class="bigtask-subtask" draggable="true" data-type="bigtask-subtask" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-st-text="' + Util.escHtml(t.text).replace(/"/g, '&quot;') + '">';
           h += '<input type="checkbox" class="task-checkbox bigtask-subtask-checkbox" data-big-task-id="' + bt.id + '" data-subtask-id="' + t.id + '" ' + (t.completed ? 'checked' : '') + (btHasStages ? ' disabled style="pointer-events:none;opacity:0.5;"' : '') + '>';
-          h += '<span class="bigtask-subtask-text st-editable-text' + (t.completed ? ' done' : '') + '" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="双击编辑内容">' + renderTaskText(t.text) + '</span>';
+          var hlIcon = (t.highlights && t.highlights.length > 0) ? '⭐' : '☆';
+          h += '<span class="bigtask-subtask-text st-editable-text' + (t.completed ? ' done' : '') + '" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="双击编辑内容">' + renderTaskText(t.text, t.highlights) + '</span>';
           if (!btHasStages) {
             h += '<span class="bigtask-subtask-date st-editable-date" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;">' + (t.plannedDate || '📅') + '</span>';
             h += '<span class="bigtask-subtask-weight st-editable-weight" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.weight || 5) + '" title="点击修改参考权重" style="cursor:pointer;">' + (t.weight || 5) + '%</span>';
             h += '<button class="task-defer-btn st-import-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务" style="width:18px;height:18px;font-size:11px;">📥</button>';
           }
+          h += '<button class="task-extra-btn bt-st-hl-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" title="高亮/取消高亮" style="width:18px;height:18px;font-size:11px;padding:0;">' + hlIcon + '</button>';
           h += '<button class="task-delete-btn st-delete-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="删除子任务" style="width:16px;height:16px;font-size:12px;">&times;</button>';
           h += '<button class="split-stages-btn bt-st-split-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" title="拆分为阶段" style="width:18px;height:18px;font-size:10px;">⊞</button>';
           h += '</div>';
           // Stages for this big task subtask
           if (btHasStages) {
             t.stages.forEach(function(s) {
+              var sHlIcon = (s.highlights && s.highlights.length > 0) ? '⭐' : '☆';
               h += '<div class="bigtask-subtask-stage' + (s.completed ? ' completed' : '') + '" style="display:flex;align-items:center;gap:4px;padding:2px 6px 2px 28px;font-size:11px;">';
               h += '<input type="checkbox" class="task-checkbox" style="width:14px;height:14px;" data-bt-stage="1" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" ' + (s.completed ? 'checked' : '') + '>';
-              h += '<span class="bt-stage-text" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" title="双击编辑" style="flex:1;">' + Util.escHtml(s.text) + '</span>';
+              h += '<span class="bt-stage-text" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" title="双击编辑" style="flex:1;">' + renderTaskText(s.text, s.highlights) + '</span>';
+              h += '<span class="bt-stage-date" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" data-value="' + (s.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;font-size:10px;color:var(--text2);">' + (s.plannedDate || '📅') + '</span>';
+              h += '<button class="task-extra-btn bt-stage-hl-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" title="高亮/取消高亮" style="width:14px;height:14px;font-size:9px;padding:0;">' + sHlIcon + '</button>';
               h += '<button class="task-delete-btn bt-stage-del" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" style="width:14px;height:14px;font-size:10px;">&times;</button>';
               h += '</div>';
             });

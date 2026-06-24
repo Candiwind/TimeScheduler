@@ -307,20 +307,24 @@ function deleteBigTask(id) {
   return false;
 }
 
-// Recalculate overall progress of a big task from completed subtask weights
+// Recalculate overall progress: equal-weight per subtask (or per stage if staged)
 function recalcBigTaskProgress(bigTask) {
-  var totalWeight = 0, completedWeight = 0;
+  var total = 0, done = 0;
   if (bigTask.milestones) {
     bigTask.milestones.forEach(function(ms) {
       if (ms.tasks) {
         ms.tasks.forEach(function(t) {
-          totalWeight += t.weight || 0;
-          if (t.completed) completedWeight += t.weight || 0;
+          if (t.stages && t.stages.length > 0) {
+            t.stages.forEach(function(s) { total++; if (s.completed) done++; });
+          } else {
+            total++;
+            if (t.completed) done++;
+          }
         });
       }
     });
   }
-  bigTask.progress = totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0;
+  bigTask.progress = total > 0 ? Math.round((done / total) * 100) : 0;
   return bigTask;
 }
 
@@ -481,6 +485,71 @@ function deleteBigSubtaskStage(bigTaskId, subtaskId, stageId) {
               t.stages = t.stages.filter(function(s) { return s.id !== stageId; });
               if (t.stages.length === 0) { delete t.stages; t.completed = false; }
               else { t.completed = t.stages.every(function(s) { return s.completed; }); }
+            }
+          });
+        }
+      });
+    }
+  }
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
+function toggleBigSubtaskHighlight(btId, stId) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === stId) {
+              if (t.highlights && t.highlights.length > 0) { delete t.highlights; }
+              else { t.highlights = [{ start: 0, end: (t.text || '').length }]; }
+            }
+          });
+        }
+      });
+    }
+  }
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
+function toggleBigSubtaskStageHighlight(btId, stId, stageId) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === stId && t.stages) {
+              t.stages.forEach(function(s) {
+                if (s.id === stageId) {
+                  if (s.highlights && s.highlights.length > 0) { delete s.highlights; }
+                  else { s.highlights = [{ start: 0, end: (s.text || '').length }]; }
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+  }
+  saveBigTasks(tasks);
+  renderBigTaskPanel();
+}
+
+function editBigSubtaskStageDate(btId, stId, stageId, newDate) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId && tasks[i].milestones) {
+      tasks[i].milestones.forEach(function(ms) {
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            if (t.id === stId && t.stages) {
+              t.stages.forEach(function(s) {
+                if (s.id === stageId) { s.plannedDate = newDate; }
+              });
             }
           });
         }

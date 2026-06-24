@@ -83,9 +83,7 @@ function showStatsModal() {
     '<strong>总计：</strong>' + stats.total + ' 个任务 | <strong>完成：</strong>' + stats.done + ' 个<br>' +
     '<strong>简单完成率：</strong>' + stats.simpleRate + '% | <strong>加权完成率：</strong>' + stats.weightedRate + '%';
   var deferCount = data._deferred || 0;
-  if (deferCount > 0) {
-    overall.innerHTML += '<br><strong>今日推迟：</strong>' + deferCount + ' 个';
-  }
+  overall.innerHTML += '<br><strong>今日推迟：</strong>' + deferCount + ' 个';
   var extraCount = calcExtraCompleted(data);
   if (extraCount > 0) {
     overall.innerHTML += ' | <strong>额外完成：</strong>' + extraCount + ' 个';

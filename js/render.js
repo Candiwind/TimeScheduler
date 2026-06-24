@@ -564,6 +564,12 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
   var stageRow = document.createElement('div');
   stageRow.className = 'subtask-stage-item';
   if (stage.completed) stageRow.classList.add('completed');
+  stageRow.draggable = true;
+  stageRow.dataset.type = 'stage';
+  stageRow.dataset.quadrant = quadrantKey;
+  stageRow.dataset.blockId = blockId;
+  stageRow.dataset.subtaskId = subtaskId;
+  stageRow.dataset.stageId = stage.id;
 
   var stageCheckbox = document.createElement('input');
   stageCheckbox.type = 'checkbox';
@@ -643,6 +649,14 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
   stageRow.appendChild(deferBtn);
   if (timeSlotBtn) stageRow.appendChild(timeSlotBtn);
   stageRow.appendChild(delBtn);
+
+  // Drag handlers for stage
+  stageRow.addEventListener('dragstart', handleStageDragStart);
+  stageRow.addEventListener('dragend', handleStageDragEnd);
+  stageRow.addEventListener('dragover', handleStageDragOver);
+  stageRow.addEventListener('dragleave', handleStageDragLeave);
+  stageRow.addEventListener('drop', handleStageDrop);
+
   return stageRow;
 }
 
@@ -650,6 +664,11 @@ function createStageElementForTask(stage, quadrantKey, taskId) {
   var stageRow = document.createElement('div');
   stageRow.className = 'subtask-stage-item';
   if (stage.completed) stageRow.classList.add('completed');
+  stageRow.draggable = true;
+  stageRow.dataset.type = 'stage';
+  stageRow.dataset.quadrant = quadrantKey;
+  stageRow.dataset.taskId = taskId;
+  stageRow.dataset.stageId = stage.id;
 
   var stageCheckbox = document.createElement('input');
   stageCheckbox.type = 'checkbox';
@@ -725,6 +744,13 @@ function createStageElementForTask(stage, quadrantKey, taskId) {
   stageRow.appendChild(deferBtn);
   if (timeSlotBtn) stageRow.appendChild(timeSlotBtn);
   stageRow.appendChild(delBtn);
+
+  stageRow.addEventListener('dragstart', handleStageDragStart);
+  stageRow.addEventListener('dragend', handleStageDragEnd);
+  stageRow.addEventListener('dragover', handleStageDragOver);
+  stageRow.addEventListener('dragleave', handleStageDragLeave);
+  stageRow.addEventListener('drop', handleStageDrop);
+
   return stageRow;
 }
 
@@ -843,7 +869,7 @@ function updateStatsBar(data) {
   var deferCount = data._deferred || 0;
   var hcEl = document.getElementById('headerCompletion');
   if (hcEl) {
-    hcEl.title = '今日整体完成情况' + (deferCount > 0 ? ' | 今日推迟: ' + deferCount + ' 个' : '');
+    hcEl.title = '今日整体完成情况';
   }
 
   // Time slot breakdown in header — each group in a pill badge
@@ -857,6 +883,9 @@ function updateStatsBar(data) {
     var rate = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
     parts.push('<span class="header-slot-badge" title="' + gk + '">' + gd.icons + ' <span>' + gd.done + '/' + gd.total + ' ' + rate + '%</span></span>');
   });
+  if (deferCount > 0) {
+    parts.push('<span class="header-slot-badge" title="今日推迟任务数">⏩ <span>' + deferCount + '推迟</span></span>');
+  }
   slotEl.style.display = '';
   slotEl.innerHTML = parts.join('');
 }

@@ -296,6 +296,14 @@ function renderBigTaskPanel() {
     });
   });
 
+  // Bind stage import button
+  listEl.querySelectorAll('.bt-stage-import-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importBigSubtaskStageToToday(this.dataset.btId, this.dataset.stId, this.dataset.stageId, this.dataset.stageText);
+    });
+  });
+
   // Bind stage date editing
   listEl.querySelectorAll('.bt-stage-date').forEach(function(el) {
     el.addEventListener('click', function(e) {
@@ -413,6 +421,7 @@ function renderBigTaskCardHTML(bt, idx) {
               h += '<span class="bt-stage-text" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" title="双击编辑" style="flex:1;">' + renderTaskText(s.text, s.highlights) + '</span>';
               h += '<span class="bt-stage-date" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" data-value="' + (s.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;font-size:10px;color:var(--text2);">' + (s.plannedDate || '📅') + '</span>';
               h += '<button class="task-extra-btn bt-stage-hl-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" title="高亮/取消高亮" style="width:14px;height:14px;font-size:9px;padding:0;">' + sHlIcon + '</button>';
+              h += '<button class="task-defer-btn bt-stage-import-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" data-stage-text="' + Util.escHtml(s.text).replace(/"/g, '&quot;') + '" title="导入今日象限" style="width:16px;height:16px;font-size:10px;padding:0;">📥</button>';
               h += '<button class="task-delete-btn bt-stage-del" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" style="width:14px;height:14px;font-size:10px;">&times;</button>';
               h += '</div>';
             });
@@ -533,6 +542,23 @@ function applyBigTaskDropOverrides() {
       clearAllHighlights();
       moveBigtaskSubToQuadrant(this.dataset.key, window._dragFromBigtask);
       window._dragFromBigtask = null;
+      return;
+    }
+    if (draggedItem && draggedItem.dataset.type === 'stage') {
+      e.preventDefault();
+      var c3 = this.querySelector('.quadrant-tasks');
+      if (c3) c3.classList.remove('drag-over');
+      clearAllHighlights();
+      moveStageOutToTask(
+        draggedItem.dataset.quadrant,
+        draggedItem.dataset.blockId || null,
+        draggedItem.dataset.subtaskId || null,
+        draggedItem.dataset.taskId || null,
+        draggedItem.dataset.stageId
+      );
+      draggedItem = null;
+      dragSourceQuadrant = null;
+      dragSourceBlockId = null;
       return;
     }
     _origHandleQuadrantDrop.call(this, e);

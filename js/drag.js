@@ -686,3 +686,165 @@ function getBigSubtaskData(btId, stId) {
   }
   return null;
 }
+
+// ============ Stage Drag Handlers ============
+
+function handleStageDragStart(e) {
+  this.classList.add('dragging');
+  draggedItem = this;
+  dragSourceQuadrant = this.dataset.quadrant;
+  dragSourceBlockId = this.dataset.blockId || null;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', 'STAGE:' + this.dataset.stageId);
+}
+
+function handleStageDragEnd(e) {
+  this.classList.remove('dragging');
+  draggedItem = null;
+  dragSourceQuadrant = null;
+  dragSourceBlockId = null;
+  document.querySelectorAll('.subtask-stage-item').forEach(function(el) {
+    el.classList.remove('drag-before', 'drag-after');
+  });
+}
+
+function handleStageDragOver(e) {
+  e.preventDefault();
+  if (!draggedItem || draggedItem.dataset.type !== 'stage') return;
+  var target = e.currentTarget;
+  if (target === draggedItem) return;
+  target.classList.remove('drag-before', 'drag-after');
+  var rect = target.getBoundingClientRect();
+  if (e.clientY < rect.top + rect.height / 2) {
+    target.classList.add('drag-before');
+  } else {
+    target.classList.add('drag-after');
+  }
+}
+
+function handleStageDragLeave(e) {
+  e.currentTarget.classList.remove('drag-before', 'drag-after');
+}
+
+function handleStageDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedItem || draggedItem.dataset.type !== 'stage') return;
+  var source = draggedItem;
+  var target = e.currentTarget;
+  document.querySelectorAll('.subtask-stage-item').forEach(function(el) {
+    el.classList.remove('drag-before', 'drag-after');
+  });
+  // Only reorder within same parent
+  if (source.dataset.blockId !== target.dataset.blockId ||
+      source.dataset.subtaskId !== target.dataset.subtaskId ||
+      source.dataset.taskId !== target.dataset.taskId) return;
+  var rect = target.getBoundingClientRect();
+  var before = e.clientY < rect.top + rect.height / 2;
+  var qKey = source.dataset.quadrant;
+  if (source.dataset.blockId) {
+    reorderStages(qKey, source.dataset.blockId, source.dataset.subtaskId, source.dataset.stageId, target.dataset.stageId, before);
+  } else if (source.dataset.taskId) {
+    reorderTaskStages(qKey, source.dataset.taskId, source.dataset.stageId, target.dataset.stageId, before);
+  }
+  draggedItem = null;
+  dragSourceQuadrant = null;
+  dragSourceBlockId = null;
+}
+
+// Stage out → standalone task
+function moveStageOutToTask(quadrantKey, blockId, subtaskId, taskId, stageId) {
+  var data = loadDateData(currentDate);
+  var stageObj = null;
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    var item = data[quadrantKey][i];
+    if (blockId && item.id === blockId && item.blockName !== undefined) {
+      var tasks = item.tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          var idx = -1;
+          for (var k = 0; k < tasks[j].stages.length; k++) {
+            if (tasks[j].stages[k].id === stageId) { stageObj = tasks[j].stages.splice(k, 1)[0]; break; }
+          }
+          if (tasks[j].stages.length === 0) delete tasks[j].stages;
+          tasks[j].completed = tasks[j].stages ? tasks[j].stages.every(function(s) { return s.completed; }) : false;
+          break;
+        }
+      }
+      break;
+    }
+    if (taskId && item.id === taskId && !item.blockName && item.stages) {
+      var idx2 = -1;
+      for (var k2 = 0; k2 < item.stages.length; k2++) {
+        if (item.stages[k2].id === stageId) { stageObj = item.stages.splice(k2, 1)[0]; break; }
+      }
+      if (item.stages.length === 0) delete item.stages;
+      item.completed = item.stages ? item.stages.every(function(s) { return s.completed; }) : false;
+      break;
+    }
+  }
+  if (!stageObj) return;
+  data[quadrantKey].push({
+    id: generateId(),
+    text: stageObj.text || '',
+    completed: stageObj.completed || false,
+    progress: '100%',
+    dueDate: '',
+    highlights: stageObj.highlights || undefined,
+    timeSlot: stageObj.timeSlot || ''
+  });
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+// Reorder stages within same subtask
+function reorderStages(quadrantKey, blockId, subtaskId, srcStageId, targetStageId, before) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          var stages = tasks[j].stages;
+          var srcIdx = -1, tgtIdx = -1;
+          for (var k = 0; k < stages.length; k++) {
+            if (stages[k].id === srcStageId) srcIdx = k;
+            if (stages[k].id === targetStageId) tgtIdx = k;
+          }
+          if (srcIdx < 0 || tgtIdx < 0) return;
+          var found = stages.splice(srcIdx, 1)[0];
+          var insertAt = before ? tgtIdx : tgtIdx + 1;
+          if (srcIdx < tgtIdx && !before) insertAt--;
+          stages.splice(insertAt, 0, found);
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+// Reorder stages within same standalone task
+function reorderTaskStages(quadrantKey, taskId, srcStageId, targetStageId, before) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      var stages = data[quadrantKey][i].stages;
+      var srcIdx = -1, tgtIdx = -1;
+      for (var k = 0; k < stages.length; k++) {
+        if (stages[k].id === srcStageId) srcIdx = k;
+        if (stages[k].id === targetStageId) tgtIdx = k;
+      }
+      if (srcIdx < 0 || tgtIdx < 0) return;
+      var found = stages.splice(srcIdx, 1)[0];
+      var insertAt = before ? tgtIdx : tgtIdx + 1;
+      if (srcIdx < tgtIdx && !before) insertAt--;
+      stages.splice(insertAt, 0, found);
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}

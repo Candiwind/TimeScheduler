@@ -85,9 +85,7 @@ function buildDailyReportMd(date, data, stats) {
   lines.push('| 简单完成率 | ' + stats.simpleRate + '% |');
   lines.push('| 加权完成率 | ' + stats.weightedRate + '% (所有任务权重均等，自动合计100%) |');
   var deferCount = data._deferred || 0;
-  if (deferCount > 0) {
-    lines.push('| 今日推迟 | ' + deferCount + ' |');
-  }
+  lines.push('| 今日推迟 | ' + deferCount + ' |');
   var extraCount = calcExtraCompleted(data);
   if (extraCount > 0) {
     lines.push('| 额外完成 | ' + extraCount + ' |');
@@ -193,9 +191,7 @@ function buildDailyReportHtml(date, data, stats) {
   h += '<tr><td style="padding:4px 12px;">已完成</td><td style="font-weight:700;color:#5cb85c;">' + stats.done + '</td></tr>';
   h += '<tr><td style="padding:4px 12px;">加权完成率</td><td style="font-weight:700;color:var(--accent);">' + stats.weightedRate + '%</td></tr>';
   var deferCount = data._deferred || 0;
-  if (deferCount > 0) {
-    h += '<tr><td style="padding:4px 12px;">今日推迟</td><td style="color:#f0ad4e;">' + deferCount + '</td></tr>';
-  }
+  h += '<tr><td style="padding:4px 12px;">今日推迟</td><td style="color:#f0ad4e;">' + deferCount + '</td></tr>';
   var extraCount = calcExtraCompleted(data);
   if (extraCount > 0) {
     h += '<tr><td style="padding:4px 12px;">额外完成</td><td style="color:#f0ad4e;">' + extraCount + '</td></tr>';

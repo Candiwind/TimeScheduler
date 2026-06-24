@@ -539,6 +539,21 @@ function toggleBigSubtaskStageHighlight(btId, stId, stageId) {
   renderBigTaskPanel();
 }
 
+function importBigSubtaskStageToToday(btId, stId, stageId, stageText) {
+  var data = loadDateData(currentDate);
+  if (!data['II']) data['II'] = [];
+  data['II'].push({
+    id: generateId(),
+    text: stageText,
+    completed: false,
+    progress: '100%',
+    dueDate: '',
+    bigTaskRef: { bigTaskId: btId, subtaskId: stId, stageId: stageId }
+  });
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
 function editBigSubtaskStageDate(btId, stId, stageId, newDate) {
   var tasks = loadBigTasks();
   for (var i = 0; i < tasks.length; i++) {

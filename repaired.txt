@@ -87,6 +87,8 @@
     涉及文件：index.html / bigtask.js / render.js
 50. ✅ 去除重复的第二行stats bar：整体完成情况仅保留首行header badge
     涉及文件：index.html / render.js / style.css
+51. ✅ 统计面板新增分时段完成情况：早晨+上午/中午+下午/傍晚+晚上三组
+    涉及文件：stats-ui.js
 
 ────────────────────────────────────────
 

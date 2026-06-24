@@ -113,14 +113,36 @@ git reset --hard v1.1
 git push --force origin main   # ⚠️ 谨慎使用 force push
 ```
 
+
 ---
 
-## 6. 相关文件索引
+## 7. V1.2 补充更新（2026-06-24）—— 日报导出增强
+
+### 变更内容
+日报导出功能增强——包含待办池（含周计划/月计划）任务列表
+
+### 操作步骤
+
+```bash
+git add js/daily-report.js repaired.txt repairing.txt
+git commit -m "V1.2: 日报导出包含待办池/周计划/月计划任务"
+git push origin main
+```
+
+### 修改文件
+| 文件 | 修改内容 |
+|------|----------|
+| `js/daily-report.js` | `buildDailyReportMd()` 和 `buildDailyReportHtml()` 新增待办池/周计划/月计划三个板块 |
+| `repaired.txt` | 新增第42项修改记录 |
+
+---
+
+## 8. 相关文件索引
 
 | 文件 | 说明 |
 |------|------|
-| `js/render.js:451-488` | 加权完成率核心计算函数 |
-| `js/stats-ui.js:27-48` | 统计面板展示逻辑 |
-| `js/daily-report.js:86` | 日报加权率文案 |
-| `repair.txt` | 修改记录清单 |
+| `js/daily-report.js:128-160` | 日报Markdown生成——待办池板块 |
+| `js/daily-report.js:230-264` | 日报HTML生成——待办池板块 |
+| `repaired.txt` | 已修正修改记录清单 |
+| `repairing.txt` | 待修正修改记录清单 |
 | `GitHub-Operations-V1.2.md` | 本文档 |

@@ -125,6 +125,40 @@ function buildDailyReportMd(date, data, stats) {
     lines.push('');
   });
 
+  // Plan pool sections (待办池/周计划/月计划)
+  var planPools = [
+    { title: '📥 待办池', loadFn: loadFutureTasks },
+    { title: '📅 周计划', loadFn: loadWeekTasks },
+    { title: '🗓️ 月计划', loadFn: loadMonthTasks }
+  ];
+
+  planPools.forEach(function(pool) {
+    var poolTasks = pool.loadFn();
+    lines.push('## ' + pool.title + '（' + poolTasks.length + '）');
+    lines.push('');
+    if (poolTasks.length === 0) {
+      lines.push('- （无任务）');
+    } else {
+      poolTasks.forEach(function(ft) {
+        if (ft.type === 'block') {
+          lines.push('- **📦 ' + (ft.blockName || '') + '**');
+          if (ft.tasks && ft.tasks.length > 0) {
+            ft.tasks.forEach(function(st) {
+              var targetLabel = st.targetQuadrant ? ' → ' + ((QUADRANTS[st.targetQuadrant] || {}).name || st.targetQuadrant) : '';
+              var dateLabel = st.scheduledDate ? ' 📅' + st.scheduledDate : '';
+              lines.push('  - ⬜ ' + (st.text || '') + targetLabel + dateLabel);
+            });
+          }
+        } else {
+          var targetLabel2 = ft.targetQuadrant ? ' → ' + ((QUADRANTS[ft.targetQuadrant] || {}).name || ft.targetQuadrant) : '';
+          var dateLabel2 = ft.scheduledDate ? ' 📅' + ft.scheduledDate : '';
+          lines.push('- ⬜ ' + (ft.text || '') + targetLabel2 + dateLabel2);
+        }
+      });
+    }
+    lines.push('');
+  });
+
   // Note section
   lines.push('## 📝 备注');
   lines.push('');
@@ -187,6 +221,42 @@ function buildDailyReportHtml(date, data, stats) {
           var extra = item.extraCompleted ? ' 🎁' : '';
           var timeLabel = item.timeSlot ? ' ' + ((TIME_SLOTS.find(function(s) { return s.key === item.timeSlot; }) || {}).icon || '') : '';
           h += '<li ' + cls + '>' + icon + ' ' + Util.escHtml(item.text || '') + timeLabel + extra + '</li>';
+        }
+      });
+      h += '</ul>';
+    }
+  });
+
+  // Plan pool sections (待办池/周计划/月计划)
+  var poolColors = { '📥 待办池': '#e8d5f5', '📅 周计划': '#d5e5f5', '🗓️ 月计划': '#d5f5e0' };
+  var planPoolsHtml = [
+    { title: '📥 待办池', loadFn: loadFutureTasks },
+    { title: '📅 周计划', loadFn: loadWeekTasks },
+    { title: '🗓️ 月计划', loadFn: loadMonthTasks }
+  ];
+
+  planPoolsHtml.forEach(function(pool) {
+    var poolTasks = pool.loadFn();
+    h += '<h3 style="margin:0 0 8px;background:' + (poolColors[pool.title] || '#e8e8e8') + ';padding:6px 12px;border-radius:6px;font-size:14px;">' + pool.title + ' <span style="font-size:12px;">（' + poolTasks.length + '）</span></h3>';
+    if (poolTasks.length === 0) {
+      h += '<p style="color:var(--text3);padding:0 12px;">（无任务）</p>';
+    } else {
+      h += '<ul style="margin:4px 0 14px;padding-left:24px;">';
+      poolTasks.forEach(function(ft) {
+        if (ft.type === 'block') {
+          h += '<li><strong>📦 ' + Util.escHtml(ft.blockName || '') + '</strong><ul>';
+          if (ft.tasks && ft.tasks.length > 0) {
+            ft.tasks.forEach(function(st) {
+              var targetLabel = st.targetQuadrant ? ' → ' + ((QUADRANTS[st.targetQuadrant] || {}).name || st.targetQuadrant) : '';
+              var dateLabel = st.scheduledDate ? ' 📅' + st.scheduledDate : '';
+              h += '<li>⬜ ' + Util.escHtml(st.text || '') + targetLabel + dateLabel + '</li>';
+            });
+          }
+          h += '</ul></li>';
+        } else {
+          var targetLabel2 = ft.targetQuadrant ? ' → ' + ((QUADRANTS[ft.targetQuadrant] || {}).name || ft.targetQuadrant) : '';
+          var dateLabel2 = ft.scheduledDate ? ' 📅' + ft.scheduledDate : '';
+          h += '<li>⬜ ' + Util.escHtml(ft.text || '') + targetLabel2 + dateLabel2 + '</li>';
         }
       });
       h += '</ul>';

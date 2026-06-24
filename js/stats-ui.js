@@ -70,7 +70,7 @@ function showStatsModal() {
     var row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:6px;background:var(--surface3);border-radius:8px;font-size:13px;';
     row.innerHTML =
-      '<span style="font-size:16px;width:60px;text-align:center;">' + g.icons + '</span>' +
+      '<span style="font-size:16px;width:60px;text-align:center;">' + gd.icons + '</span>' +
       '<span style="flex:1;font-weight:600;">' + g.label + '</span>' +
       '<span style="color:var(--accent);font-weight:700;">' + gd.done + '/' + gd.total + '</span>' +
       '<span style="font-weight:700;min-width:42px;text-align:right;">' + rate + '%</span>';

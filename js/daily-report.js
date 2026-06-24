@@ -286,7 +286,7 @@ function buildDailyReportHtml(date, data, stats) {
   var slotStatsHtml = calcTimeSlotCompletion(data);
   h += '<h3 style="margin:0 0 8px;background:#f0f0f5;padding:6px 12px;border-radius:6px;font-size:14px;">⏰ 分时段完成情况</h3>';
   var slotHasAnyHtml = false;
-  slotGroupKeys2.forEach(function(gk) {
+  ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'].forEach(function(gk) {
     var gd = slotStatsHtml[gk];
     if (gd.total > 0) {
       slotHasAnyHtml = true;

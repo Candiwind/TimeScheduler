@@ -89,13 +89,8 @@ mark {
 }
 .header-completion span { font-weight: 700; }
 .header-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-left: 8px; }
-/* Time slot stats bar */
-.slot-stats-bar {
-  text-align: center; padding: 4px 12px; margin-bottom: 6px;
-  background: var(--surface); border-radius: 6px;
-  font-size: 12px; color: var(--text2); border: 1px solid var(--border);
-}
-[data-theme="dark"] .slot-stats-bar { background: var(--surface2); }
+.header-slot-breakdown { font-size: 11px; opacity: 0.85; }
+.header-slot-breakdown span { margin: 0 2px; }
 
 /* ============ Toolbar ============ */
 .toolbar {

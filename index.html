@@ -16,7 +16,7 @@
   <!-- Header (merged: always-visible controls + collapsible secondary) -->
   <header class="app-header">
     <h1>📊 四象限任务管理器</h1>
-    <span class="header-completion" id="headerCompletion" title="今日整体完成情况">✅ <span id="hcDone">0</span>/<span id="hcTotal">0</span> · <span id="hcRate">0%</span></span>
+    <span class="header-completion" id="headerCompletion" title="今日整体完成情况">✅ <span id="hcDone">0</span>/<span id="hcTotal">0</span> · <span id="hcRate">0%</span></span><span class="header-slot-breakdown" id="headerSlotBreakdown" style="display:none;"></span>
     <div class="header-actions">
       <input type="date" id="datePicker" title="选择日期">
       <button class="btn btn-info btn-sm" id="btnToday">今天</button>
@@ -28,11 +28,6 @@
       <button class="btn btn-sm btn-cancel" id="btnToggleMore" title="展开/折叠更多功能">⚙️</button>
     </div>
   </header>
-
-  <!-- Time Slot Stats Bar -->
-  <div class="slot-stats-bar" id="slotStatsBar" style="display:none;">
-    <span id="slotStatsContent"></span>
-  </div>
 
   <!-- Collapsible secondary toolbar -->
   <div class="toolbar" id="secondaryToolbar" style="display:none;">

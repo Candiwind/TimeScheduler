@@ -621,40 +621,36 @@ function calcTimeSlotCompletion(data) {
 
 function updateStatsBar(data) {
   var stats = calcWeightedCompletion(data);
-  // Update header completion badge (only stats display now)
   var hcDone = document.getElementById('hcDone');
   var hcTotal = document.getElementById('hcTotal');
   var hcRate = document.getElementById('hcRate');
   if (hcDone) hcDone.textContent = stats.done;
   if (hcTotal) hcTotal.textContent = stats.total;
   if (hcRate) hcRate.textContent = stats.weightedRate + '%';
-  // Show deferred count in header if any
   var deferCount = data._deferred || 0;
   var hcEl = document.getElementById('headerCompletion');
   if (hcEl) {
     hcEl.title = '今日整体完成情况' + (deferCount > 0 ? ' | 今日推迟: ' + deferCount + ' 个' : '');
   }
-  // Update time slot stats bar
+
+  // Time slot breakdown in header (right of main completion badge)
   var slotStats = calcTimeSlotCompletion(data);
-  var slotBar = document.getElementById('slotStatsBar');
-  var slotContent = document.getElementById('slotStatsContent');
-  if (!slotBar || !slotContent) return;
+  var slotEl = document.getElementById('headerSlotBreakdown');
+  if (!slotEl) return;
   var slotGroupKeys = ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'];
-  var hasAny = false;
   var parts = [];
   slotGroupKeys.forEach(function(gk) {
     var gd = slotStats[gk];
     if (gd.total > 0) {
-      hasAny = true;
       var rate = Math.round((gd.done / gd.total) * 100);
-      parts.push(gd.icons + ' ' + gk + ' ' + gd.done + '/' + gd.total + ' ' + rate + '%');
+      parts.push('<span title="' + gk + '">' + gd.icons + ' ' + gd.done + '/' + gd.total + ' ' + rate + '%</span>');
     }
   });
-  if (hasAny) {
-    slotBar.style.display = '';
-    slotContent.textContent = '⏰ ' + parts.join('  |  ');
+  if (parts.length > 0) {
+    slotEl.style.display = '';
+    slotEl.innerHTML = '| ' + parts.join(' ');
   } else {
-    slotBar.style.display = 'none';
+    slotEl.style.display = 'none';
   }
 }
 

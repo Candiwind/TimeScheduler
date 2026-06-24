@@ -62,7 +62,7 @@ function renderQuadrant(key, items) {
   }
   // Toggle has-tasks class for footer auto-hide (point 7)
   var quadrant = document.getElementById('quadrant-' + key);
-  if (quadrant) quadrant.classList.toggle('has-tasks', totalCount > 0);
+  if (quadrant) quadrant.classList.toggle('has-tasks', qc.total > 0);
 
   // Filter by search term
   var filtered = items;

@@ -348,17 +348,20 @@ function renderBigTaskCardHTML(bt, idx) {
       h += '<div class="bigtask-milestone-body">';
       if (ms.tasks && ms.tasks.length > 0) {
         ms.tasks.forEach(function(t) {
+          var btHasStages = t.stages && t.stages.length > 0;
           h += '<div class="bigtask-subtask" draggable="true" data-type="bigtask-subtask" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-st-text="' + Util.escHtml(t.text).replace(/"/g, '&quot;') + '">';
-          h += '<input type="checkbox" class="task-checkbox bigtask-subtask-checkbox" data-big-task-id="' + bt.id + '" data-subtask-id="' + t.id + '" ' + (t.completed ? 'checked' : '') + '>';
+          h += '<input type="checkbox" class="task-checkbox bigtask-subtask-checkbox" data-big-task-id="' + bt.id + '" data-subtask-id="' + t.id + '" ' + (t.completed ? 'checked' : '') + (btHasStages ? ' disabled style="pointer-events:none;opacity:0.5;"' : '') + '>';
           h += '<span class="bigtask-subtask-text st-editable-text' + (t.completed ? ' done' : '') + '" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="双击编辑内容">' + renderTaskText(t.text) + '</span>';
-          h += '<span class="bigtask-subtask-date st-editable-date" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;">' + (t.plannedDate || '📅') + '</span>';
-          h += '<span class="bigtask-subtask-weight st-editable-weight" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.weight || 5) + '" title="点击修改参考权重" style="cursor:pointer;">' + (t.weight || 5) + '%</span>';
-          h += '<button class="task-defer-btn st-import-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务" style="width:18px;height:18px;font-size:11px;">📥</button>';
+          if (!btHasStages) {
+            h += '<span class="bigtask-subtask-date st-editable-date" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;">' + (t.plannedDate || '📅') + '</span>';
+            h += '<span class="bigtask-subtask-weight st-editable-weight" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.weight || 5) + '" title="点击修改参考权重" style="cursor:pointer;">' + (t.weight || 5) + '%</span>';
+            h += '<button class="task-defer-btn st-import-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务" style="width:18px;height:18px;font-size:11px;">📥</button>';
+          }
           h += '<button class="task-delete-btn st-delete-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="删除子任务" style="width:16px;height:16px;font-size:12px;">&times;</button>';
           h += '<button class="split-stages-btn bt-st-split-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" title="拆分为阶段" style="width:18px;height:18px;font-size:10px;">⊞</button>';
           h += '</div>';
           // Stages for this big task subtask
-          if (t.stages && t.stages.length > 0) {
+          if (btHasStages) {
             t.stages.forEach(function(s) {
               h += '<div class="bigtask-subtask-stage' + (s.completed ? ' completed' : '') + '" style="display:flex;align-items:center;gap:4px;padding:2px 6px 2px 28px;font-size:11px;">';
               h += '<input type="checkbox" class="task-checkbox" style="width:14px;height:14px;" data-bt-stage="1" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" data-stage-id="' + s.id + '" ' + (s.completed ? 'checked' : '') + '>';

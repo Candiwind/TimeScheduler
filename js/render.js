@@ -229,6 +229,19 @@ function createTaskElement(item, quadrantKey, index) {
   });
   el.appendChild(delBtn);
 
+  var hasStages = item.stages && item.stages.length > 0;
+
+  // When stages exist, hide action buttons — they belong to stages
+  if (hasStages) {
+    hlBtn.style.display = 'none';
+    bonusBtn.style.display = 'none';
+    deferBtn.style.display = 'none';
+    timeSlotBtn.style.display = 'none';
+    // Make checkbox auto-derived
+    left.querySelector('input[type=checkbox]').style.pointerEvents = 'none';
+    left.querySelector('input[type=checkbox]').style.opacity = '0.5';
+  }
+
   // Prevent inner interactive elements from capturing drag
   [hlBtn, bonusBtn, deferBtn, timeSlotBtn, delBtn].forEach(function(innerEl) {
     if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
@@ -392,6 +405,8 @@ function createSubTaskElement(task, quadrantKey, blockId) {
   el.dataset.blockId = blockId;
   el.dataset.id = task.id;
 
+  var hasStages = task.stages && task.stages.length > 0;
+
   var checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.className = 'task-checkbox';
@@ -478,6 +493,16 @@ function createSubTaskElement(task, quadrantKey, blockId) {
   el.appendChild(timeSlotBtn2);
   el.appendChild(delBtn);
 
+  // When stages exist, hide action buttons — they belong to stages
+  if (hasStages) {
+    hlBtn.style.display = 'none';
+    bonusBtn.style.display = 'none';
+    deferBtn.style.display = 'none';
+    timeSlotBtn2.style.display = 'none';
+    checkbox.style.pointerEvents = 'none';
+    checkbox.style.opacity = '0.5';
+  }
+
   // Prevent inner interactive elements from capturing drag
   [checkbox, hlBtn, bonusBtn, deferBtn, timeSlotBtn2, delBtn].forEach(function(innerEl) {
     if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
@@ -552,12 +577,49 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
 
   var stageText = document.createElement('span');
   stageText.className = 'task-text stage-text';
-  stageText.textContent = stage.text || '';
+  stageText.innerHTML = renderTaskText(stage.text || '', stage.highlights);
+  stageText.dataset.rawText = stage.text || '';
   stageText.addEventListener('dblclick', function(e) {
     e.stopPropagation();
-    startEdit(stageText, stageText.textContent, function(newVal) {
+    startEdit(stageText, stageText.dataset.rawText, function(newVal) {
       updateStageText(quadrantKey, blockId, subtaskId, stage.id, newVal);
     });
+  });
+
+  // Highlight button
+  var hlBtn = document.createElement('button');
+  hlBtn.className = 'task-extra-btn';
+  hlBtn.innerHTML = (stage.highlights && stage.highlights.length > 0) ? '⭐' : '☆';
+  hlBtn.title = '高亮/取消高亮';
+  hlBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleSubtaskStageHighlight(quadrantKey, blockId, subtaskId, stage.id);
+  });
+
+  // Bonus button
+  var bonusBtn = document.createElement('button');
+  bonusBtn.className = 'task-extra-btn';
+  bonusBtn.style.color = stage.extraCompleted ? '#f0ad4e' : '';
+  bonusBtn.innerHTML = '🎁';
+  bonusBtn.title = '标记/取消为额外完成';
+  bonusBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleSubtaskStageExtra(quadrantKey, blockId, subtaskId, stage.id);
+  });
+
+  // Defer button
+  var deferBtn = document.createElement('button');
+  deferBtn.className = 'task-defer-btn';
+  deferBtn.innerHTML = '&#9209;';
+  deferBtn.title = '推迟';
+  deferBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    deferSubtaskStage(quadrantKey, blockId, subtaskId, stage.id);
+  });
+
+  // Time slot button
+  var timeSlotBtn = createTimeSlotBtn(stage.timeSlot || '', quadrantKey, null, null, {
+    setFn: function(slotKey) { setSubtaskStageTimeSlot(quadrantKey, blockId, subtaskId, stage.id, slotKey); }
   });
 
   var delBtn = document.createElement('button');
@@ -570,8 +632,16 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
   });
   delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
 
+  [stageCheckbox, hlBtn, bonusBtn, deferBtn, timeSlotBtn, delBtn].forEach(function(innerEl) {
+    if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+  });
+
   stageRow.appendChild(stageCheckbox);
   stageRow.appendChild(stageText);
+  stageRow.appendChild(hlBtn);
+  stageRow.appendChild(bonusBtn);
+  stageRow.appendChild(deferBtn);
+  if (timeSlotBtn) stageRow.appendChild(timeSlotBtn);
   stageRow.appendChild(delBtn);
   return stageRow;
 }
@@ -593,12 +663,45 @@ function createStageElementForTask(stage, quadrantKey, taskId) {
 
   var stageText = document.createElement('span');
   stageText.className = 'task-text stage-text';
-  stageText.textContent = stage.text || '';
+  stageText.innerHTML = renderTaskText(stage.text || '', stage.highlights);
+  stageText.dataset.rawText = stage.text || '';
   stageText.addEventListener('dblclick', function(e) {
     e.stopPropagation();
-    startEdit(stageText, stageText.textContent, function(newVal) {
+    startEdit(stageText, stageText.dataset.rawText, function(newVal) {
       updateTaskStageText(quadrantKey, taskId, stage.id, newVal);
     });
+  });
+
+  var hlBtn = document.createElement('button');
+  hlBtn.className = 'task-extra-btn';
+  hlBtn.innerHTML = (stage.highlights && stage.highlights.length > 0) ? '⭐' : '☆';
+  hlBtn.title = '高亮/取消高亮';
+  hlBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleTaskStageHighlight(quadrantKey, taskId, stage.id);
+  });
+
+  var bonusBtn = document.createElement('button');
+  bonusBtn.className = 'task-extra-btn';
+  bonusBtn.style.color = stage.extraCompleted ? '#f0ad4e' : '';
+  bonusBtn.innerHTML = '🎁';
+  bonusBtn.title = '标记/取消为额外完成';
+  bonusBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleTaskStageExtra(quadrantKey, taskId, stage.id);
+  });
+
+  var deferBtn = document.createElement('button');
+  deferBtn.className = 'task-defer-btn';
+  deferBtn.innerHTML = '&#9209;';
+  deferBtn.title = '推迟';
+  deferBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    deferTaskStage(quadrantKey, taskId, stage.id);
+  });
+
+  var timeSlotBtn = createTimeSlotBtn(stage.timeSlot || '', quadrantKey, null, null, {
+    setFn: function(slotKey) { setTaskStageTimeSlot(quadrantKey, taskId, stage.id, slotKey); }
   });
 
   var delBtn = document.createElement('button');
@@ -611,8 +714,16 @@ function createStageElementForTask(stage, quadrantKey, taskId) {
   });
   delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
 
+  [stageCheckbox, hlBtn, bonusBtn, deferBtn, timeSlotBtn, delBtn].forEach(function(innerEl) {
+    if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+  });
+
   stageRow.appendChild(stageCheckbox);
   stageRow.appendChild(stageText);
+  stageRow.appendChild(hlBtn);
+  stageRow.appendChild(bonusBtn);
+  stageRow.appendChild(deferBtn);
+  if (timeSlotBtn) stageRow.appendChild(timeSlotBtn);
   stageRow.appendChild(delBtn);
   return stageRow;
 }
@@ -812,7 +923,7 @@ function createDateTextInput(value, onChange, onBlur) {
 }
 
 // Shared helper: create time-slot selector button
-function createTimeSlotBtn(currentKey, quadrantKey, taskId, blockId) {
+function createTimeSlotBtn(currentKey, quadrantKey, taskId, blockId, opts) {
   var slot = TIME_SLOTS.find(function(s) { return s.key === currentKey; }) || TIME_SLOTS[0];
   var btn = document.createElement('button');
   btn.className = 'task-timeslot-btn';
@@ -821,9 +932,50 @@ function createTimeSlotBtn(currentKey, quadrantKey, taskId, blockId) {
   btn.setAttribute('data-slot-key', slot.key);
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
-    showTimeSlotPicker(btn, quadrantKey, taskId, blockId);
+    if (opts && opts.setFn) {
+      showTimeSlotPickerCustom(btn, opts.setFn);
+    } else {
+      showTimeSlotPicker(btn, quadrantKey, taskId, blockId);
+    }
   });
   return btn;
+}
+
+function showTimeSlotPickerCustom(anchorEl, setFn) {
+  var existing = document.getElementById('timeslotPicker');
+  if (existing) existing.remove();
+  var picker = document.createElement('div');
+  picker.id = 'timeslotPicker';
+  picker.className = 'timeslot-picker';
+  TIME_SLOTS.forEach(function(slot) {
+    var opt = document.createElement('div');
+    opt.className = 'timeslot-option';
+    if (slot.key === (anchorEl.getAttribute('data-slot-key') || '')) {
+      opt.classList.add('active');
+    }
+    opt.innerHTML = '<span class="timeslot-icon">' + slot.icon + '</span><span class="timeslot-label">' + slot.label + '</span>';
+    opt.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      setFn(slot.key);
+      anchorEl.innerHTML = slot.icon;
+      anchorEl.setAttribute('data-slot-key', slot.key);
+      anchorEl.title = slot.title;
+      picker.remove();
+    });
+    picker.appendChild(opt);
+  });
+  // Position near the button
+  var rect = anchorEl.getBoundingClientRect();
+  picker.style.position = 'fixed';
+  picker.style.top = (rect.bottom + 4) + 'px';
+  picker.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
+  document.body.appendChild(picker);
+  setTimeout(function() {
+    document.addEventListener('click', function closePicker() {
+      if (picker.parentNode) picker.remove();
+      document.removeEventListener('click', closePicker);
+    });
+  }, 0);
 }
 
 function showTimeSlotPicker(anchorEl, quadrantKey, taskId, blockId) {

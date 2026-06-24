@@ -490,3 +490,161 @@ function updateTaskStageText(quadrantKey, taskId, stageId, newText) {
   saveDateData(currentDate, data);
   renderQuadrantOnly(quadrantKey);
 }
+
+// ============ Subtask-stage extra operations ============
+
+function toggleSubtaskStageHighlight(quadrantKey, blockId, subtaskId, stageId) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages.forEach(function(s) {
+            if (s.id === stageId) {
+              if (s.highlights && s.highlights.length > 0) { delete s.highlights; }
+              else { s.highlights = [{ start: 0, end: (s.text || '').length }]; }
+            }
+          });
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function toggleSubtaskStageExtra(quadrantKey, blockId, subtaskId, stageId) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages.forEach(function(s) {
+            if (s.id === stageId) { s.extraCompleted = !s.extraCompleted; }
+          });
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function deferSubtaskStage(quadrantKey, blockId, subtaskId, stageId) {
+  var data = loadDateData(currentDate);
+  var stageText = '';
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages.forEach(function(s) {
+            if (s.id === stageId) { stageText = s.text || ''; }
+          });
+          break;
+        }
+      }
+      break;
+    }
+  }
+  if (!stageText) return;
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var ft = { id: 'ft_' + generateId(), type: 'task', text: stageText,
+    scheduledDate: tomorrow.toISOString().split('T')[0], targetQuadrant: quadrantKey };
+  addFutureTask(ft);
+  deleteStage(quadrantKey, blockId, subtaskId, stageId);
+}
+
+function setSubtaskStageTimeSlot(quadrantKey, blockId, subtaskId, stageId, slotKey) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages.forEach(function(s) {
+            if (s.id === stageId) { s.timeSlot = slotKey; }
+          });
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+// ============ Task-stage extra operations ============
+
+function toggleTaskStageHighlight(quadrantKey, taskId, stageId) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages.forEach(function(s) {
+        if (s.id === stageId) {
+          if (s.highlights && s.highlights.length > 0) { delete s.highlights; }
+          else { s.highlights = [{ start: 0, end: (s.text || '').length }]; }
+        }
+      });
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function toggleTaskStageExtra(quadrantKey, taskId, stageId) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages.forEach(function(s) {
+        if (s.id === stageId) { s.extraCompleted = !s.extraCompleted; }
+      });
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function deferTaskStage(quadrantKey, taskId, stageId) {
+  var data = loadDateData(currentDate);
+  var stageText = '';
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages.forEach(function(s) {
+        if (s.id === stageId) { stageText = s.text || ''; }
+      });
+      break;
+    }
+  }
+  if (!stageText) return;
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  var ft = { id: 'ft_' + generateId(), type: 'task', text: stageText,
+    scheduledDate: tomorrow.toISOString().split('T')[0], targetQuadrant: quadrantKey };
+  addFutureTask(ft);
+  deleteTaskStage(quadrantKey, taskId, stageId);
+}
+
+function setTaskStageTimeSlot(quadrantKey, taskId, stageId, slotKey) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName && data[quadrantKey][i].stages) {
+      data[quadrantKey][i].stages.forEach(function(s) {
+        if (s.id === stageId) { s.timeSlot = slotKey; }
+      });
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}

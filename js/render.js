@@ -585,6 +585,40 @@ function calcWeightedCompletion(data) {
   };
 }
 
+// Time slot completion: group by pairs
+function calcTimeSlotCompletion(data) {
+  var groups = {
+    '早晨 + 上午': { total: 0, done: 0, icons: '🌄🕘' },
+    '中午 + 下午': { total: 0, done: 0, icons: '☀️🕒' },
+    '傍晚 + 晚上': { total: 0, done: 0, icons: '🌇🌙' }
+  };
+  var slotToGroup = {
+    'early_morn': '早晨 + 上午',
+    'forenoon': '早晨 + 上午',
+    'noon': '中午 + 下午',
+    'afternoon': '中午 + 下午',
+    'dusk': '傍晚 + 晚上',
+    'night': '傍晚 + 晚上'
+  };
+  QUADRANT_KEYS.forEach(function(key) {
+    var items = data[key] || [];
+    items.forEach(function(item) {
+      if (item.blockName !== undefined) {
+        if (item.tasks) {
+          item.tasks.forEach(function(t) {
+            var g = slotToGroup[t.timeSlot];
+            if (g) { groups[g].total++; if (t.completed) groups[g].done++; }
+          });
+        }
+      } else {
+        var g = slotToGroup[item.timeSlot];
+        if (g) { groups[g].total++; if (item.completed) groups[g].done++; }
+      }
+    });
+  });
+  return groups;
+}
+
 function updateStatsBar(data) {
   var stats = calcWeightedCompletion(data);
   // Update header completion badge (only stats display now)
@@ -599,6 +633,28 @@ function updateStatsBar(data) {
   var hcEl = document.getElementById('headerCompletion');
   if (hcEl) {
     hcEl.title = '今日整体完成情况' + (deferCount > 0 ? ' | 今日推迟: ' + deferCount + ' 个' : '');
+  }
+  // Update time slot stats bar
+  var slotStats = calcTimeSlotCompletion(data);
+  var slotBar = document.getElementById('slotStatsBar');
+  var slotContent = document.getElementById('slotStatsContent');
+  if (!slotBar || !slotContent) return;
+  var slotGroupKeys = ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'];
+  var hasAny = false;
+  var parts = [];
+  slotGroupKeys.forEach(function(gk) {
+    var gd = slotStats[gk];
+    if (gd.total > 0) {
+      hasAny = true;
+      var rate = Math.round((gd.done / gd.total) * 100);
+      parts.push(gd.icons + ' ' + gk + ' ' + gd.done + '/' + gd.total + ' ' + rate + '%');
+    }
+  });
+  if (hasAny) {
+    slotBar.style.display = '';
+    slotContent.textContent = '⏰ ' + parts.join('  |  ');
+  } else {
+    slotBar.style.display = 'none';
   }
 }
 

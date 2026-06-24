@@ -295,7 +295,7 @@ function setupPrinciplesPanel() {
     var data = loadPrinciples();
     if (data.principles.length >= 5) { alert('原则最多5条，建议不超过3条'); return; }
     if (!data.startDate || !data.endDate) { alert('请先设置起止日期'); return; }
-    var text = prompt('请输入坚守原则（如"每天早上6点起床"）：');
+    var text = prompt('请输入依循（如"每天早上6点起床"）：');
     if (!text) return;
     addPrinciple(text);
     renderPrinciplesPanel();

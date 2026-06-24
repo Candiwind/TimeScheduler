@@ -138,37 +138,3 @@ function buildRecentHistoryHTML(today) {
   html += '</table>';
   return html;
 }
-
-// Time slot completion: group by pairs
-function calcTimeSlotCompletion(data) {
-  var groups = {
-    '早晨 + 上午': { total: 0, done: 0, icons: '🌄🕘' },
-    '中午 + 下午': { total: 0, done: 0, icons: '☀️🕒' },
-    '傍晚 + 晚上': { total: 0, done: 0, icons: '🌇🌙' }
-  };
-  var slotToGroup = {
-    'early_morn': '早晨 + 上午',
-    'forenoon': '早晨 + 上午',
-    'noon': '中午 + 下午',
-    'afternoon': '中午 + 下午',
-    'dusk': '傍晚 + 晚上',
-    'night': '傍晚 + 晚上'
-  };
-  QUADRANT_KEYS.forEach(function(key) {
-    var items = data[key] || [];
-    items.forEach(function(item) {
-      if (item.blockName !== undefined) {
-        if (item.tasks) {
-          item.tasks.forEach(function(t) {
-            var g = slotToGroup[t.timeSlot];
-            if (g) { groups[g].total++; if (t.completed) groups[g].done++; }
-          });
-        }
-      } else {
-        var g = slotToGroup[item.timeSlot];
-        if (g) { groups[g].total++; if (item.completed) groups[g].done++; }
-      }
-    });
-  });
-  return groups;
-}

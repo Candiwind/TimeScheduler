@@ -89,8 +89,17 @@ mark {
 }
 .header-completion span { font-weight: 700; }
 .header-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-left: 8px; }
-.header-slot-breakdown { font-size: 11px; opacity: 0.85; }
-.header-slot-breakdown span { margin: 0 2px; }
+.header-slot-breakdown { display: flex; align-items: center; gap: 4px; margin-right: auto; }
+.header-slot-badge {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  padding: 3px 8px; background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.12);
+  border-radius: 12px; white-space: nowrap;
+}
+[data-theme="dark"] .header-slot-badge {
+  background: rgba(125,189,242,0.06); border-color: rgba(125,189,242,0.12);
+}
+.header-slot-badge span { font-weight: 700; }
 
 /* ============ Toolbar ============ */
 .toolbar {

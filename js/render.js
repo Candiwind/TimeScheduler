@@ -633,7 +633,7 @@ function updateStatsBar(data) {
     hcEl.title = '今日整体完成情况' + (deferCount > 0 ? ' | 今日推迟: ' + deferCount + ' 个' : '');
   }
 
-  // Time slot breakdown in header (right of main completion badge)
+  // Time slot breakdown in header — each group in a pill badge
   var slotStats = calcTimeSlotCompletion(data);
   var slotEl = document.getElementById('headerSlotBreakdown');
   if (!slotEl) return;
@@ -641,17 +641,11 @@ function updateStatsBar(data) {
   var parts = [];
   slotGroupKeys.forEach(function(gk) {
     var gd = slotStats[gk];
-    if (gd.total > 0) {
-      var rate = Math.round((gd.done / gd.total) * 100);
-      parts.push('<span title="' + gk + '">' + gd.icons + ' ' + gd.done + '/' + gd.total + ' ' + rate + '%</span>');
-    }
+    var rate = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
+    parts.push('<span class="header-slot-badge" title="' + gk + '">' + gd.icons + ' <span>' + gd.done + '/' + gd.total + ' ' + rate + '%</span></span>');
   });
-  if (parts.length > 0) {
-    slotEl.style.display = '';
-    slotEl.innerHTML = '| ' + parts.join(' ');
-  } else {
-    slotEl.style.display = 'none';
-  }
+  slotEl.style.display = '';
+  slotEl.innerHTML = parts.join('');
 }
 
 function setSearchTerm(term) {

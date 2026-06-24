@@ -92,6 +92,16 @@ function buildDailyReportMd(date, data, stats) {
   if (extraCount > 0) {
     lines.push('| 额外完成 | ' + extraCount + ' |');
   }
+  // Time slot breakdown in overview
+  var slotStats = calcTimeSlotCompletion(data);
+  var slotGroupKeys2 = ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'];
+  var slotRows = '';
+  slotGroupKeys2.forEach(function(gk) {
+    var gd = slotStats[gk];
+    var rate2 = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
+    slotRows += '| ' + gd.icons + ' ' + gk + ' | ' + gd.done + '/' + gd.total + ' | ' + rate2 + '% |\n';
+  });
+  lines.push(slotRows);
   lines.push('');
 
   QUADRANT_KEYS.forEach(function(key) {
@@ -159,25 +169,6 @@ function buildDailyReportMd(date, data, stats) {
     lines.push('');
   });
 
-  // Time slot stats
-  var slotStats = calcTimeSlotCompletion(data);
-  lines.push('## ⏰ 分时段完成情况');
-  lines.push('');
-  var slotGroupKeys2 = ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'];
-  var slotHasAny = false;
-  slotGroupKeys2.forEach(function(gk) {
-    var gd = slotStats[gk];
-    if (gd.total > 0) {
-      slotHasAny = true;
-      var rate2 = Math.round((gd.done / gd.total) * 100);
-      lines.push('| ' + gd.icons + ' ' + gk + ' | ' + gd.done + '/' + gd.total + ' | ' + rate2 + '% |');
-    }
-  });
-  if (!slotHasAny) {
-    lines.push('（未设置时段的任务）');
-  }
-  lines.push('');
-
   // Note section
   lines.push('## 📝 备注');
   lines.push('');
@@ -209,6 +200,13 @@ function buildDailyReportHtml(date, data, stats) {
   if (extraCount > 0) {
     h += '<tr><td style="padding:4px 12px;">额外完成</td><td style="color:#f0ad4e;">' + extraCount + '</td></tr>';
   }
+  // Time slot rows in overview table
+  var slotStatsHtml = calcTimeSlotCompletion(data);
+  ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'].forEach(function(gk) {
+    var gd = slotStatsHtml[gk];
+    var rate3 = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
+    h += '<tr><td style="padding:4px 12px;">' + gd.icons + ' ' + gk + '</td><td style="font-weight:700;color:var(--accent);">' + gd.done + '/' + gd.total + ' <span style="font-size:11px;opacity:0.8;">(' + rate3 + '%)</span></td></tr>';
+  });
   h += '</table>';
 
   QUADRANT_KEYS.forEach(function(key) {
@@ -281,26 +279,6 @@ function buildDailyReportHtml(date, data, stats) {
       h += '</ul>';
     }
   });
-
-  // Time slot stats HTML
-  var slotStatsHtml = calcTimeSlotCompletion(data);
-  h += '<h3 style="margin:0 0 8px;background:#f0f0f5;padding:6px 12px;border-radius:6px;font-size:14px;">⏰ 分时段完成情况</h3>';
-  var slotHasAnyHtml = false;
-  ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'].forEach(function(gk) {
-    var gd = slotStatsHtml[gk];
-    if (gd.total > 0) {
-      slotHasAnyHtml = true;
-      var rate3 = Math.round((gd.done / gd.total) * 100);
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 12px;font-size:13px;">' +
-        '<span style="font-size:16px;">' + gd.icons + '</span>' +
-        '<span style="flex:1;">' + gk + '</span>' +
-        '<span style="color:var(--accent);font-weight:700;">' + gd.done + '/' + gd.total + '</span>' +
-        '<span style="font-weight:700;">' + rate3 + '%</span></div>';
-    }
-  });
-  if (!slotHasAnyHtml) {
-    h += '<p style="color:var(--text3);padding:0 12px;">（未设置时段的任务）</p>';
-  }
 
   // Note
   var note = '';

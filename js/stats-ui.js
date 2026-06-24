@@ -26,25 +26,11 @@ function showStatsModal() {
 
   var weightHint = document.createElement('p');
   weightHint.style.cssText = 'font-size:11px;color:var(--text2);margin-bottom:4px;';
-  weightHint.innerHTML = '完成率加权：I×0.35 + II×0.3 + III×0.2 + IV×0.15';
+  weightHint.innerHTML = '完成率加权：所有任务权重均等，单项权重=100%÷任务总数';
   content.appendChild(weightHint);
 
-  var baseWeights = { I: 4, II: 3, III: 2, IV: 1 };
-  var totalBaseWeight = 0;
-  QUADRANT_KEYS.forEach(function(key) {
-    var items = data[key] || [];
-    items.forEach(function(item) {
-      if (item.blockName !== undefined) {
-        if (item.tasks) item.tasks.forEach(function() { totalBaseWeight += baseWeights[key]; });
-      } else {
-        totalBaseWeight += baseWeights[key];
-      }
-    });
-  });
-  var perTaskPct = {};
-  QUADRANT_KEYS.forEach(function(key) {
-    perTaskPct[key] = totalBaseWeight > 0 ? (baseWeights[key] / totalBaseWeight * 100).toFixed(1) : 0;
-  });
+  // All tasks have equal weight; per-task percentage = 100% / total task count
+  var perTaskPctVal = stats.total > 0 ? (100 / stats.total).toFixed(1) : 0;
 
   var grid = document.createElement('div');
   grid.className = 'stats-grid';
@@ -52,14 +38,14 @@ function showStatsModal() {
   QUADRANT_KEYS.forEach(function(key) {
     var q = QUADRANTS[key];
     var qc = stats.quadRates[key];
-    var weight = QUADRANT_WEIGHTS[key];
+    var quadWeight = stats.total > 0 ? Math.round((qc.total / stats.total) * 100) : 0;
     var quadDiv = document.createElement('div');
     quadDiv.className = 'stats-quad sq-' + key.toLowerCase();
     quadDiv.innerHTML =
-      '<div class="sq-name">' + q.icon + ' ' + q.name + ' <small>(加权 ' + Math.round(weight * 100) + '%)</small></div>' +
+      '<div class="sq-name">' + q.icon + ' ' + q.name + ' <small>(任务占比 ' + quadWeight + '%)</small></div>' +
       '<div class="sq-total">' + qc.total + '</div>' +
       '<div class="sq-done">完成 ' + qc.done + ' / ' + qc.total + ' (' + Math.round(qc.rate * 100) + '%)</div>' +
-      '<div style="font-size:10px;opacity:0.7;">单任务占比: ' + perTaskPct[key] + '%</div>';
+      '<div style="font-size:10px;opacity:0.7;">单任务占比: ' + perTaskPctVal + '%</div>';
     grid.appendChild(quadDiv);
   });
 

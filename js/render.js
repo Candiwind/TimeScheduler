@@ -448,8 +448,8 @@ function updateDateDisplay(date) {
   document.title = '四象限任务管理器 - ' + date;
 }
 
-// Weighted completion: I=0.35, II=0.3, III=0.2, IV=0.15
-var QUADRANT_WEIGHTS = { I: 0.35, II: 0.3, III: 0.2, IV: 0.15 };
+// Weighted completion: all tasks have equal weight, auto-adjusts with task count
+// Each task weight = 100/N%, when all completed weighted sum = 100%
 
 function calcQuadrantCompletion(items) {
   var total = 0, done = 0;
@@ -475,16 +475,14 @@ function calcWeightedCompletion(data) {
     totalAll += qc.total;
     doneAll += qc.done;
   });
-  // Weighted average of per-quadrant completion rates
-  var weighted = 0;
-  QUADRANT_KEYS.forEach(function(key) {
-    weighted += quadRates[key].rate * QUADRANT_WEIGHTS[key];
-  });
+  // Equal weight per task: each task contributes 1/N of total
+  // Weight auto-adjusts as task count changes; all done = 100%
+  var weightedRate = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
   return {
     total: totalAll,
     done: doneAll,
-    simpleRate: totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0,
-    weightedRate: Math.round(weighted * 100),
+    simpleRate: weightedRate,
+    weightedRate: weightedRate,
     quadRates: quadRates
   };
 }
@@ -496,7 +494,7 @@ function updateStatsBar(data) {
   document.getElementById('statRate').textContent = stats.weightedRate + '%';
   var rateEl = document.getElementById('statRate');
   if (rateEl) {
-    rateEl.title = '加权完成率 (I×0.35 + II×0.3 + III×0.2 + IV×0.15) | 简单完成率: ' + stats.simpleRate + '%';
+    rateEl.title = '加权完成率（所有任务权重均等，自动合计100%）| 简单完成率: ' + stats.simpleRate + '%';
   }
   // Show deferred count
   var deferCount = data._deferred || 0;

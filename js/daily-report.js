@@ -83,7 +83,7 @@ function buildDailyReportMd(date, data, stats) {
   lines.push('| 总任务数 | ' + stats.total + ' |');
   lines.push('| 已完成 | ' + stats.done + ' |');
   lines.push('| 简单完成率 | ' + stats.simpleRate + '% |');
-  lines.push('| 加权完成率 | ' + stats.weightedRate + '% (I×0.35 + II×0.3 + III×0.2 + IV×0.15) |');
+  lines.push('| 加权完成率 | ' + stats.weightedRate + '% (所有任务权重均等，自动合计100%) |');
   var deferCount = data._deferred || 0;
   if (deferCount > 0) {
     lines.push('| 今日推迟 | ' + deferCount + ' |');

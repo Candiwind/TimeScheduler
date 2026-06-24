@@ -805,13 +805,27 @@ function calcTimeSlotCompletion(data) {
       if (item.blockName !== undefined) {
         if (item.tasks) {
           item.tasks.forEach(function(t) {
-            var g = slotToGroup[t.timeSlot];
-            if (g) { groups[g].total++; if (t.completed) groups[g].done++; }
+            if (t.stages && t.stages.length > 0) {
+              t.stages.forEach(function(s) {
+                var g = slotToGroup[s.timeSlot];
+                if (g) { groups[g].total++; if (s.completed) groups[g].done++; }
+              });
+            } else {
+              var g = slotToGroup[t.timeSlot];
+              if (g) { groups[g].total++; if (t.completed) groups[g].done++; }
+            }
           });
         }
       } else {
-        var g = slotToGroup[item.timeSlot];
-        if (g) { groups[g].total++; if (item.completed) groups[g].done++; }
+        if (item.stages && item.stages.length > 0) {
+          item.stages.forEach(function(s) {
+            var g = slotToGroup[s.timeSlot];
+            if (g) { groups[g].total++; if (s.completed) groups[g].done++; }
+          });
+        } else {
+          var g = slotToGroup[item.timeSlot];
+          if (g) { groups[g].total++; if (item.completed) groups[g].done++; }
+        }
       }
     });
   });

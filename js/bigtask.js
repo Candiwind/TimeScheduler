@@ -20,6 +20,23 @@ function setupBigTaskPanel() {
 function renderBigTaskPanel() {
   var bigTasks = loadBigTasks();
   var listEl = document.getElementById('bigTaskList');
+
+  // Save expanded card states and collapsed milestone states before re-render
+  var expandedCardIds = {};
+  var collapsedMilestoneIds = {};
+  var existingCards = document.querySelectorAll('#bigTaskList .bigtask-card');
+  existingCards.forEach(function(card) {
+    if (card.classList.contains('expanded')) {
+      var nameEl = card.querySelector('.bt-editable-name');
+      if (nameEl && nameEl.dataset.btId) expandedCardIds[nameEl.dataset.btId] = true;
+    }
+    card.querySelectorAll('.bigtask-milestone').forEach(function(ms) {
+      var msNameEl = ms.querySelector('.ms-editable-name');
+      if (msNameEl && msNameEl.dataset.msId && ms.classList.contains('collapsed')) {
+        collapsedMilestoneIds[msNameEl.dataset.msId] = true;
+      }
+    });
+  });
   var emptyEl = document.getElementById('bigTaskEmpty');
   var countEl = document.getElementById('bigTaskCount');
 
@@ -201,6 +218,31 @@ function renderBigTaskPanel() {
     });
   });
 
+  // Bind drag handlers for bigtask subtasks
+  listEl.querySelectorAll('.bigtask-subtask').forEach(function(el) {
+    el.addEventListener('dragstart', handleBigtaskSubDragStart);
+    el.addEventListener('dragend', handleBigtaskSubDragEnd);
+    el.addEventListener('dragover', handleBigtaskSubDragOver);
+    el.addEventListener('dragleave', handleBigtaskSubDragLeave);
+    el.addEventListener('drop', handleBigtaskSubDrop);
+  });
+
+  // Restore expanded card states
+  listEl.querySelectorAll('.bigtask-card').forEach(function(card) {
+    var nameEl = card.querySelector('.bt-editable-name');
+    if (nameEl && nameEl.dataset.btId && expandedCardIds[nameEl.dataset.btId]) {
+      card.classList.add('expanded');
+    }
+  });
+
+  // Restore collapsed milestone states
+  listEl.querySelectorAll('.bigtask-milestone').forEach(function(ms) {
+    var msNameEl = ms.querySelector('.ms-editable-name');
+    if (msNameEl && msNameEl.dataset.msId && collapsedMilestoneIds[msNameEl.dataset.msId]) {
+      ms.classList.add('collapsed');
+    }
+  });
+
   renderBigTaskPool();
 }
 
@@ -209,7 +251,7 @@ function renderBigTaskCardHTML(bt, idx) {
   var countdownClass = daysLeft <= 14 ? ' urgent' : '';
 
   var completedClass = (bt.progress >= 100) ? ' completed' : '';
-  var h = '<div class="bigtask-card' + (idx === 0 ? ' expanded' : '') + completedClass + '">';
+  var h = '<div class="bigtask-card' + completedClass + '">';
   h += '<div class="bigtask-card-header">';
   h += '<span class="bigtask-card-icon">📌</span>';
   h += '<div class="bigtask-card-info">';
@@ -253,7 +295,7 @@ function renderBigTaskCardHTML(bt, idx) {
       h += '<div class="bigtask-milestone-body">';
       if (ms.tasks && ms.tasks.length > 0) {
         ms.tasks.forEach(function(t) {
-          h += '<div class="bigtask-subtask">';
+          h += '<div class="bigtask-subtask" draggable="true" data-type="bigtask-subtask" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-st-text="' + Util.escHtml(t.text).replace(/"/g, '&quot;') + '">';
           h += '<input type="checkbox" class="task-checkbox bigtask-subtask-checkbox" data-big-task-id="' + bt.id + '" data-subtask-id="' + t.id + '" ' + (t.completed ? 'checked' : '') + '>';
           h += '<span class="bigtask-subtask-text st-editable-text' + (t.completed ? ' done' : '') + '" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="双击编辑内容">' + renderTaskText(t.text) + '</span>';
           h += '<span class="bigtask-subtask-date st-editable-date" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;">' + (t.plannedDate || '📅') + '</span>';
@@ -292,6 +334,14 @@ function renderBigTaskPool() {
 
   poolEl.style.display = '';
   itemsEl.innerHTML = '';
+
+  // Show warning if too many tasks scheduled for today
+  if (poolItems.length > 3) {
+    var warnEl = document.createElement('div');
+    warnEl.className = 'pool-daily-warning';
+    warnEl.textContent = '⚠️ 今日任务较多（' + poolItems.length + ' 个），建议每日安排 ≤3 个任务，避免设立不可能完成的计划';
+    itemsEl.appendChild(warnEl);
+  }
 
   poolItems.forEach(function(pi) {
     var el = document.createElement('div');
@@ -361,6 +411,15 @@ function applyBigTaskDropOverrides() {
       window._dragFromFuture = null;
       return;
     }
+    if (window._dragFromBigtask) {
+      e.preventDefault();
+      var container2 = this.querySelector('.quadrant-tasks');
+      if (container2) container2.classList.remove('drag-over');
+      clearAllHighlights();
+      moveBigtaskSubToQuadrant(this.dataset.key, window._dragFromBigtask);
+      window._dragFromBigtask = null;
+      return;
+    }
     _origHandleQuadrantDrop.call(this, e);
   };
 
@@ -378,6 +437,13 @@ function applyBigTaskDropOverrides() {
       this.classList.remove('drag-over-task');
       addFutureDragToQuadrant(this.dataset.quadrant, window._dragFromFuture);
       window._dragFromFuture = null;
+      return;
+    }
+    if (window._dragFromBigtask) {
+      e.preventDefault(); e.stopPropagation();
+      this.classList.remove('drag-over-task');
+      moveBigtaskSubToQuadrant(this.dataset.quadrant, window._dragFromBigtask);
+      window._dragFromBigtask = null;
       return;
     }
     _origHandleTaskDrop.call(this, e);
@@ -427,6 +493,31 @@ function applyBigTaskDropOverrides() {
       saveDateData(currentDate, d2);
       removeFutureDragSource(fData);
       window._dragFromFuture = null;
+      renderAll(currentDate);
+      return;
+    }
+    if (window._dragFromBigtask) {
+      e.preventDefault(); e.stopPropagation();
+      this.classList.remove('drag-over-block');
+      var tQ2 = this.dataset.quadrant;
+      var tBId2 = this.dataset.id;
+      var bData = window._dragFromBigtask;
+      var d3 = loadDateData(currentDate);
+      for (var i3 = 0; i3 < d3[tQ2].length; i3++) {
+        if (d3[tQ2][i3].id === tBId2 && d3[tQ2][i3].blockName !== undefined) {
+          if (!d3[tQ2][i3].tasks) d3[tQ2][i3].tasks = [];
+          d3[tQ2][i3].tasks.push({
+            id: generateId(),
+            text: bData.text,
+            completed: false,
+            bigTaskRef: { bigTaskId: bData.btId, subtaskId: bData.stId }
+          });
+          break;
+        }
+      }
+      saveDateData(currentDate, d3);
+      toggleBigSubtaskComplete(bData.btId, bData.stId, false);
+      window._dragFromBigtask = null;
       renderAll(currentDate);
       return;
     }

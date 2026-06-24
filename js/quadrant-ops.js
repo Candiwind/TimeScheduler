@@ -281,3 +281,124 @@ function updateTaskDueDate(quadrantKey, taskId, dueDate) {
   saveDateData(currentDate, data);
   renderQuadrantOnly(quadrantKey);
 }
+
+// ============ Subtask Stage Operations ============
+
+function splitSubtaskIntoStages(quadrantKey, blockId, subtaskId) {
+  var data = loadDateData(currentDate);
+  var subtask = null;
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId) { subtask = tasks[j]; break; }
+      }
+      break;
+    }
+  }
+  if (!subtask) return;
+  if (subtask.stages && subtask.stages.length > 0) {
+    alert('该子任务已拆分为阶段');
+    return;
+  }
+  var input = prompt('请输入阶段名称（用逗号分隔，如"设计,编码,测试"）：\n原任务名：' + (subtask.text || ''));
+  if (!input) return;
+  var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
+  if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
+  subtask.stages = stageNames.map(function(name) {
+    return { id: generateId(), text: name, completed: false };
+  });
+  // Auto-sync completed state
+  subtask.completed = false;
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function toggleStageComplete(quadrantKey, blockId, subtaskId, stageId, completed) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages.forEach(function(s) {
+            if (s.id === stageId) { s.completed = completed; }
+          });
+          // Auto-sync parent subtask
+          tasks[j].completed = tasks[j].stages.every(function(s) { return s.completed; });
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function addStage(quadrantKey, blockId, subtaskId) {
+  var text = prompt('请输入新阶段名称：');
+  if (!text) return;
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId) {
+          if (!tasks[j].stages) tasks[j].stages = [];
+          tasks[j].stages.push({ id: generateId(), text: text, completed: false });
+          tasks[j].completed = false;
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function deleteStage(quadrantKey, blockId, subtaskId, stageId) {
+  if (!confirm('确定删除该阶段？')) return;
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages = tasks[j].stages.filter(function(s) { return s.id !== stageId; });
+          if (tasks[j].stages.length === 0) {
+            delete tasks[j].stages;
+            tasks[j].completed = false;
+          } else {
+            tasks[j].completed = tasks[j].stages.every(function(s) { return s.completed; });
+          }
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function updateStageText(quadrantKey, blockId, subtaskId, stageId, newText) {
+  var data = loadDateData(currentDate);
+  for (var i = 0; i < data[quadrantKey].length; i++) {
+    if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
+      var tasks = data[quadrantKey][i].tasks || [];
+      for (var j = 0; j < tasks.length; j++) {
+        if (tasks[j].id === subtaskId && tasks[j].stages) {
+          tasks[j].stages.forEach(function(s) {
+            if (s.id === stageId) { s.text = newText; }
+          });
+          break;
+        }
+      }
+      break;
+    }
+  }
+  saveDateData(currentDate, data);
+  renderQuadrantOnly(quadrantKey);
+}

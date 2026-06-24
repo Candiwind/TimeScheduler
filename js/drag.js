@@ -515,3 +515,174 @@ function reorderSubtasks(quadrantKey, blockId, taskId, targetId, before) {
   saveDateData(currentDate, data);
   renderAll(currentDate);
 }
+
+// ============ Big Task Subtask Drag Handlers ============
+
+function handleBigtaskSubDragStart(e) {
+  this.classList.add('dragging');
+  draggedItem = this;
+  dragSourceQuadrant = null;
+  dragSourceBlockId = null;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', 'BTSUB:' + this.dataset.btId + ':' + this.dataset.msId + ':' + this.dataset.stId);
+  window._dragFromBigtask = {
+    btId: this.dataset.btId,
+    msId: this.dataset.msId,
+    stId: this.dataset.stId,
+    text: this.dataset.stText
+  };
+}
+
+function handleBigtaskSubDragEnd(e) {
+  this.classList.remove('dragging');
+  draggedItem = null;
+  dragSourceQuadrant = null;
+  dragSourceBlockId = null;
+  window._dragFromBigtask = null;
+  document.querySelectorAll('.bigtask-subtask').forEach(function(el) {
+    el.classList.remove('drag-before', 'drag-after');
+  });
+}
+
+function handleBigtaskSubDragOver(e) {
+  e.preventDefault();
+  if (!draggedItem || draggedItem.dataset.type !== 'bigtask-subtask') return;
+  var target = e.currentTarget;
+  if (target === draggedItem) return;
+  if (target.dataset.btId !== draggedItem.dataset.btId) return;
+  target.classList.remove('drag-before', 'drag-after');
+  var rect = target.getBoundingClientRect();
+  var mid = rect.top + rect.height / 2;
+  if (e.clientY < mid) {
+    target.classList.add('drag-before');
+  } else {
+    target.classList.add('drag-after');
+  }
+}
+
+function handleBigtaskSubDragLeave(e) {
+  e.currentTarget.classList.remove('drag-before', 'drag-after');
+}
+
+function handleBigtaskSubDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!draggedItem || draggedItem.dataset.type !== 'bigtask-subtask') return;
+  var sourceBtId = draggedItem.dataset.btId;
+  var sourceMsId = draggedItem.dataset.msId;
+  var sourceStId = draggedItem.dataset.stId;
+  var target = e.currentTarget;
+  var targetBtId = target.dataset.btId;
+  var targetMsId = target.dataset.msId;
+  var targetStId = target.dataset.stId;
+  document.querySelectorAll('.bigtask-subtask').forEach(function(el) {
+    el.classList.remove('drag-before', 'drag-after');
+  });
+  if (sourceBtId !== targetBtId) return;
+  if (sourceMsId === targetMsId && sourceStId === targetStId) return;
+  var rect = target.getBoundingClientRect();
+  var mid = rect.top + rect.height / 2;
+  var before = e.clientY < mid;
+  if (sourceMsId === targetMsId) {
+    reorderBigtaskSubtasks(sourceBtId, sourceMsId, sourceStId, targetStId, before);
+  } else {
+    moveBigtaskSubBetweenMilestones(sourceBtId, sourceMsId, sourceStId, targetMsId, targetStId, before);
+  }
+  draggedItem = null;
+  dragSourceQuadrant = null;
+  dragSourceBlockId = null;
+  window._dragFromBigtask = null;
+}
+
+function reorderBigtaskSubtasks(btId, msId, stId, targetStId, before) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId && tasks[i].milestones) {
+      for (var j = 0; j < tasks[i].milestones.length; j++) {
+        var ms = tasks[i].milestones[j];
+        if (ms.id === msId && ms.tasks) {
+          var srcIdx = -1;
+          for (var k = 0; k < ms.tasks.length; k++) {
+            if (ms.tasks[k].id === stId) { srcIdx = k; break; }
+          }
+          if (srcIdx < 0) return;
+          var found = ms.tasks.splice(srcIdx, 1)[0];
+          var insertAt = ms.tasks.length;
+          for (var m = 0; m < ms.tasks.length; m++) {
+            if (ms.tasks[m].id === targetStId) { insertAt = before ? m : m + 1; break; }
+          }
+          ms.tasks.splice(insertAt, 0, found);
+          recalcBigTaskProgress(tasks[i]);
+          saveBigTasks(tasks);
+          renderBigTaskPanel();
+          return;
+        }
+      }
+    }
+  }
+}
+
+function moveBigtaskSubBetweenMilestones(btId, fromMsId, stId, toMsId, targetStId, before) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId && tasks[i].milestones) {
+      var fromMs = null, toMs = null;
+      for (var j = 0; j < tasks[i].milestones.length; j++) {
+        if (tasks[i].milestones[j].id === fromMsId) fromMs = tasks[i].milestones[j];
+        if (tasks[i].milestones[j].id === toMsId) toMs = tasks[i].milestones[j];
+      }
+      if (!fromMs || !toMs) return;
+      var srcIdx = -1;
+      if (fromMs.tasks) {
+        for (var k = 0; k < fromMs.tasks.length; k++) {
+          if (fromMs.tasks[k].id === stId) { srcIdx = k; break; }
+        }
+      }
+      if (srcIdx < 0) return;
+      var found = fromMs.tasks.splice(srcIdx, 1)[0];
+      if (!toMs.tasks) toMs.tasks = [];
+      var insertAt = toMs.tasks.length;
+      for (var m = 0; m < toMs.tasks.length; m++) {
+        if (toMs.tasks[m].id === targetStId) { insertAt = before ? m : m + 1; break; }
+      }
+      toMs.tasks.splice(insertAt, 0, found);
+      recalcBigTaskProgress(tasks[i]);
+      saveBigTasks(tasks);
+      renderBigTaskPanel();
+      return;
+    }
+  }
+}
+
+function moveBigtaskSubToQuadrant(quadrantKey, dragData) {
+  var data = loadDateData(currentDate);
+  if (!data[quadrantKey]) data[quadrantKey] = [];
+  var st = getBigSubtaskData(dragData.btId, dragData.stId);
+  data[quadrantKey].push({
+    id: generateId(),
+    text: (st ? st.text : dragData.text),
+    completed: false,
+    progress: '100%',
+    dueDate: '',
+    bigTaskRef: { bigTaskId: dragData.btId, subtaskId: dragData.stId }
+  });
+  saveDateData(currentDate, data);
+  renderAll(currentDate);
+}
+
+function getBigSubtaskData(btId, stId) {
+  var tasks = loadBigTasks();
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId && tasks[i].milestones) {
+      for (var j = 0; j < tasks[i].milestones.length; j++) {
+        var ms = tasks[i].milestones[j];
+        if (ms.tasks) {
+          for (var k = 0; k < ms.tasks.length; k++) {
+            if (ms.tasks[k].id === stId) return ms.tasks[k];
+          }
+        }
+      }
+    }
+  }
+  return null;
+}

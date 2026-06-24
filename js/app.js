@@ -17,6 +17,7 @@ function initApp() {
   setupDailyReport();
   setupBigTaskPanel();
   setupPlanPoolPanel();
+  setupPrinciplesPanel();
   setupHintBar();
   migrateFutureTasks(today);
   migrateWeekTasks(today);
@@ -24,6 +25,7 @@ function initApp() {
   renderAll(today);
   renderBigTaskPanel();
   renderPlanPoolPanel();
+  renderPrinciplesPanel();
 
   setTimeout(function() {
     autoSyncFromDevice();
@@ -272,7 +274,33 @@ renderAll = function(date) {
   _originalRenderAll(date);
   renderBigTaskPanel();
   renderPlanPoolPanel();
+  renderPrinciplesPanel();
 };
+
+// ============ Principles Panel ============
+function setupPrinciplesPanel() {
+  document.getElementById('principlesPanelToggle').addEventListener('click', function() {
+    document.getElementById('principlesPanel').classList.toggle('collapsed');
+  });
+
+  document.getElementById('btnSetPrinciplesDate').addEventListener('click', function() {
+    var data = loadPrinciples();
+    showDateRangeEditor(this, data.startDate, data.endDate, function(start, end) {
+      updatePrinciplesDateRange(start, end);
+      renderPrinciplesPanel();
+    });
+  });
+
+  document.getElementById('btnAddPrinciple').addEventListener('click', function() {
+    var data = loadPrinciples();
+    if (data.principles.length >= 5) { alert('原则最多5条，建议不超过3条'); return; }
+    if (!data.startDate || !data.endDate) { alert('请先设置起止日期'); return; }
+    var text = prompt('请输入坚守原则（如"每天早上6点起床"）：');
+    if (!text) return;
+    addPrinciple(text);
+    renderPrinciplesPanel();
+  });
+}
 
 // ============ Start ============
 document.addEventListener('DOMContentLoaded', function() {

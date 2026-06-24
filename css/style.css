@@ -77,8 +77,18 @@ mark {
   padding: 8px 16px; background: var(--surface); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); margin-bottom: 8px; transition: background var(--t);
 }
-.app-header h1 { font-size: 18px; font-weight: 700; margin-right: auto; white-space: nowrap; }
-.header-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.app-header h1 { font-size: 18px; font-weight: 700; white-space: nowrap; }
+.header-completion {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  padding: 3px 10px; background: rgba(74,144,217,0.08); border: 1px solid rgba(74,144,217,0.15);
+  border-radius: 14px; white-space: nowrap; margin-right: auto;
+}
+[data-theme="dark"] .header-completion {
+  background: rgba(125,189,242,0.08); border-color: rgba(125,189,242,0.15);
+}
+.header-completion span { font-weight: 700; }
+.header-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-left: 8px; }
 
 /* ============ Toolbar ============ */
 .toolbar {
@@ -293,6 +303,19 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .bigtask-pool-item:active { cursor: grabbing; }
 .bigtask-pool-item .pool-item-source { font-size: 10px; color: var(--text3); }
 .bigtask-pool-item.dragging { opacity: 0.4; }
+.pool-daily-warning {
+  margin-bottom: 6px; padding: 6px 10px;
+  background: #fff8e1; border-left: 3px solid #f0ad4e;
+  border-radius: 4px; font-size: 11px; color: #8a6d14; text-align: center;
+}
+[data-theme="dark"] .pool-daily-warning {
+  background: #3a3020; color: #d4b84a; border-color: #8a7420;
+}
+
+/* Big task subtask drag indicators */
+.bigtask-subtask.dragging { opacity: 0.3; }
+.bigtask-subtask.drag-before { border-top: 2px solid var(--accent); }
+.bigtask-subtask.drag-after { border-bottom: 2px solid var(--accent); }
 
 /* Editable fields in big task cards */
 .bt-editable-name:hover,
@@ -303,6 +326,43 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .st-editable-date:hover,
 .st-editable-weight:hover,
 .bt-editable-target:hover { opacity: 0.75; }
+
+/* ============ Principles Panel ============ */
+.principles-panel {
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  margin-bottom: 12px; transition: background var(--t); overflow: hidden;
+}
+.principles-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; cursor: pointer; font-weight: 700; font-size: 13px;
+  background: linear-gradient(135deg, #e0f0e8, #e8f5f0); color: #3a6a5a;
+  user-select: none; border-left: 3px solid #5cb85c;
+}
+[data-theme="dark"] .principles-panel-header {
+  background: linear-gradient(135deg, #1a3028, #203830); color: #90c8a8;
+}
+.principles-panel-header:hover { filter: brightness(0.97); }
+.principles-toggle-icon { font-size: 12px; transition: transform var(--t); }
+.principles-panel.collapsed .principles-toggle-icon { transform: rotate(-90deg); }
+.principles-panel.collapsed .principles-panel-body { display: none; }
+
+.principles-panel-body { padding: 12px 16px; }
+.principles-date-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  font-size: 12px; color: var(--text2);
+}
+.principles-date-display { font-weight: 600; color: var(--accent); }
+.principles-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.principle-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; transition: all var(--t);
+}
+.principle-item:hover { border-color: var(--accent); background: var(--accent-light); }
+.principle-index { font-weight: 700; color: var(--accent); font-size: 12px; }
+.principle-text { flex: 1; cursor: pointer; }
+.principle-text:hover { color: var(--accent); }
+.principles-actions { display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 
 /* ============ Quadrant Grid ============ */
 .quadrant-grid {
@@ -333,9 +393,9 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   letter-spacing: 0.3px;
 }
 .task-count {
-  margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text2);
-  background: rgba(255,255,255,0.5); padding: 2px 10px; border-radius: 10px;
-  min-width: 22px; text-align: center;
+  margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text2);
+  background: rgba(255,255,255,0.5); padding: 2px 8px; border-radius: 10px;
+  min-width: 50px; text-align: center; white-space: nowrap;
 }
 .quadrant-i .quadrant-header { background: linear-gradient(135deg, #ffb8b8, #ffcdcd); }
 .quadrant-ii .quadrant-header { background: linear-gradient(135deg, #bdd8ff, #d0e4ff); }
@@ -476,6 +536,37 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 [data-theme="dark"] .quadrant-ii .subtask-item.completed { background: rgba(150,180,255,0.15); border-color: rgba(150,180,255,0.25); }
 [data-theme="dark"] .quadrant-iii .subtask-item.completed { background: rgba(255,240,150,0.15); border-color: rgba(255,240,150,0.25); }
 [data-theme="dark"] .quadrant-iv .subtask-item.completed { background: rgba(150,240,150,0.15); border-color: rgba(150,240,150,0.25); }
+/* Split stages button */
+.split-stages-btn {
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--text3); font-size: 10px; cursor: pointer; border-radius: 4px;
+  padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--t); margin-left: 2px;
+}
+.split-stages-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+/* Stages container inside a subtask */
+.subtask-item.has-stages { flex-wrap: wrap; }
+.subtask-stages {
+  width: 100%; margin-top: 4px; padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+.subtask-stage-item {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 6px 3px 20px; font-size: 11px;
+  border-radius: 4px; transition: all var(--t);
+}
+.subtask-stage-item:hover { background: var(--accent-light); }
+.subtask-stage-item .stage-checkbox { width: 14px; height: 14px; }
+.subtask-stage-item .stage-text { flex: 1; color: var(--text2); }
+.subtask-stage-item.completed .stage-text { text-decoration: line-through; opacity: 0.55; }
+.stage-del-btn { width: 16px; height: 16px; font-size: 12px; line-height: 1; }
+.add-stage-btn {
+  width: 100%; margin-top: 4px; padding: 3px; border: 1px dashed var(--border2);
+  background: transparent; color: var(--text3); font-size: 10px; cursor: pointer;
+  border-radius: 4px; transition: all var(--t);
+}
+.add-stage-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
 .add-subtask-btn {
   width: 100%; padding: 6px; border: 1px dashed var(--border2); background: transparent;
   color: var(--text3); font-size: 11px; cursor: pointer; border-radius: 0 0 9px 9px;

@@ -16,6 +16,7 @@
   <!-- Header (merged: always-visible controls + collapsible secondary) -->
   <header class="app-header">
     <h1>📊 四象限任务管理器</h1>
+    <span class="header-completion" id="headerCompletion" title="今日整体完成情况">✅ <span id="hcDone">0</span>/<span id="hcTotal">0</span> · <span id="hcRate">0%</span></span>
     <div class="header-actions">
       <input type="date" id="datePicker" title="选择日期">
       <button class="btn btn-info btn-sm" id="btnToday">今天</button>
@@ -69,7 +70,7 @@
   </div>
 
   <!-- Big Task Panel -->
-  <div class="bigtask-panel" id="bigTaskPanel">
+  <div class="bigtask-panel collapsed" id="bigTaskPanel">
     <div class="bigtask-panel-header" id="bigTaskPanelToggle">
       <span>🎯 大任务规划 (<span id="bigTaskCount">0</span>/5，建议≤3)</span>
       <span class="bigtask-toggle-icon">▼</span>
@@ -86,6 +87,26 @@
       <div class="bigtask-actions">
         <button class="btn btn-sm btn-primary" id="btnAddBigTask">+ 新建大任务</button>
         <button class="btn btn-sm btn-info" id="btnClaudePlan" data-tooltip="用 AI 调研规划大任务">🤖 AI 规划</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Principles Panel -->
+  <div class="principles-panel collapsed" id="principlesPanel">
+    <div class="principles-panel-header" id="principlesPanelToggle">
+      <span>💎 坚守原则（<span id="principlesCount">0</span>/5，建议≤3）</span>
+      <span class="principles-toggle-icon">▼</span>
+    </div>
+    <div class="principles-panel-body" id="principlesPanelBody">
+      <div class="principles-date-row">
+        <button class="btn btn-sm btn-info" id="btnSetPrinciplesDate">📅 设置日期</button>
+        <span class="principles-date-display" id="principlesDateDisplay">未设置日期范围</span>
+      </div>
+      <div class="principles-list" id="principlesList">
+        <div class="empty-hint" id="principlesEmpty">暂无原则，点击下方按钮添加</div>
+      </div>
+      <div class="principles-actions">
+        <button class="btn btn-sm btn-primary" id="btnAddPrinciple">+ 添加原则</button>
       </div>
     </div>
   </div>
@@ -156,7 +177,7 @@
   </div><!-- /quadrant-grid -->
 
   <!-- Unified Plan Pool Panel (Tab: 待办/本周/本月) -->
-  <div class="planpool-panel" id="planPoolPanel">
+  <div class="planpool-panel collapsed" id="planPoolPanel">
     <div class="planpool-panel-header" id="planPoolPanelToggle">
       <span>📋 计划池 (<span id="planPoolTotalCount">0</span>)</span>
       <div class="planpool-tabs" id="planPoolTabs">

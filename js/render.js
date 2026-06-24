@@ -53,12 +53,12 @@ function renderQuadrant(key, items) {
   var container = document.querySelector('#quadrant-' + key + ' .quadrant-tasks');
   if (!container) return;
 
-  // Update count badge
+  // Update count badge — show a/b c% (done/total rate%)
   var countEl = document.getElementById('count-' + key);
-  var totalCount = countAllTasks(items);
+  var qc = calcQuadrantCompletion(items);
   if (countEl) {
-    countEl.textContent = totalCount;
-    countEl.style.display = totalCount > 0 ? '' : 'none';
+    countEl.textContent = qc.done + '/' + qc.total + ' ' + Math.round(qc.rate * 100) + '%';
+    countEl.style.display = qc.total > 0 ? '' : 'none';
   }
   // Toggle has-tasks class for footer auto-hide (point 7)
   var quadrant = document.getElementById('quadrant-' + key);
@@ -109,7 +109,15 @@ function countAllTasks(items) {
   var count = 0;
   items.forEach(function(item) {
     if (item.blockName !== undefined) {
-      count += (item.tasks ? item.tasks.length : 0);
+      if (item.tasks) {
+        item.tasks.forEach(function(t) {
+          if (t.stages && t.stages.length > 0) {
+            count += t.stages.length;
+          } else {
+            count++;
+          }
+        });
+      }
     } else {
       count++;
     }
@@ -439,7 +447,90 @@ function createSubTaskElement(task, quadrantKey, blockId) {
   el.addEventListener('dragleave', handleSubtaskDragLeave);
   el.addEventListener('drop', handleSubtaskDrop);
 
+  // Split into stages button
+  var splitBtn = document.createElement('button');
+  splitBtn.className = 'split-stages-btn';
+  splitBtn.innerHTML = '⊞';
+  splitBtn.title = '拆分为阶段';
+  splitBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    splitSubtaskIntoStages(quadrantKey, blockId, task.id);
+  });
+  splitBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+  el.appendChild(splitBtn);
+
+  // Stages container (rendered below the subtask row)
+  if (task.stages && task.stages.length > 0) {
+    var stagesContainer = document.createElement('div');
+    stagesContainer.className = 'subtask-stages';
+    el.classList.add('has-stages');
+    // Auto-sync parent completed based on all stages
+    var allStagesDone = task.stages.every(function(s) { return s.completed; });
+    if (task.completed !== allStagesDone) {
+      task.completed = allStagesDone;
+      // Update checkbox to match
+      checkbox.checked = allStagesDone;
+      if (allStagesDone) { el.classList.add('completed'); } else { el.classList.remove('completed'); }
+    }
+    task.stages.forEach(function(stage) {
+      var stageEl = createStageElement(stage, quadrantKey, blockId, task.id);
+      stagesContainer.appendChild(stageEl);
+    });
+    // Add stage button
+    var addStageBtn = document.createElement('button');
+    addStageBtn.className = 'add-stage-btn';
+    addStageBtn.innerHTML = '+ 阶段';
+    addStageBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      addStage(quadrantKey, blockId, task.id);
+    });
+    addStageBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    stagesContainer.appendChild(addStageBtn);
+    el.appendChild(stagesContainer);
+  }
+
   return el;
+}
+
+function createStageElement(stage, quadrantKey, blockId, subtaskId) {
+  var stageRow = document.createElement('div');
+  stageRow.className = 'subtask-stage-item';
+  if (stage.completed) stageRow.classList.add('completed');
+
+  var stageCheckbox = document.createElement('input');
+  stageCheckbox.type = 'checkbox';
+  stageCheckbox.className = 'task-checkbox stage-checkbox';
+  stageCheckbox.checked = stage.completed;
+  stageCheckbox.addEventListener('change', function(e) {
+    e.stopPropagation();
+    toggleStageComplete(quadrantKey, blockId, subtaskId, stage.id, stageCheckbox.checked);
+  });
+  stageCheckbox.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+
+  var stageText = document.createElement('span');
+  stageText.className = 'task-text stage-text';
+  stageText.textContent = stage.text || '';
+  stageText.addEventListener('dblclick', function(e) {
+    e.stopPropagation();
+    startEdit(stageText, stageText.textContent, function(newVal) {
+      updateStageText(quadrantKey, blockId, subtaskId, stage.id, newVal);
+    });
+  });
+
+  var delBtn = document.createElement('button');
+  delBtn.className = 'task-delete-btn stage-del-btn';
+  delBtn.innerHTML = '&times;';
+  delBtn.title = '删除阶段';
+  delBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    deleteStage(quadrantKey, blockId, subtaskId, stage.id);
+  });
+  delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+
+  stageRow.appendChild(stageCheckbox);
+  stageRow.appendChild(stageText);
+  stageRow.appendChild(delBtn);
+  return stageRow;
 }
 
 function updateDateDisplay(date) {
@@ -456,7 +547,14 @@ function calcQuadrantCompletion(items) {
   items.forEach(function(item) {
     if (item.blockName !== undefined) {
       if (item.tasks) {
-        item.tasks.forEach(function(t) { total++; if (t.completed) done++; });
+        item.tasks.forEach(function(t) {
+          if (t.stages && t.stages.length > 0) {
+            t.stages.forEach(function(s) { total++; if (s.completed) done++; });
+          } else {
+            total++;
+            if (t.completed) done++;
+          }
+        });
       }
     } else {
       total++;
@@ -507,6 +605,13 @@ function updateStatsBar(data) {
   if (deferLabel) {
     deferLabel.style.display = deferCount > 0 ? '' : 'none';
   }
+  // Update header completion badge
+  var hcDone = document.getElementById('hcDone');
+  var hcTotal = document.getElementById('hcTotal');
+  var hcRate = document.getElementById('hcRate');
+  if (hcDone) hcDone.textContent = stats.done;
+  if (hcTotal) hcTotal.textContent = stats.total;
+  if (hcRate) hcRate.textContent = stats.weightedRate + '%';
 }
 
 function setSearchTerm(term) {
@@ -703,11 +808,7 @@ function renderPlanPoolPanel() {
     return;
   }
 
-  var panel = document.getElementById('planPoolPanel');
-  if (panel && panel.classList.contains('collapsed') && ptasks.length > 0) {
-    panel.classList.remove('collapsed');
-  }
-
+  // Panel collapse state is user-controlled — no auto-expand
   var html = '';
   ptasks.forEach(function(ft) {
     if (ft.type === 'block') {
@@ -979,3 +1080,62 @@ function addWeekSubtask(ftId, text) { _addPlanSubtask(WEEK_TASK_KEY, saveWeekTas
 function editMonthSubtaskField(ftId, stId, field, value) { _editPlanSubtaskField(MONTH_TASK_KEY, saveMonthTasks, ftId, stId, field, value); }
 function deleteMonthSubtask(ftId, stId) { _deletePlanSubtask(MONTH_TASK_KEY, saveMonthTasks, ftId, stId); }
 function addMonthSubtask(ftId, text) { _addPlanSubtask(MONTH_TASK_KEY, saveMonthTasks, ftId, text); }
+
+// ============ Principles Panel Render ============
+
+function renderPrinciplesPanel() {
+  var data = loadPrinciples();
+  var countEl = document.getElementById('principlesCount');
+  if (countEl) countEl.textContent = data.principles.length;
+
+  var dateDisplay = document.getElementById('principlesDateDisplay');
+  if (dateDisplay) {
+    var hasDates = data.startDate && data.endDate;
+    dateDisplay.textContent = hasDates ? data.startDate + ' ~ ' + data.endDate : '未设置日期范围';
+    dateDisplay.style.color = hasDates ? '' : 'var(--text3)';
+  }
+
+  var listEl = document.getElementById('principlesList');
+  var emptyEl = document.getElementById('principlesEmpty');
+  if (!listEl) return;
+
+  // Remove existing items but keep emptyEl reference
+  listEl.querySelectorAll('.principle-item').forEach(function(el) { el.remove(); });
+
+  if (data.principles.length === 0) {
+    if (emptyEl) emptyEl.style.display = '';
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  data.principles.forEach(function(p, idx) {
+    var el = document.createElement('div');
+    el.className = 'principle-item';
+    el.innerHTML = '<span class="principle-index">' + (idx + 1) + '.</span>' +
+      '<span class="principle-text">' + Util.escHtml(p.text) + '</span>' +
+      '<button class="task-delete-btn principle-del-btn" data-pid="' + p.id + '">&times;</button>';
+    listEl.appendChild(el);
+  });
+
+  // Bind edit on dblclick
+  listEl.querySelectorAll('.principle-text').forEach(function(el) {
+    el.addEventListener('dblclick', function() {
+      var pid = this.parentElement.querySelector('.principle-del-btn').dataset.pid;
+      startEdit(this, this.textContent, function(newVal) {
+        updatePrinciple(pid, newVal);
+        renderPrinciplesPanel();
+      });
+    });
+  });
+
+  // Bind delete
+  listEl.querySelectorAll('.principle-del-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!confirm('删除该原则？')) return;
+      deletePrinciple(this.dataset.pid);
+      renderPrinciplesPanel();
+    });
+  });
+}

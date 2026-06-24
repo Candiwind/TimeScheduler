@@ -659,3 +659,50 @@ function _migratePlanPool(poolKey, date, shouldMigrate) {
   return migrated;
 }
 
+// ============ Principles Module ============
+var PRINCIPLES_KEY = 'quadrant_principles';
+
+function loadPrinciples() {
+  try {
+    var raw = localStorage.getItem(PRINCIPLES_KEY);
+    return raw ? JSON.parse(raw) : { id: '', startDate: '', endDate: '', principles: [] };
+  } catch (e) {
+    return { id: '', startDate: '', endDate: '', principles: [] };
+  }
+}
+
+function savePrinciples(data) {
+  try { localStorage.setItem(PRINCIPLES_KEY, JSON.stringify(data)); }
+  catch (e) { alert('存储空间不足'); }
+}
+
+function addPrinciple(text) {
+  var data = loadPrinciples();
+  if (data.principles.length >= 5) { alert('原则最多5条，建议不超过3条'); return null; }
+  var p = { id: generateId(), text: text };
+  data.principles.push(p);
+  savePrinciples(data);
+  return p;
+}
+
+function updatePrinciple(id, text) {
+  var data = loadPrinciples();
+  for (var i = 0; i < data.principles.length; i++) {
+    if (data.principles[i].id === id) { data.principles[i].text = text; break; }
+  }
+  savePrinciples(data);
+}
+
+function deletePrinciple(id) {
+  var data = loadPrinciples();
+  data.principles = data.principles.filter(function(p) { return p.id !== id; });
+  savePrinciples(data);
+}
+
+function updatePrinciplesDateRange(startDate, endDate) {
+  var data = loadPrinciples();
+  data.startDate = startDate;
+  data.endDate = endDate;
+  savePrinciples(data);
+}
+

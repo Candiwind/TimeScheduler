@@ -74,12 +74,13 @@ function deleteBlockWithUndo(quadrantKey, block, _unused) {
 
 function deleteTaskDirect(quadrantKey, taskId, blockId) {
   var data = loadDateData(currentDate);
+  var removedItem = null;
   if (blockId) {
     for (var i = 0; i < data[quadrantKey].length; i++) {
       if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
         var tasks = data[quadrantKey][i].tasks || [];
         for (var j = 0; j < tasks.length; j++) {
-          if (tasks[j].id === taskId) { tasks.splice(j, 1); break; }
+          if (tasks[j].id === taskId) { removedItem = tasks.splice(j, 1)[0]; break; }
         }
         break;
       }
@@ -87,22 +88,30 @@ function deleteTaskDirect(quadrantKey, taskId, blockId) {
   } else {
     for (var k = 0; k < data[quadrantKey].length; k++) {
       if (data[quadrantKey][k].id === taskId && !data[quadrantKey][k].blockName) {
-        data[quadrantKey].splice(k, 1);
+        removedItem = data[quadrantKey].splice(k, 1)[0];
         break;
       }
     }
   }
+  // If the deleted task has a bigTaskRef, unlink it from the big task subtask
+  // so migrateBigTaskSubtasks won't re-import it on the next renderAll
+  _unlinkBigTaskRef(removedItem);
   saveDateData(currentDate, data);
   renderAll(currentDate);
 }
 
 function deleteBlockDirect(quadrantKey, blockId) {
   var data = loadDateData(currentDate);
+  var removedBlock = null;
   for (var i = 0; i < data[quadrantKey].length; i++) {
     if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
-      data[quadrantKey].splice(i, 1);
+      removedBlock = data[quadrantKey].splice(i, 1)[0];
       break;
     }
+  }
+  // Unlink bigTaskRef from block subtasks so they won't be re-imported
+  if (removedBlock && removedBlock.tasks) {
+    _unlinkBigTaskRefs(removedBlock.tasks);
   }
   saveDateData(currentDate, data);
   renderAll(currentDate);
@@ -118,6 +127,7 @@ function deleteTask(quadrantKey, taskId) {
     }
   }
   if (found) {
+    _unlinkBigTaskRef(found);
     saveDateData(currentDate, data);
     renderAll(currentDate);
     Toast.show('任务已删除', function() {
@@ -139,6 +149,8 @@ function deleteBlock(quadrantKey, blockId) {
     }
   }
   if (found) {
+    // Unlink subtasks' bigTaskRef to prevent re-import
+    if (found.tasks) _unlinkBigTaskRefs(found.tasks);
     saveDateData(currentDate, data);
     renderAll(currentDate);
     Toast.show('任务块已删除', function() {
@@ -153,15 +165,18 @@ function deleteBlock(quadrantKey, blockId) {
 function deleteSubTask(quadrantKey, blockId, taskId) {
   if (!confirm('确定删除该子任务？')) return;
   var data = loadDateData(currentDate);
+  var removedItem = null;
   for (var i = 0; i < data[quadrantKey].length; i++) {
     if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
       var tasks = data[quadrantKey][i].tasks || [];
       for (var j = 0; j < tasks.length; j++) {
-        if (tasks[j].id === taskId) { tasks.splice(j, 1); break; }
+        if (tasks[j].id === taskId) { removedItem = tasks.splice(j, 1)[0]; break; }
       }
       break;
     }
   }
+  // Unlink from big task to prevent re-import
+  _unlinkBigTaskRef(removedItem);
   saveDateData(currentDate, data);
   renderAll(currentDate);
 }
@@ -633,6 +648,37 @@ function deferTaskStage(quadrantKey, taskId, stageId) {
     scheduledDate: tomorrow.toISOString().split('T')[0], targetQuadrant: quadrantKey };
   addFutureTask(ft);
   deleteTaskStage(quadrantKey, taskId, stageId);
+}
+
+// ---- BigTaskRef Unlink Helpers ----
+// Clear the big task subtask's plannedDate to prevent migrateBigTaskSubtasks
+// from re-importing a task that was just deleted from the quadrant.
+function _unlinkBigTaskRef(taskItem) {
+  if (!taskItem || !taskItem.bigTaskRef) return;
+  var bigTasks = loadBigTasks();
+  for (var i = 0; i < bigTasks.length; i++) {
+    if (bigTasks[i].id === taskItem.bigTaskRef.bigTaskId && bigTasks[i].milestones) {
+      for (var j = 0; j < bigTasks[i].milestones.length; j++) {
+        var ms = bigTasks[i].milestones[j];
+        if (ms.tasks) {
+          for (var k = 0; k < ms.tasks.length; k++) {
+            if (ms.tasks[k].id === taskItem.bigTaskRef.subtaskId) {
+              ms.tasks[k].plannedDate = '';
+              saveBigTasks(bigTasks);
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function _unlinkBigTaskRefs(taskArray) {
+  if (!taskArray) return;
+  for (var i = 0; i < taskArray.length; i++) {
+    _unlinkBigTaskRef(taskArray[i]);
+  }
 }
 
 function setTaskStageTimeSlot(quadrantKey, taskId, stageId, slotKey) {

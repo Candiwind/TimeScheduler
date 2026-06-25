@@ -525,17 +525,6 @@ function createSubTaskElement(task, quadrantKey, blockId) {
   el.appendChild(timeSlotBtn2);
   el.appendChild(delBtn);
 
-  // When stages exist, hide action buttons — they belong to stages
-  if (hasStages) {
-    hlBtn.style.display = 'none';
-    bonusBtn.style.display = 'none';
-    deferBtn.style.display = 'none';
-    timeSlotBtn2.style.display = 'none';
-    splitBtn.style.display = 'none';
-    checkbox.style.pointerEvents = 'none';
-    checkbox.style.opacity = '0.5';
-  }
-
   // Prevent inner interactive elements from capturing drag
   [checkbox, hlBtn, bonusBtn, deferBtn, timeSlotBtn2, delBtn].forEach(function(innerEl) {
     if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
@@ -550,6 +539,17 @@ function createSubTaskElement(task, quadrantKey, blockId) {
 
   // Split into stages button
   var splitBtn = document.createElement('button');
+
+  // When stages exist, hide action buttons — they belong to stages (must be after splitBtn creation)
+  if (hasStages) {
+    hlBtn.style.display = 'none';
+    bonusBtn.style.display = 'none';
+    deferBtn.style.display = 'none';
+    timeSlotBtn2.style.display = 'none';
+    splitBtn.style.display = 'none';
+    checkbox.style.pointerEvents = 'none';
+    checkbox.style.opacity = '0.5';
+  }
   splitBtn.className = 'split-stages-btn';
   splitBtn.innerHTML = '⊞';
   splitBtn.title = '拆分为阶段';

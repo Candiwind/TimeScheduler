@@ -251,6 +251,7 @@ function createTaskElement(item, quadrantKey, index) {
     bonusBtn.style.display = 'none';
     deferBtn.style.display = 'none';
     timeSlotBtn.style.display = 'none';
+    splitBtn.style.display = 'none';
     // Make checkbox auto-derived
     left.querySelector('input[type=checkbox]').style.pointerEvents = 'none';
     left.querySelector('input[type=checkbox]').style.opacity = '0.5';
@@ -303,7 +304,8 @@ function createTaskElement(item, quadrantKey, index) {
       addTaskStage(quadrantKey, item.id);
     });
     addStageBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
-    stagesContainer.appendChild(addStageBtn);
+    // Insert before delBtn so both appear at top-right
+    el.insertBefore(addStageBtn, delBtn);
     el.appendChild(stagesContainer);
   }
 
@@ -529,6 +531,7 @@ function createSubTaskElement(task, quadrantKey, blockId) {
     bonusBtn.style.display = 'none';
     deferBtn.style.display = 'none';
     timeSlotBtn2.style.display = 'none';
+    splitBtn.style.display = 'none';
     checkbox.style.pointerEvents = 'none';
     checkbox.style.opacity = '0.5';
   }
@@ -580,7 +583,7 @@ function createSubTaskElement(task, quadrantKey, blockId) {
       var stageEl = createStageElement(stage, quadrantKey, blockId, task.id);
       stagesContainer.appendChild(stageEl);
     });
-    // Add stage button
+    // Add stage button at top-right of task element
     var addStageBtn = document.createElement('button');
     addStageBtn.className = 'add-stage-btn';
     addStageBtn.innerHTML = '+ 阶段';
@@ -589,7 +592,8 @@ function createSubTaskElement(task, quadrantKey, blockId) {
       addStage(quadrantKey, blockId, task.id);
     });
     addStageBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
-    stagesContainer.appendChild(addStageBtn);
+    // Insert before delBtn so both appear at top-right
+    el.insertBefore(addStageBtn, delBtn);
     el.appendChild(stagesContainer);
   }
 

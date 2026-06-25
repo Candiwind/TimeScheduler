@@ -261,6 +261,13 @@ function createTaskElement(item, quadrantKey, index) {
 
   // Stages container
   if (item.stages && item.stages.length > 0) {
+    var slotOrder = ['early_morn','forenoon','noon','afternoon','dusk','night'];
+    item.stages.sort(function(a, b) {
+      var ai = slotOrder.indexOf(a.timeSlot || '');
+      var bi = slotOrder.indexOf(b.timeSlot || '');
+      if (ai === -1) ai = 99; if (bi === -1) bi = 99;
+      return ai - bi;
+    });
     var stagesContainer = document.createElement('div');
     stagesContainer.className = 'subtask-stages';
     el.classList.add('has-stages');
@@ -529,10 +536,16 @@ function createSubTaskElement(task, quadrantKey, blockId) {
 
   // Stages container (rendered below the subtask row)
   if (task.stages && task.stages.length > 0) {
+    var slotOrder2 = ['early_morn','forenoon','noon','afternoon','dusk','night'];
+    task.stages.sort(function(a, b) {
+      var ai = slotOrder2.indexOf(a.timeSlot || '');
+      var bi = slotOrder2.indexOf(b.timeSlot || '');
+      if (ai === -1) ai = 99; if (bi === -1) bi = 99;
+      return ai - bi;
+    });
     var stagesContainer = document.createElement('div');
     stagesContainer.className = 'subtask-stages';
     el.classList.add('has-stages');
-    // Auto-sync parent completed based on all stages
     var allStagesDone = task.stages.every(function(s) { return s.completed; });
     if (task.completed !== allStagesDone) {
       task.completed = allStagesDone;

@@ -412,6 +412,13 @@ function renderBigTaskCardHTML(bt, idx) {
       h += '<div class="bigtask-milestone-bar"><div class="bigtask-milestone-bar-fill" style="width:' + msRate + '%"></div></div>';
       h += '<div class="bigtask-milestone-body">';
       if (ms.tasks && ms.tasks.length > 0) {
+        // Sort by plannedDate, nulls last
+        ms.tasks.sort(function(a, b) {
+          if (!a.plannedDate && !b.plannedDate) return 0;
+          if (!a.plannedDate) return 1;
+          if (!b.plannedDate) return -1;
+          return a.plannedDate.localeCompare(b.plannedDate);
+        });
         ms.tasks.forEach(function(t) {
           var btHasStages = t.stages && t.stages.length > 0;
           h += '<div class="bigtask-subtask" draggable="true" data-type="bigtask-subtask" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-st-text="' + Util.escHtml(t.text).replace(/"/g, '&quot;') + '">';
@@ -429,6 +436,13 @@ function renderBigTaskCardHTML(bt, idx) {
           h += '</div>';
           // Stages for this big task subtask
           if (btHasStages) {
+            // Sort stages by plannedDate, nulls last
+            t.stages.sort(function(a, b) {
+              if (!a.plannedDate && !b.plannedDate) return 0;
+              if (!a.plannedDate) return 1;
+              if (!b.plannedDate) return -1;
+              return a.plannedDate.localeCompare(b.plannedDate);
+            });
             t.stages.forEach(function(s) {
               var sHlIcon = (s.highlights && s.highlights.length > 0) ? '⭐' : '☆';
               h += '<div class="bigtask-subtask-stage' + (s.completed ? ' completed' : '') + '" style="display:flex;align-items:center;gap:4px;padding:2px 6px 2px 28px;font-size:11px;">';

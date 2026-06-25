@@ -92,9 +92,9 @@ mark {
 .header-slot-breakdown { display: flex; align-items: center; gap: 4px; margin-right: auto; }
 .header-slot-badge {
   display: flex; align-items: center; gap: 2px;
-  font-size: 11px; font-weight: 600; color: var(--accent);
-  padding: 3px 8px; background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.12);
-  border-radius: 12px; white-space: nowrap;
+  font-size: 10px; font-weight: 600; color: var(--accent);
+  padding: 2px 6px; background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.12);
+  border-radius: 10px; white-space: nowrap;
 }
 [data-theme="dark"] .header-slot-badge {
   background: rgba(125,189,242,0.06); border-color: rgba(125,189,242,0.12);
@@ -406,25 +406,26 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   flex: 1; overflow-y: auto; padding: 8px; min-height: 40px; max-height: 55vh; transition: background 0.2s;
 }
 
-/* ============ Quadrant Footer ============ */
-.quadrant-footer {
-  padding: 4px 8px; display: flex; gap: 4px; align-items: center;
-  border-top: 1px solid var(--border); background: var(--surface2); flex-shrink: 0;
-  transition: all var(--t);
+/* ============ Quadrant Header Add Buttons ============ */
+.quadrant-add-btn {
+  width: 22px; height: 22px; padding: 0; border: 1px solid transparent;
+  background: rgba(255,255,255,0.45); color: var(--text2);
+  font-size: 12px; border-radius: 5px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all var(--t); margin-left: 2px;
 }
-.quadrant-footer .btn-add-task { flex: 1; font-size: 11px; padding: 5px 8px; justify-content: center; }
-.quadrant-footer .btn-add-block {
-  width: 28px; height: 28px; padding: 0; font-size: 15px; border-radius: 6px;
-  flex-shrink: 0; justify-content: center;
+.quadrant-add-btn:hover {
+  background: rgba(255,255,255,0.8); color: var(--accent);
+  border-color: var(--accent); transform: scale(1.1);
 }
-/* Collapsed footer: when quadrant has tasks, footer becomes minimal */
-.quadrant.has-tasks .quadrant-footer {
-  padding: 2px 8px; border-top: 1px dashed var(--border); background: transparent;
+[data-theme="dark"] .quadrant-add-btn {
+  background: rgba(255,255,255,0.06);
 }
-.quadrant.has-tasks .quadrant-footer .btn-add-task {
-  font-size: 10px; padding: 3px 6px; opacity: 0.45;
+[data-theme="dark"] .quadrant-add-btn:hover {
+  background: rgba(255,255,255,0.12);
 }
-.quadrant.has-tasks .quadrant-footer .btn-add-task:hover { opacity: 1; }
+
+/* Quadrant footer and has-tasks are removed — add buttons moved to header */
 
 /* ============ Task Item ============ */
 .task-item {

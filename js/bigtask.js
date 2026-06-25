@@ -96,6 +96,20 @@ function renderBigTaskPanel() {
     });
   });
 
+  // Bind complete toggle
+  listEl.querySelectorAll('.bigtask-complete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var btId = this.dataset.btId;
+      var bts = loadBigTasks();
+      var bt = null;
+      for (var bi = 0; bi < bts.length; bi++) { if (bts[bi].id === btId) { bt = bts[bi]; break; } }
+      var newProgress = (bt && bt.progress >= 100) ? 0 : 100;
+      updateBigTask(btId, { progress: newProgress });
+      renderBigTaskPanel();
+    });
+  });
+
   // Bind delete
   listEl.querySelectorAll('.bigtask-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
@@ -357,6 +371,7 @@ function renderBigTaskCardHTML(bt, idx) {
   h += '<span class="bigtask-card-progress-text">' + (bt.progress || 0) + '%</span>';
   h += '</div>';
   h += '<span class="bigtask-card-countdown' + countdownClass + '">' + (daysLeft >= 0 ? '倒计时 ' + daysLeft + ' 天' : '已逾期') + '</span>';
+  h += '<button class="bigtask-complete-btn' + (bt.progress >= 100 ? ' completed' : '') + '" data-bt-id="' + bt.id + '" title="' + (bt.progress >= 100 ? '标记为未完成' : '标记为完成') + '" style="font-size:14px;padding:0;width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">' + (bt.progress >= 100 ? '✅' : '⬜') + '</button>';
   h += '<span class="bigtask-card-toggle" style="font-size:10px;color:var(--text3);transition:transform var(--t);">▼</span>';
   h += '<button class="task-delete-btn bigtask-delete-btn" data-big-task-id="' + bt.id + '" title="删除大任务">&times;</button>';
   h += '</div>';
@@ -668,15 +683,29 @@ function applyBigTaskDropOverrides() {
 
 function addPoolTaskToQuadrant(quadrantKey, poolData) {
   var data = loadDateData(currentDate);
-  var task = {
-    id: generateId(),
-    text: poolData.text,
-    completed: false,
-    progress: '100%',
-    bigTaskRef: { bigTaskId: poolData.bigTaskId, subtaskId: poolData.subtaskId },
-    weight: poolData.weight
-  };
-  data[quadrantKey].push(task);
+  // Check if a task with same bigTaskRef already exists (auto-migrated) — move it instead of duplicating
+  var existingKey = null, existingIndex = -1;
+  QUADRANT_KEYS.forEach(function(key) {
+    var items = data[key] || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].bigTaskRef && items[i].bigTaskRef.bigTaskId === poolData.bigTaskId && items[i].bigTaskRef.subtaskId === poolData.subtaskId) {
+        existingKey = key; existingIndex = i; return;
+      }
+    }
+  });
+  if (existingKey && existingIndex >= 0) {
+    var existing = data[existingKey].splice(existingIndex, 1)[0];
+    data[quadrantKey].push(existing);
+  } else {
+    data[quadrantKey].push({
+      id: generateId(),
+      text: poolData.text,
+      completed: false,
+      progress: '100%',
+      bigTaskRef: { bigTaskId: poolData.bigTaskId, subtaskId: poolData.subtaskId },
+      weight: poolData.weight
+    });
+  }
   saveDateData(currentDate, data);
   toggleBigSubtaskComplete(poolData.bigTaskId, poolData.subtaskId, false);
   renderAll(currentDate);

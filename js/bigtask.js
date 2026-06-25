@@ -698,18 +698,43 @@ function applyBigTaskDropOverrides() {
 function addPoolTaskToQuadrant(quadrantKey, poolData) {
   var data = loadDateData(currentDate);
   // Check if a task with same bigTaskRef already exists (auto-migrated) — move it instead of duplicating
-  var existingKey = null, existingIndex = -1;
+  var existingKey = null, existingIndex = -1, existingBlockIndex = -1, existingInBlock = false;
   QUADRANT_KEYS.forEach(function(key) {
     var items = data[key] || [];
     for (var i = 0; i < items.length; i++) {
+      // Check top-level tasks
       if (items[i].bigTaskRef && items[i].bigTaskRef.bigTaskId === poolData.bigTaskId && items[i].bigTaskRef.subtaskId === poolData.subtaskId) {
         existingKey = key; existingIndex = i; return;
+      }
+      // Also check block subtasks
+      if (items[i].blockName !== undefined && items[i].tasks) {
+        for (var j = 0; j < items[i].tasks.length; j++) {
+          if (items[i].tasks[j].bigTaskRef && items[i].tasks[j].bigTaskRef.bigTaskId === poolData.bigTaskId && items[i].tasks[j].bigTaskRef.subtaskId === poolData.subtaskId) {
+            existingKey = key; existingIndex = i;
+            existingBlockIndex = j; existingInBlock = true;
+            return;
+          }
+        }
       }
     }
   });
   if (existingKey && existingIndex >= 0) {
-    var existing = data[existingKey].splice(existingIndex, 1)[0];
-    data[quadrantKey].push(existing);
+    if (existingInBlock && existingBlockIndex >= 0) {
+      // Remove from block subtasks
+      var blockItem = data[existingKey][existingIndex];
+      var subtask = blockItem.tasks.splice(existingBlockIndex, 1)[0];
+      data[quadrantKey].push({
+        id: subtask.id || generateId(),
+        text: subtask.text,
+        completed: false,
+        progress: '100%',
+        bigTaskRef: subtask.bigTaskRef
+      });
+    } else {
+      // Move top-level task to target quadrant
+      var existing = data[existingKey].splice(existingIndex, 1)[0];
+      data[quadrantKey].push(existing);
+    }
   } else {
     data[quadrantKey].push({
       id: generateId(),

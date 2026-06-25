@@ -391,7 +391,7 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   letter-spacing: 0.3px;
 }
 .task-count {
-  margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text2);
+  font-size: 11px; font-weight: 600; color: var(--text2);
   background: rgba(255,255,255,0.5); padding: 2px 8px; border-radius: 10px;
   min-width: 50px; text-align: center; white-space: nowrap;
 }
@@ -408,21 +408,29 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 
 /* ============ Quadrant Header Add Buttons ============ */
 .quadrant-add-btn {
-  width: 22px; height: 22px; padding: 0; border: 1px solid transparent;
-  background: rgba(255,255,255,0.45); color: var(--text2);
+  width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.55); color: var(--text2);
   font-size: 12px; border-radius: 5px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: all var(--t); margin-left: 2px;
+  flex-shrink: 0; transition: all var(--t); margin-left: 3px;
 }
 .quadrant-add-btn:hover {
-  background: rgba(255,255,255,0.8); color: var(--accent);
-  border-color: var(--accent); transform: scale(1.1);
+  background: var(--accent); color: #fff; border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.quadrant-add-btn:active {
+  transform: scale(0.95);
 }
 [data-theme="dark"] .quadrant-add-btn {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);
 }
 [data-theme="dark"] .quadrant-add-btn:hover {
-  background: rgba(255,255,255,0.12);
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+
+/* Push add buttons to top-right, left of task-count */
+[id^="btnAddTask-"] {
+  margin-left: auto;
 }
 
 /* Quadrant footer and has-tasks are removed — add buttons moved to header */

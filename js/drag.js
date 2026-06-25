@@ -363,6 +363,10 @@ function moveTaskIntoBlock(fromKey, taskId, toKey, blockId) {
   for (var j = 0; j < data[toKey].length; j++) {
     if (data[toKey][j].id === blockId && data[toKey][j].blockName !== undefined) {
       var taskItem = { id: found.id, text: found.text, completed: found.completed, progress: found.progress };
+      // Preserve bigTaskRef and timeSlot when moving into block
+      if (found.bigTaskRef) taskItem.bigTaskRef = found.bigTaskRef;
+      if (found.timeSlot) taskItem.timeSlot = found.timeSlot;
+      if (found.highlights) taskItem.highlights = found.highlights;
       if (!data[toKey][j].tasks) data[toKey][j].tasks = [];
       data[toKey][j].tasks.push(taskItem);
       break;
@@ -389,6 +393,11 @@ function moveSubtaskOut(fromKey, blockId, taskId, toKey, dropIndex) {
   }
   if (!found) return;
   var newTask = { id: found.id, text: found.text, completed: found.completed, progress: found.progress };
+  // Preserve bigTaskRef, timeSlot, stages, and highlights when moving out
+  if (found.bigTaskRef) newTask.bigTaskRef = found.bigTaskRef;
+  if (found.timeSlot) newTask.timeSlot = found.timeSlot;
+  if (found.stages) newTask.stages = found.stages;
+  if (found.highlights) newTask.highlights = found.highlights;
   if (dropIndex >= 0 && dropIndex <= data[toKey].length) {
     data[toKey].splice(dropIndex, 0, newTask);
   } else {
@@ -415,6 +424,11 @@ function moveSubtaskToAfter(fromKey, blockId, taskId, toKey, afterId) {
   }
   if (!found) return;
   var newTask = { id: found.id, text: found.text, completed: found.completed, progress: found.progress };
+  // Preserve bigTaskRef, timeSlot, stages, and highlights when moving out
+  if (found.bigTaskRef) newTask.bigTaskRef = found.bigTaskRef;
+  if (found.timeSlot) newTask.timeSlot = found.timeSlot;
+  if (found.stages) newTask.stages = found.stages;
+  if (found.highlights) newTask.highlights = found.highlights;
   var insertAt = data[toKey].length;
   for (var k = 0; k < data[toKey].length; k++) {
     if (data[toKey][k].id === afterId) {
@@ -657,15 +671,51 @@ function moveBigtaskSubBetweenMilestones(btId, fromMsId, stId, toMsId, targetStI
 function moveBigtaskSubToQuadrant(quadrantKey, dragData) {
   var data = loadDateData(currentDate);
   if (!data[quadrantKey]) data[quadrantKey] = [];
-  var st = getBigSubtaskData(dragData.btId, dragData.stId);
-  data[quadrantKey].push({
-    id: generateId(),
-    text: (st ? st.text : dragData.text),
-    completed: false,
-    progress: '100%',
-    dueDate: '',
-    bigTaskRef: { bigTaskId: dragData.btId, subtaskId: dragData.stId }
+  // Check if task with same bigTaskRef already exists — move it instead of duplicating
+  var existingKey = null, existingIndex = -1, existingBlockIndex = -1, existingInBlock = false;
+  QUADRANT_KEYS.forEach(function(key) {
+    var items = data[key] || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].bigTaskRef && items[i].bigTaskRef.bigTaskId === dragData.btId && items[i].bigTaskRef.subtaskId === dragData.stId) {
+        existingKey = key; existingIndex = i; return;
+      }
+      if (items[i].blockName !== undefined && items[i].tasks) {
+        for (var j = 0; j < items[i].tasks.length; j++) {
+          if (items[i].tasks[j].bigTaskRef && items[i].tasks[j].bigTaskRef.bigTaskId === dragData.btId && items[i].tasks[j].bigTaskRef.subtaskId === dragData.stId) {
+            existingKey = key; existingIndex = i;
+            existingBlockIndex = j; existingInBlock = true;
+            return;
+          }
+        }
+      }
+    }
   });
+  if (existingKey && existingIndex >= 0) {
+    if (existingInBlock && existingBlockIndex >= 0) {
+      var blockItem = data[existingKey][existingIndex];
+      var subtask = blockItem.tasks.splice(existingBlockIndex, 1)[0];
+      data[quadrantKey].push({
+        id: subtask.id || generateId(),
+        text: subtask.text,
+        completed: false,
+        progress: '100%',
+        bigTaskRef: subtask.bigTaskRef
+      });
+    } else {
+      var existing = data[existingKey].splice(existingIndex, 1)[0];
+      data[quadrantKey].push(existing);
+    }
+  } else {
+    var st = getBigSubtaskData(dragData.btId, dragData.stId);
+    data[quadrantKey].push({
+      id: generateId(),
+      text: (st ? st.text : dragData.text),
+      completed: false,
+      progress: '100%',
+      dueDate: '',
+      bigTaskRef: { bigTaskId: dragData.btId, subtaskId: dragData.stId }
+    });
+  }
   saveDateData(currentDate, data);
   renderAll(currentDate);
 }

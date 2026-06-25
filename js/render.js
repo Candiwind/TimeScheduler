@@ -64,21 +64,25 @@ function renderQuadrant(key, items) {
   var quadrant = document.getElementById('quadrant-' + key);
   if (quadrant) quadrant.classList.toggle('has-tasks', qc.total > 0);
 
-  // Sort by timeSlot: tasks ordered by time slot, blocks/unset last
-  var slotOrder = ['early_morn','forenoon','noon','afternoon','dusk','night'];
-  items.sort(function(a, b) {
-    var aSlot = (a.blockName === undefined) ? (a.timeSlot || '') : '';
-    var bSlot = (b.blockName === undefined) ? (b.timeSlot || '') : '';
-    var ai = slotOrder.indexOf(aSlot); var bi = slotOrder.indexOf(bSlot);
-    if (ai === -1) ai = 99; if (bi === -1) bi = 99;
-    return ai - bi;
-  });
-
   // Filter by search term
   var filtered = items;
   if (searchTerm) {
     filtered = filterItems(items, searchTerm.toLowerCase());
   }
+
+  // Sort by timeSlot (completion time period); unset slots go last.
+  // Stable: preserves manual order within same/no slot.
+  filtered = filtered.slice();
+  var slotOrder = ['early_morn','forenoon','noon','afternoon','dusk','night'];
+  filtered.sort(function(a, b) {
+    var aSlot = a.blockName !== undefined ? '' : (a.timeSlot || '');
+    var bSlot = b.blockName !== undefined ? '' : (b.timeSlot || '');
+    var ai = slotOrder.indexOf(aSlot);
+    var bi = slotOrder.indexOf(bSlot);
+    if (ai === -1) ai = 99;
+    if (bi === -1) bi = 99;
+    return ai - bi;
+  });
 
   // Use DocumentFragment for batch DOM insertion
   var frag = document.createDocumentFragment();
@@ -384,15 +388,16 @@ function createTaskBlockElement(block, quadrantKey, index) {
   tasksContainer.addEventListener('dragstart', function(e) { e.stopPropagation(); });
 
   if (block.tasks && block.tasks.length > 0) {
-    // Sort subtasks by timeSlot
+    // Sort subtasks by timeSlot (unset goes last)
     var slotOrder = ['early_morn','forenoon','noon','afternoon','dusk','night'];
-    block.tasks.sort(function(a, b) {
+    var sortedTasks = block.tasks.slice().sort(function(a, b) {
       var ai = slotOrder.indexOf(a.timeSlot || '');
       var bi = slotOrder.indexOf(b.timeSlot || '');
-      if (ai === -1) ai = 99; if (bi === -1) bi = 99;
+      if (ai === -1) ai = 99;
+      if (bi === -1) bi = 99;
       return ai - bi;
     });
-    block.tasks.forEach(function(task) {
+    sortedTasks.forEach(function(task) {
       tasksContainer.appendChild(createSubTaskElement(task, quadrantKey, block.id));
     });
   }

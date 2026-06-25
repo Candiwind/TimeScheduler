@@ -777,9 +777,9 @@ function handleStageDragLeave(e) {
 }
 
 function handleStageDrop(e) {
+  if (!draggedItem || draggedItem.dataset.type !== 'stage') return;
   e.preventDefault();
   e.stopPropagation();
-  if (!draggedItem || draggedItem.dataset.type !== 'stage') return;
   var source = draggedItem;
   var target = e.currentTarget;
   document.querySelectorAll('.subtask-stage-item').forEach(function(el) {

@@ -95,15 +95,17 @@
 ────────────────────────────────────────
 
 【V1.3 网页版问题，已修正】
-大任务规划栏那里整体加一个”完成”选项，可以自己点击
-任务推迟数量每天清理重新统计
-网页第一行，统计结果除了第一样整体统计情况之外，其他数据字号小一点
-补全象限任务块内子任务按时间段排序（render.js createTaskBlockElement）
-象限内小任务添加按钮重新设计为小按钮，位于右上角统计badge左侧
-修复大任务自动加载进象限的小任务拖动到其他象限后原象限任务不消失的问题
+1. ✅ 大任务规划栏那里整体加一个”完成”选项，可以自己点击
+2. ✅ 任务推迟数量每天清理重新统计
+3. ✅ 网页第一行，统计结果除了第一样整体统计情况之外，其他数据字号小一点
+4. ✅ 补全象限任务块内子任务按时间段排序（render.js createTaskBlockElement）
+5. ✅ 象限内小任务添加按钮重新设计为小按钮，位于右上角统计badge左侧
+6. ✅ 修复大任务自动加载进象限的小任务拖动到其他象限后原象限任务不消失的问题
   （moveTaskIntoBlock/moveSubtaskOut/moveSubtaskToAfter 保留 bigTaskRef；
    addPoolTaskToQuadrant/moveBigtaskSubToQuadrant 也检查块内子任务的 bigTaskRef，
    避免 migrateBigTaskSubtasks 重复导入）
+7. ✅ handleStageDrop 修复：不再无条件阻止事件冒泡，避免拖拽任务到阶段上时被吞掉
+8. ✅ migrateBigTaskSubtasks 新增去重逻辑：拖拽后若象限II残留同 bigTaskRef 的旧任务，自动清理
 
 
 ────────────────────────────────────────

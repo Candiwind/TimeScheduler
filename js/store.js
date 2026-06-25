@@ -654,6 +654,54 @@ function migrateBigTaskSubtasks(date) {
   var bigTasks = loadBigTasks();
   var data = loadDateData(date);
   var migrated = 0;
+  var dedupRemoved = false;
+
+  // First pass: build a set of bigTaskRef keys that already exist in non-II quadrants
+  // (or in block subtasks).
+  var existingRefsOutsideII = {};
+  QUADRANT_KEYS.forEach(function(key) {
+    if (key === 'II') return;
+    var items = data[key] || [];
+    items.forEach(function(task) {
+      if (task.bigTaskRef) {
+        var refKey = task.bigTaskRef.bigTaskId + '::' + task.bigTaskRef.subtaskId;
+        existingRefsOutsideII[refKey] = true;
+      }
+      if (task.blockName !== undefined && task.tasks) {
+        task.tasks.forEach(function(st) {
+          if (st.bigTaskRef) {
+            var rk = st.bigTaskRef.bigTaskId + '::' + st.bigTaskRef.subtaskId;
+            existingRefsOutsideII[rk] = true;
+          }
+        });
+      }
+    });
+  });
+
+  // Second pass: remove stale duplicates in quadrant II that also exist in other quadrants
+  if (data['II']) {
+    var beforeLen = data['II'].length;
+    data['II'] = data['II'].filter(function(task) {
+      if (task.blockName !== undefined) {
+        if (task.tasks) {
+          task.tasks = task.tasks.filter(function(st) {
+            if (st.bigTaskRef) {
+              var rk = st.bigTaskRef.bigTaskId + '::' + st.bigTaskRef.subtaskId;
+              return !existingRefsOutsideII[rk];
+            }
+            return true;
+          });
+        }
+        return true;
+      }
+      if (task.bigTaskRef) {
+        var rk = task.bigTaskRef.bigTaskId + '::' + task.bigTaskRef.subtaskId;
+        if (existingRefsOutsideII[rk]) return false;
+      }
+      return true;
+    });
+    if (data['II'].length !== beforeLen) dedupRemoved = true;
+  }
 
   bigTasks.forEach(function(bt) {
     if (bt.milestones) {
@@ -695,7 +743,7 @@ function migrateBigTaskSubtasks(date) {
     }
   });
 
-  if (migrated > 0) {
+  if (migrated > 0 || dedupRemoved) {
     saveDateData(date, data);
   }
   return migrated;

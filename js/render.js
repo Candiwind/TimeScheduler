@@ -245,7 +245,15 @@ function createTaskElement(item, quadrantKey, index) {
 
   var hasStages = item.stages && item.stages.length > 0;
 
-  // When stages exist, hide action buttons — they belong to stages
+  // Prevent inner interactive elements from capturing drag
+  [hlBtn, bonusBtn, deferBtn, timeSlotBtn, delBtn].forEach(function(innerEl) {
+    if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+  });
+
+  // Split into stages button
+  var splitBtn = document.createElement('button');
+
+  // When stages exist, hide action buttons — they belong to stages (must be after splitBtn creation)
   if (hasStages) {
     hlBtn.style.display = 'none';
     bonusBtn.style.display = 'none';
@@ -256,14 +264,6 @@ function createTaskElement(item, quadrantKey, index) {
     left.querySelector('input[type=checkbox]').style.pointerEvents = 'none';
     left.querySelector('input[type=checkbox]').style.opacity = '0.5';
   }
-
-  // Prevent inner interactive elements from capturing drag
-  [hlBtn, bonusBtn, deferBtn, timeSlotBtn, delBtn].forEach(function(innerEl) {
-    if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
-  });
-
-  // Split into stages button
-  var splitBtn = document.createElement('button');
   splitBtn.className = 'split-stages-btn';
   splitBtn.innerHTML = '⊞';
   splitBtn.title = '拆分为阶段';

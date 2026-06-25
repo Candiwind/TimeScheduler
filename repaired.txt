@@ -110,6 +110,11 @@
    deleteSubTask 删除时自动清除 bigTaskSubtask.plannedDate，阻止 migrateBigTaskSubtasks 再次导入
 10. ✅ 划分阶段后添加阶段按钮移至任务右上角：addStageBtn 改为右上角小按钮（margin-left:auto），
     splitBtn 在已有阶段时隐藏，按钮通过 insertBefore 置于 delBtn 之前
+11. ✅ 阶段支持手动拖拽排序：移除渲染时的 timeSlot 强制排序，改为按完成状态排序
+   （未完成在前、已完成在后），同一状态组内保留手动拖拽顺序。
+   拖拽基础设施已完备（handleStageDrop → reorderStages/reorderTaskStages），
+   仅需修改 createTaskElement / createSubTaskElement 中的 stages.sort 逻辑
+   涉及文件：render.js
 
 
 ────────────────────────────────────────

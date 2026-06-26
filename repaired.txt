@@ -167,6 +167,9 @@
    修复全部16处创建路径（addTask/addSubTask/addStage/splitStages/migrateBigTask/
    importBigSubtask/addPoolTask/moveBigtaskSub等），确保新条目始终含timeSlot。
    涉及文件：timeslot.js / render.js / quadrant-ops.js / store.js / future.js / bigtask.js / drag.js
+12. ✅ 时间视图各时段块添加滚动条：.timeview-items 设置 max-height: 48vh + overflow-y: auto，
+   与象限视图一致，内容超出时各时段块独立滚动。移动端 max-height: 30vh。
+   涉及文件：style.css
 
 
 ────────────────────────────────────────

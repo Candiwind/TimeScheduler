@@ -408,6 +408,8 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  max-height: 48vh;
+  overflow-y: auto;
 }
 /* Task items inside time view: don't need quadrant border or extra padding */
 .timeview-items .task-item {
@@ -1041,6 +1043,7 @@ kbd {
   .quadrant-grid { gap: 8px; }
   .quadrant { min-height: 150px; border-radius: 8px; }
   .quadrant-tasks { max-height: 35vh; padding: 6px; }
+  .timeview-items { max-height: 30vh; }
   .task-item { padding: 8px 10px; font-size: 13px; }
   .subtask-item { padding: 6px 8px; font-size: 12px; }
   .task-checkbox { width: 18px; height: 18px; }

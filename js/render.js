@@ -545,7 +545,8 @@ function renderTimeView(date) {
         if (el && QUADRANT_BG[qKey]) el.style.backgroundColor = QUADRANT_BG[qKey];
         if (el) itemsContainer.appendChild(el);
       } else if (entry._childType === 'subtask') {
-        el = createSubTaskElement(entry._subtaskData, qKey, entry.item.id);
+        // skipStages: stages are distributed to their own timeSlots separately
+        el = createSubTaskElement(entry._subtaskData, qKey, entry.item.id, { skipStages: true });
         if (el && QUADRANT_BG[qKey]) el.style.backgroundColor = QUADRANT_BG[qKey];
         if (el) itemsContainer.appendChild(el);
       } else if (entry._childType === 'subtask-stage') {
@@ -940,7 +941,7 @@ function createTaskBlockElement(block, quadrantKey, index) {
   return el;
 }
 
-function createSubTaskElement(task, quadrantKey, blockId) {
+function createSubTaskElement(task, quadrantKey, blockId, opts) {
   var el = document.createElement('div');
   el.className = 'subtask-item';
   if (task.completed) el.classList.add('completed');
@@ -1074,6 +1075,8 @@ function createSubTaskElement(task, quadrantKey, blockId) {
   el.appendChild(splitBtn);
 
   // Stages container (rendered below the subtask row)
+  // In time view (opts.skipStages), stages are distributed to their own timeSlot
+  // sections — skip the nested container to avoid duplication.
   if (task.stages && task.stages.length > 0) {
     // Sort stages: incomplete first, completed last; then by timeSlot within each group
     task.stages.sort(function(a, b) {
@@ -1084,16 +1087,19 @@ function createSubTaskElement(task, quadrantKey, blockId) {
       if (bi === -1) bi = 99;
       return ai - bi;
     });
-    var stagesContainer = document.createElement('div');
-    stagesContainer.className = 'subtask-stages';
-    el.classList.add('has-stages');
+    // Keep completed-state synced even when skipping the nested container
     var allStagesDone = task.stages.every(function(s) { return s.completed; });
     if (task.completed !== allStagesDone) {
       task.completed = allStagesDone;
-      // Update checkbox to match
       checkbox.checked = allStagesDone;
       if (allStagesDone) { el.classList.add('completed'); } else { el.classList.remove('completed'); }
     }
+    if (opts && opts.skipStages) {
+      return el; // stages rendered separately (distributed by timeSlot)
+    }
+    var stagesContainer = document.createElement('div');
+    stagesContainer.className = 'subtask-stages';
+    el.classList.add('has-stages');
     task.stages.forEach(function(stage) {
       var stageEl = createStageElement(stage, quadrantKey, blockId, task.id);
       stagesContainer.appendChild(stageEl);

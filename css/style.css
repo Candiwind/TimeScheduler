@@ -420,6 +420,12 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   margin: 0;
   border-radius: 6px;
 }
+/* Time view: hide structural action buttons (add stages / add subtask / split) */
+.timeview-items .add-stage-btn,
+.timeview-items .split-stages-btn,
+.timeview-items .add-subtask-btn {
+  display: none !important;
+}
 /* Completed tasks in time view: keep quadrant bg visible, only strike through text */
 .timeview-items .task-item.completed {
   opacity: 1;
@@ -471,6 +477,43 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   font-size: 10px;
   color: var(--text3);
   white-space: nowrap;
+}
+
+/* Parent group header (replaces compact card — quadrant-view style) */
+.timeview-parent-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  border-left: 3px solid var(--primary);
+}
+.timeview-parent-badge {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.timeview-bigtask-name {
+  font-size: 12px;
+  color: var(--primary);
+  background: var(--surface2);
+  padding: 1px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+.timeview-parent-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeview-parent-hint {
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+  margin-right: 4px;
 }
 .timeview-compact-parent .task-checkbox {
   width: 15px;

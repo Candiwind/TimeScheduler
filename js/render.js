@@ -320,16 +320,22 @@ function renderTimeView(date) {
     }
     return entry.item.completed;
   }
+  // Sort key: compact parent (0) < child (1) < standalone (2)
+  function getEntryType(entry) {
+    if (entry._compactParent) return 0;
+    if (entry._childType) return 1;
+    return 2;
+  }
   function sortGroup(group) {
     group.sort(function(a, b) {
-      // Parents before children
-      var aChild = a._childType ? 1 : 0;
-      var bChild = b._childType ? 1 : 0;
-      if (aChild !== bChild) return aChild - bChild;
-      // Then by quadrant
+      // First by quadrant (I→II→III→IV)
       var qa = quadOrder[a.quadrantKey] !== undefined ? quadOrder[a.quadrantKey] : 99;
       var qb = quadOrder[b.quadrantKey] !== undefined ? quadOrder[b.quadrantKey] : 99;
       if (qa !== qb) return qa - qb;
+      // Then by entry type: cp header → children → standalone
+      var ta = getEntryType(a);
+      var tb = getEntryType(b);
+      if (ta !== tb) return ta - tb;
       // Then incomplete first
       var aDone = getCompleted(a) ? 1 : 0;
       var bDone = getCompleted(b) ? 1 : 0;
@@ -416,6 +422,82 @@ function renderTimeView(date) {
     return el;
   }
 
+  // Helper: look up big task name by ID
+  function getBigTaskName(btId) {
+    var tasks = loadBigTasks();
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === btId) return tasks[i].name;
+    }
+    return null;
+  }
+
+  // Helper: create a parent group header (quadrant-view style, replaces compact parent card)
+  function createParentHeaderEl(cpEntry, childCount) {
+    var item = cpEntry.item;
+    var qKey = cpEntry.quadrantKey;
+    var isBlock = item.blockName !== undefined;
+
+    var el = document.createElement('div');
+    el.className = 'timeview-parent-header';
+    if (QUADRANT_BG[qKey]) {
+      el.style.backgroundColor = QUADRANT_BG[qKey];
+    }
+
+    // Quadrant badge
+    var badge = document.createElement('span');
+    badge.className = 'timeview-parent-badge';
+    badge.textContent = (QUADRANTS[qKey] && QUADRANTS[qKey].icon) || qKey;
+    badge.title = qKey + '象限';
+    el.appendChild(badge);
+
+    // Big task name (if this item came from a big task)
+    if (item.bigTaskRef && item.bigTaskRef.bigTaskId) {
+      var btName = getBigTaskName(item.bigTaskRef.bigTaskId);
+      if (btName) {
+        var btSpan = document.createElement('span');
+        btSpan.className = 'timeview-bigtask-name';
+        btSpan.textContent = '🎯 ' + btName;
+        btSpan.title = '来自大任务：' + btName;
+        el.appendChild(btSpan);
+      }
+    }
+
+    // Item name
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'timeview-parent-name';
+    nameSpan.textContent = (isBlock ? '📦 ' : '📋 ') + (item.blockName || item.text || '未命名');
+    el.appendChild(nameSpan);
+
+    // Child count hint
+    var hint = document.createElement('span');
+    hint.className = 'timeview-parent-hint';
+    hint.textContent = childCount + '项';
+    el.appendChild(hint);
+
+    // Delete button
+    var delBtn = document.createElement('button');
+    delBtn.className = 'task-delete-btn';
+    delBtn.innerHTML = '×';
+    delBtn.title = '删除（含所有子项）';
+    delBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var name = item.blockName || item.text || '';
+      var msg = childCount > 0
+        ? '确定删除"' + name + '"及其 ' + childCount + ' 个子项？\n（子项分布在各个时段中，也将被一并删除）'
+        : '确定删除"' + name + '"？';
+      if (!confirm(msg)) return;
+      if (isBlock) {
+        deleteBlockDirect(qKey, item.id);
+      } else {
+        deleteTaskDirect(qKey, item.id);
+      }
+    });
+    delBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    el.appendChild(delBtn);
+
+    return el;
+  }
+
   var frag = document.createDocumentFragment();
 
   SLOT_ORDER.forEach(function(slotKey) {
@@ -440,39 +522,49 @@ function renderTimeView(date) {
     var itemsContainer = document.createElement('div');
     itemsContainer.className = 'timeview-items';
 
+    // Pre-count children per parent for the header badge
+    var childCounts = {};
+    group.forEach(function(entry) {
+      if (entry._childType) {
+        var ck = entry.quadrantKey + '::' + entry.item.id;
+        childCounts[ck] = (childCounts[ck] || 0) + 1;
+      }
+    });
+
+    // Render in sort order: parent headers, then their children, then standalones
     group.forEach(function(entry) {
       var qKey = entry.quadrantKey;
       var el;
 
-      if (entry._childType === 'stage') {
+      if (entry._compactParent) {
+        var cpk = qKey + '::' + entry.item.id;
+        el = createParentHeaderEl(entry, childCounts[cpk] || 0);
+        itemsContainer.appendChild(el);
+      } else if (entry._childType === 'stage') {
         el = createStageElementForTask(entry._stageData, qKey, entry.item.id);
-        el = wrapChildEl(el, entry._parentName, qKey);
+        if (el && QUADRANT_BG[qKey]) el.style.backgroundColor = QUADRANT_BG[qKey];
+        if (el) itemsContainer.appendChild(el);
       } else if (entry._childType === 'subtask') {
         el = createSubTaskElement(entry._subtaskData, qKey, entry.item.id);
-        el = wrapChildEl(el, entry._parentName, qKey);
+        if (el && QUADRANT_BG[qKey]) el.style.backgroundColor = QUADRANT_BG[qKey];
+        if (el) itemsContainer.appendChild(el);
       } else if (entry._childType === 'subtask-stage') {
         el = createStageElement(entry._stageData, qKey, entry.item.id, entry._subtaskData.id);
-        el = wrapChildEl(el, entry._parentName, qKey);
-      } else if (entry._compactParent) {
-        // Compact parent marker placed in each slot that has children
-        el = createCompactParentEl(entry);
+        if (el && QUADRANT_BG[qKey]) el.style.backgroundColor = QUADRANT_BG[qKey];
+        if (el) itemsContainer.appendChild(el);
       } else {
-        var isParent = parentsWithChildren[qKey + '::' + entry.item.id];
-        if (isParent) {
-          el = createCompactParentEl(entry);
+        // Standalone item (no distributed children)
+        var item = entry.item;
+        if (item.blockName !== undefined) {
+          el = createTaskBlockElement(item, qKey, 0);
         } else {
-          var item = entry.item;
-          if (item.blockName !== undefined) {
-            el = createTaskBlockElement(item, qKey, 0);
-          } else {
-            el = createTaskElement(item, qKey, 0);
-          }
-          if (QUADRANT_BG[qKey]) {
-            el.style.backgroundColor = QUADRANT_BG[qKey];
-          }
+          el = createTaskElement(item, qKey, 0);
         }
+        if (el && QUADRANT_BG[qKey]) {
+          el.style.backgroundColor = QUADRANT_BG[qKey];
+        }
+        if (el) itemsContainer.appendChild(el);
       }
-      itemsContainer.appendChild(el);
     });
 
     section.appendChild(itemsContainer);

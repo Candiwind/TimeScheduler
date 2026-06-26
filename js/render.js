@@ -276,7 +276,7 @@ function renderTimeView(date) {
               var ssSlot = stage.timeSlot || getDefaultTimeSlot();
               if (!slotGroups[ssSlot]) slotGroups[ssSlot] = [];
               slotGroups[ssSlot].push(ssEntry);
-              parentChildSlots[parentKey].slots[tSlot] = true;
+              parentChildSlots[parentKey].slots[ssSlot] = true;
             });
           }
         });

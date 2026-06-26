@@ -215,13 +215,20 @@ function renderTimeView(date) {
     SLOT_ORDER.forEach(function(sk) {
       if (slotGroups[sk]) allEntries = allEntries.concat(slotGroups[sk]);
     });
+
+    // Track which slots each parent's children go to, so we can place compact
+    // parent cards in EVERY slot that has children (not just the parent's own slot)
+    var parentChildSlots = {}; // key: qKey+'::'+itemId -> { entry: originalEntry, slots: {slotKey: true} }
+
     allEntries.forEach(function(entry) {
       var item = entry.item;
       var qKey = entry.quadrantKey;
+      var parentKey = qKey + '::' + item.id;
 
       // Task with stages: distribute each stage to its own timeSlot
       if (!item.blockName && item.stages && item.stages.length > 0) {
-        parentsWithChildren[qKey + '::' + item.id] = true;
+        parentsWithChildren[parentKey] = true;
+        if (!parentChildSlots[parentKey]) parentChildSlots[parentKey] = { entry: entry, slots: {} };
         item.stages.forEach(function(stage) {
           var childEntry = {
             item: item,
@@ -233,12 +240,14 @@ function renderTimeView(date) {
           var tSlot = stage.timeSlot || getDefaultTimeSlot();
           if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
           slotGroups[tSlot].push(childEntry);
+          parentChildSlots[parentKey].slots[tSlot] = true;
         });
       }
 
       // Block with subtasks: distribute each subtask to its own timeSlot
       if (item.blockName && item.tasks && item.tasks.length > 0) {
-        parentsWithChildren[qKey + '::' + item.id] = true;
+        parentsWithChildren[parentKey] = true;
+        if (!parentChildSlots[parentKey]) parentChildSlots[parentKey] = { entry: entry, slots: {} };
         item.tasks.forEach(function(subtask) {
           var subEntry = {
             item: item,
@@ -250,6 +259,7 @@ function renderTimeView(date) {
           var tSlot = subtask.timeSlot || getDefaultTimeSlot();
           if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
           slotGroups[tSlot].push(subEntry);
+          parentChildSlots[parentKey].slots[tSlot] = true;
 
           // Also distribute stages of this subtask
           if (subtask.stages && subtask.stages.length > 0) {
@@ -266,10 +276,37 @@ function renderTimeView(date) {
               var ssSlot = stage.timeSlot || getDefaultTimeSlot();
               if (!slotGroups[ssSlot]) slotGroups[ssSlot] = [];
               slotGroups[ssSlot].push(ssEntry);
+              parentChildSlots[parentKey].slots[tSlot] = true;
             });
           }
         });
       }
+    });
+
+    // Remove original parent entries from slotGroups and insert compact parent
+    // markers into EVERY slot that received children from that parent
+    Object.keys(parentChildSlots).forEach(function(parentKey) {
+      var info = parentChildSlots[parentKey];
+      var origEntry = info.entry;
+
+      // Remove original parent from all slotGroups
+      SLOT_ORDER.forEach(function(sk) {
+        var group = slotGroups[sk];
+        if (!group) return;
+        for (var i = group.length - 1; i >= 0; i--) {
+          if (group[i] === origEntry) { group.splice(i, 1); break; }
+        }
+      });
+
+      // Insert compact parent marker at top of each child slot
+      Object.keys(info.slots).forEach(function(sk) {
+        if (!slotGroups[sk]) slotGroups[sk] = [];
+        slotGroups[sk].unshift({
+          item: origEntry.item,
+          quadrantKey: origEntry.quadrantKey,
+          _compactParent: true
+        });
+      });
     });
   }
   flattenChildren();
@@ -416,6 +453,9 @@ function renderTimeView(date) {
       } else if (entry._childType === 'subtask-stage') {
         el = createStageElement(entry._stageData, qKey, entry.item.id, entry._subtaskData.id);
         el = wrapChildEl(el, entry._parentName, qKey);
+      } else if (entry._compactParent) {
+        // Compact parent marker placed in each slot that has children
+        el = createCompactParentEl(entry);
       } else {
         var isParent = parentsWithChildren[qKey + '::' + entry.item.id];
         if (isParent) {

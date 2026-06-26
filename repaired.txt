@@ -115,21 +115,30 @@
    拖拽基础设施已完备（handleStageDrop → reorderStages/reorderTaskStages），
    仅需修改 createTaskElement / createSubTaskElement 中的 stages.sort 逻辑
    涉及文件：render.js
-12. ✅ 大任务子任务导入象限时连带阶段：当大任务规划的小任务（含阶段）通过自动迁移、
+
+
+────────────────────────────────────────
+
+【V1.4 网页版问题，已修正】
+1. ✅ 大任务子任务导入象限时连带阶段：当大任务规划的小任务（含阶段）通过自动迁移、
    手动导入、池拖拽、面板拖拽等方式导入象限时，其阶段也会被一并复制（新ID避免冲突）。
    新增 copyBigSubtaskStages 共享工具函数，
    涉及文件：store.js / future.js / bigtask.js / drag.js
-13. ✅ 修复任务/子任务/阶段排序逻辑：按完成状态分组（未完成在前、已完成在后），
+2. ✅ 修复任务/子任务/阶段排序逻辑：按完成状态分组（未完成在前、已完成在后），
    同一组内按 timeSlot 排序，保留组内手动拖拽顺序（稳定排序）。
    涉及文件：render.js（renderQuadrant / createTaskBlockElement / createTaskElement / createSubTaskElement）
-14. ✅ 当天数据不自动加入缓存库：引入显式缓存索引（quadrant_cached_dates_index），
-   只有用户点击"缓存当前"的日期才出现在导入缓存对话框中。
+3. ✅ 当天数据不自动加入缓存库：引入显式缓存索引（quadrant_cached_dates_index），
+   只有用户点击"缓存"的日期才出现在导入缓存对话框中。
    向后兼容：首次加载时自动将现有数据种子化到缓存索引。
    涉及文件：store.js / cache-ui.js / app.js
-15. ✅ 按完成时间查看象限待办（时段视图）：新增视图切换按钮，可在象限视图和时段视图间切换。
+4. ✅ 按完成时间查看象限待办（时段视图）：新增视图切换按钮，可在象限视图和时段视图间切换。
    时段视图按 timeSlot 分组显示所有象限任务，组内按 I→II→III→IV 象限排布。
    两种视图共享同一数据模型，修改自动同步；视图偏好保存到 localStorage。
    涉及文件：index.html / render.js / app.js / style.css
+5. ✅ 优化第一行 header 渲染尺寸：减小标题字号(15px)、按钮字号(11px)和padding(4px 8px)、
+   图标按钮尺寸(28px)、完成badge字号(11px)、时段badge字号(9px)；
+   缩短按钮文字（缓存、导入、📈、📋），确保任务数达三位数时第一行不换行。
+   涉及文件：style.css / index.html
 
 
 ────────────────────────────────────────

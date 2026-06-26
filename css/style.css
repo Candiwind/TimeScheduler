@@ -367,6 +367,58 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 14px; align-content: start;
 }
+
+/* ============ Time View ============ */
+.timeview-section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.timeview-section.timeview-noslot {
+  opacity: 0.85;
+}
+.timeview-header {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.timeview-count {
+  font-size: 11px;
+  color: var(--text2);
+  background: var(--border);
+  padding: 1px 8px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+.timeview-items {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+/* Task items inside time view: don't need quadrant border or extra padding */
+.timeview-items .task-item {
+  margin: 0;
+  border-radius: 6px;
+}
+.timeview-items .task-block {
+  margin: 0;
+  border-radius: 6px;
+}
+/* Show a subtle quadrant indicator on task items in time view */
+.timeview-items .task-item::before {
+  content: attr(data-quadrant-indicator);
+  font-size: 12px;
+  margin-right: 4px;
+  opacity: 0.7;
+}
+
 .quadrant {
   background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-sm);
   display: flex; flex-direction: column; overflow: hidden; min-height: 120px;

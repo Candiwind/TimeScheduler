@@ -111,8 +111,64 @@ function importCachedData(sourceDate, targetDate) {
   return true;
 }
 
+// ============ Explicit Cache Index (only dates user clicked "缓存当前") ============
+var CACHE_INDEX_KEY = 'quadrant_cached_dates_index';
+
+function loadCachedDatesIndex() {
+  try {
+    var raw = localStorage.getItem(CACHE_INDEX_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCachedDatesIndex(dates) {
+  try {
+    localStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(dates));
+  } catch (e) { /* silently fail */ }
+}
+
+function markDateAsCached(date) {
+  var cached = loadCachedDatesIndex();
+  if (cached.indexOf(date) === -1) {
+    cached.push(date);
+    cached.sort();
+    saveCachedDatesIndex(cached);
+  }
+}
+
+function getCachedDates() {
+  return loadCachedDatesIndex();
+}
+
+// One-time migration: seed cache index with all existing dates for backward compat
+function seedCacheIndexIfEmpty() {
+  if (loadCachedDatesIndex().length === 0) {
+    var allDates = getAllCachedDates();
+    if (allDates.length > 0) {
+      saveCachedDatesIndex(allDates);
+    }
+  }
+}
+
 function generateId() {
   return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Deep-copy stages from a big task subtask for quadrant import (new IDs to avoid conflicts)
+function copyBigSubtaskStages(bigSubtask) {
+  if (!bigSubtask.stages || !bigSubtask.stages.length) return null;
+  return bigSubtask.stages.map(function(s) {
+    return {
+      id: generateId(),
+      text: s.text,
+      completed: s.completed || false,
+      timeSlot: s.timeSlot || '',
+      highlights: s.highlights ? s.highlights.slice() : undefined,
+      extraCompleted: s.extraCompleted || false
+    };
+  });
 }
 
 // JSON export - downloads entire localStorage as JSON file
@@ -726,14 +782,17 @@ function migrateBigTaskSubtasks(date) {
               });
               if (!alreadyImported) {
                 if (!data['II']) data['II'] = [];
-                data['II'].push({
+                var newTask = {
                   id: generateId(),
                   text: t.text,
                   completed: false,
                   progress: '100%',
                   dueDate: '',
                   bigTaskRef: { bigTaskId: bt.id, subtaskId: t.id, milestoneId: ms.id }
-                });
+                };
+                var copiedStages = copyBigSubtaskStages(t);
+                if (copiedStages) newTask.stages = copiedStages;
+                data['II'].push(newTask);
                 migrated++;
               }
             }

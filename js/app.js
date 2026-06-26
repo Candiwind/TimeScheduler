@@ -3,6 +3,12 @@ function initApp() {
   var today = new Date().toISOString().split('T')[0];
   currentDate = today;
 
+  // Restore saved view mode
+  var savedViewMode = localStorage.getItem('quadrant_view_mode');
+  if (savedViewMode === 'time' || savedViewMode === 'quadrant') {
+    viewMode = savedViewMode;
+  }
+
   loadTheme();
   applyBigTaskDropOverrides();
   setupQuadrantContainers();
@@ -22,10 +28,35 @@ function initApp() {
   migrateFutureTasks(today);
   migrateWeekTasks(today);
   migrateMonthTasks(today);
+  seedCacheIndexIfEmpty(); // Backward compat: seed cache index with existing dates (one-time)
   renderAll(today);
   renderBigTaskPanel();
   renderPlanPoolPanel();
   renderPrinciplesPanel();
+
+  // View mode toggle button
+  var btnViewMode = document.getElementById('btnViewMode');
+  if (btnViewMode) {
+    // Update button label to match current mode
+    if (viewMode === 'time') {
+      btnViewMode.innerHTML = '🔲 象限视图';
+      btnViewMode.title = '切换到象限视图';
+    }
+    btnViewMode.addEventListener('click', function() {
+      if (viewMode === 'quadrant') {
+        viewMode = 'time';
+        localStorage.setItem('quadrant_view_mode', 'time');
+        btnViewMode.innerHTML = '🔲 象限视图';
+        btnViewMode.title = '切换到象限视图';
+      } else {
+        viewMode = 'quadrant';
+        localStorage.setItem('quadrant_view_mode', 'quadrant');
+        btnViewMode.innerHTML = '📋 时间视图';
+        btnViewMode.title = '切换到时间视图';
+      }
+      renderAll(currentDate);
+    });
+  }
 
   setTimeout(function() {
     autoSyncFromDevice();

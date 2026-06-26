@@ -14,6 +14,7 @@ function setupCacheButtons() {
       return;
     }
     saveDateData(date, data);
+    markDateAsCached(date);
     alert('已缓存到日期：' + date + '（可在导入缓存中查看）');
   });
 
@@ -23,7 +24,7 @@ function setupCacheButtons() {
 }
 
 function showCacheModal() {
-  var dates = getAllCachedDates();
+  var dates = getCachedDates();
   if (dates.length === 0) {
     alert('没有已缓存的日期，请先在某个日期下添加任务后点击"缓存当前"');
     return;

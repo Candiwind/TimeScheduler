@@ -82,14 +82,17 @@ function importBigSubtaskToToday(btId, msId, stId) {
   var today = currentDate;
   var data = loadDateData(today);
   if (!data['II']) data['II'] = [];
-  data['II'].push({
+  var newTask = {
     id: generateId(),
     text: subtaskData.text,
     completed: false,
     progress: '100%',
     dueDate: '',
     bigTaskRef: { bigTaskId: btId, subtaskId: stId, milestoneId: msId }
-  });
+  };
+  var copiedStages = copyBigSubtaskStages(subtaskData);
+  if (copiedStages) newTask.stages = copiedStages;
+  data['II'].push(newTask);
   saveDateData(today, data);
   renderAll(currentDate);
 }

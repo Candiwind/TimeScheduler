@@ -2,18 +2,25 @@
 
 var currentDate = '';
 var searchTerm = '';
+var SLOT_ORDER = ['early_morn','forenoon','noon','afternoon','dusk','night'];
+var viewMode = 'quadrant'; // 'quadrant' | 'time'
 
 function getCurrentDate() { return currentDate; }
 
 function renderAll(date) {
   currentDate = date;
   var data = loadDateData(date);
-  QUADRANT_KEYS.forEach(function(key) {
-    renderQuadrant(key, data[key] || []);
-  });
+  if (viewMode === 'time') {
+    renderTimeView(date);
+  } else {
+    resetGridLayout();
+    QUADRANT_KEYS.forEach(function(key) {
+      renderQuadrant(key, data[key] || []);
+    });
+    syncQuadrantRowHeights();
+  }
   updateDateDisplay(date);
   updateStatsBar(data);
-  syncQuadrantRowHeights();
 }
 
 // Sync quadrant heights within the same row so they match the taller one
@@ -44,6 +51,11 @@ function syncRowHeight(quads) {
 
 // Render single quadrant only (no stats/date update) - for targeted updates
 function renderQuadrantOnly(key) {
+  // In time view, fall back to full re-render (quadrant containers don't exist)
+  if (viewMode === 'time') {
+    renderAll(currentDate);
+    return;
+  }
   var data = loadDateData(currentDate);
   renderQuadrant(key, data[key] || []);
   updateStatsBar(data);
@@ -70,15 +82,21 @@ function renderQuadrant(key, items) {
     filtered = filterItems(items, searchTerm.toLowerCase());
   }
 
-  // Sort by timeSlot (completion time period); unset slots go last.
-  // Stable: preserves manual order within same/no slot.
+  // Sort: incomplete first, completed last; then by timeSlot within each group.
+  // Blocks go to end. Stable: preserves manual order within same group+slot.
   filtered = filtered.slice();
-  var slotOrder = ['early_morn','forenoon','noon','afternoon','dusk','night'];
   filtered.sort(function(a, b) {
-    var aSlot = a.blockName !== undefined ? '' : (a.timeSlot || '');
-    var bSlot = b.blockName !== undefined ? '' : (b.timeSlot || '');
-    var ai = slotOrder.indexOf(aSlot);
-    var bi = slotOrder.indexOf(bSlot);
+    // Blocks always at end
+    var aIsBlock = a.blockName !== undefined;
+    var bIsBlock = b.blockName !== undefined;
+    if (aIsBlock && !bIsBlock) return 1;
+    if (!aIsBlock && bIsBlock) return -1;
+    if (aIsBlock && bIsBlock) return 0;
+    // Incomplete first
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    // Then timeSlot
+    var ai = SLOT_ORDER.indexOf(a.timeSlot || '');
+    var bi = SLOT_ORDER.indexOf(b.timeSlot || '');
     if (ai === -1) ai = 99;
     if (bi === -1) bi = 99;
     return ai - bi;
@@ -117,6 +135,171 @@ function filterItems(items, term) {
     }
     return item.text && item.text.toLowerCase().indexOf(term) !== -1;
   });
+}
+
+// ============ Time-Slot View (group tasks by completion time across all quadrants) ============
+function renderTimeView(date) {
+  var data = loadDateData(date);
+  var grid = document.querySelector('.quadrant-grid');
+  if (!grid) return;
+
+  // Collect all items from all quadrants with quadrant metadata
+  var allItems = [];
+  QUADRANT_KEYS.forEach(function(key) {
+    var items = data[key] || [];
+    items.forEach(function(item) {
+      allItems.push({ item: item, quadrantKey: key });
+    });
+  });
+
+  // Filter by search term
+  if (searchTerm) {
+    var term = searchTerm.toLowerCase();
+    allItems = allItems.filter(function(entry) {
+      var item = entry.item;
+      if (item.blockName !== undefined) {
+        if (item.blockName.toLowerCase().indexOf(term) !== -1) return true;
+        if (item.tasks) {
+          return item.tasks.some(function(t) { return t.text && t.text.toLowerCase().indexOf(term) !== -1; });
+        }
+        return false;
+      }
+      return item.text && item.text.toLowerCase().indexOf(term) !== -1;
+    });
+  }
+
+  // Group by timeSlot
+  var slotGroups = {};
+  var noSlotItems = [];
+  allItems.forEach(function(entry) {
+    var item = entry.item;
+    if (item.blockName !== undefined) {
+      // Blocks: check subtasks for timeSlot hints
+      var foundSlot = null;
+      if (item.tasks) {
+        for (var ti = 0; ti < item.tasks.length; ti++) {
+          if (item.tasks[ti].timeSlot) { foundSlot = item.tasks[ti].timeSlot; break; }
+        }
+      }
+      if (foundSlot) {
+        if (!slotGroups[foundSlot]) slotGroups[foundSlot] = [];
+        slotGroups[foundSlot].push(entry);
+      } else {
+        noSlotItems.push(entry);
+      }
+    } else {
+      var slot = item.timeSlot || null;
+      if (slot) {
+        if (!slotGroups[slot]) slotGroups[slot] = [];
+        slotGroups[slot].push(entry);
+      } else {
+        noSlotItems.push(entry);
+      }
+    }
+  });
+
+  // Sort within each timeSlot group: quadrant order I→II→III→IV, then incomplete first
+  var quadOrder = { I: 0, II: 1, III: 2, IV: 3 };
+  function sortGroup(group) {
+    group.sort(function(a, b) {
+      var qa = quadOrder[a.quadrantKey] !== undefined ? quadOrder[a.quadrantKey] : 99;
+      var qb = quadOrder[b.quadrantKey] !== undefined ? quadOrder[b.quadrantKey] : 99;
+      if (qa !== qb) return qa - qb;
+      if (a.item.completed !== b.item.completed) return a.item.completed ? 1 : -1;
+      return 0;
+    });
+  }
+
+  var frag = document.createDocumentFragment();
+
+  SLOT_ORDER.forEach(function(slotKey) {
+    var group = slotGroups[slotKey];
+    if (!group || group.length === 0) return;
+    sortGroup(group);
+
+    var slotInfo = null;
+    for (var s = 0; s < TIME_SLOTS.length; s++) {
+      if (TIME_SLOTS[s].key === slotKey) { slotInfo = TIME_SLOTS[s]; break; }
+    }
+    if (!slotInfo) slotInfo = { icon: '⬚', label: slotKey };
+
+    var section = document.createElement('div');
+    section.className = 'timeview-section';
+
+    var header = document.createElement('div');
+    header.className = 'timeview-header';
+    header.innerHTML = slotInfo.icon + ' ' + slotInfo.label + ' <span class="timeview-count">' + group.length + '</span>';
+    section.appendChild(header);
+
+    var itemsContainer = document.createElement('div');
+    itemsContainer.className = 'timeview-items';
+
+    group.forEach(function(entry) {
+      var item = entry.item;
+      var qKey = entry.quadrantKey;
+      if (item.blockName !== undefined) {
+        itemsContainer.appendChild(createTaskBlockElement(item, qKey, 0));
+      } else {
+        itemsContainer.appendChild(createTaskElement(item, qKey, 0));
+      }
+    });
+
+    section.appendChild(itemsContainer);
+    frag.appendChild(section);
+  });
+
+  // No-timeSlot section (at bottom)
+  if (noSlotItems.length > 0) {
+    sortGroup(noSlotItems);
+    var noSlotSection = document.createElement('div');
+    noSlotSection.className = 'timeview-section timeview-noslot';
+
+    var nsHeader = document.createElement('div');
+    nsHeader.className = 'timeview-header';
+    nsHeader.innerHTML = '⬚ 无时段要求 <span class="timeview-count">' + noSlotItems.length + '</span>';
+    noSlotSection.appendChild(nsHeader);
+
+    var nsContainer = document.createElement('div');
+    nsContainer.className = 'timeview-items';
+
+    noSlotItems.forEach(function(entry) {
+      var item = entry.item;
+      var qKey = entry.quadrantKey;
+      if (item.blockName !== undefined) {
+        nsContainer.appendChild(createTaskBlockElement(item, qKey, 0));
+      } else {
+        nsContainer.appendChild(createTaskElement(item, qKey, 0));
+      }
+    });
+
+    noSlotSection.appendChild(nsContainer);
+    frag.appendChild(noSlotSection);
+  }
+
+  // Apply time-view layout styles
+  grid.style.display = 'flex';
+  grid.style.flexDirection = 'column';
+  grid.style.gap = '12px';
+
+  if (!frag.childNodes.length) {
+    var empty = document.createElement('div');
+    empty.className = 'empty-hint';
+    empty.textContent = searchTerm ? '无匹配任务' : '当前日期没有任务';
+    frag.appendChild(empty);
+  }
+
+  grid.innerHTML = '';
+  grid.appendChild(frag);
+}
+
+// Reset quadrant-grid to default layout (for quadrant view)
+function resetGridLayout() {
+  var grid = document.querySelector('.quadrant-grid');
+  if (grid) {
+    grid.style.display = '';
+    grid.style.flexDirection = '';
+    grid.style.gap = '';
+  }
 }
 
 function countAllTasks(items) {
@@ -276,9 +459,14 @@ function createTaskElement(item, quadrantKey, index) {
 
   // Stages container
   if (item.stages && item.stages.length > 0) {
-    // Sort stages: incomplete first, completed last (preserves manual drag order within each group)
+    // Sort stages: incomplete first, completed last; then by timeSlot within each group
     item.stages.sort(function(a, b) {
-      return (a.completed ? 1 : 0) - (b.completed ? 1 : 0);
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      var ai = SLOT_ORDER.indexOf(a.timeSlot || '');
+      var bi = SLOT_ORDER.indexOf(b.timeSlot || '');
+      if (ai === -1) ai = 99;
+      if (bi === -1) bi = 99;
+      return ai - bi;
     });
     var stagesContainer = document.createElement('div');
     stagesContainer.className = 'subtask-stages';
@@ -387,11 +575,11 @@ function createTaskBlockElement(block, quadrantKey, index) {
   tasksContainer.addEventListener('dragstart', function(e) { e.stopPropagation(); });
 
   if (block.tasks && block.tasks.length > 0) {
-    // Sort subtasks by timeSlot (unset goes last)
-    var slotOrder = ['early_morn','forenoon','noon','afternoon','dusk','night'];
+    // Sort subtasks: incomplete first, completed last; then by timeSlot
     var sortedTasks = block.tasks.slice().sort(function(a, b) {
-      var ai = slotOrder.indexOf(a.timeSlot || '');
-      var bi = slotOrder.indexOf(b.timeSlot || '');
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      var ai = SLOT_ORDER.indexOf(a.timeSlot || '');
+      var bi = SLOT_ORDER.indexOf(b.timeSlot || '');
       if (ai === -1) ai = 99;
       if (bi === -1) bi = 99;
       return ai - bi;
@@ -559,9 +747,14 @@ function createSubTaskElement(task, quadrantKey, blockId) {
 
   // Stages container (rendered below the subtask row)
   if (task.stages && task.stages.length > 0) {
-    // Sort stages: incomplete first, completed last (preserves manual drag order within each group)
+    // Sort stages: incomplete first, completed last; then by timeSlot within each group
     task.stages.sort(function(a, b) {
-      return (a.completed ? 1 : 0) - (b.completed ? 1 : 0);
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      var ai = SLOT_ORDER.indexOf(a.timeSlot || '');
+      var bi = SLOT_ORDER.indexOf(b.timeSlot || '');
+      if (ai === -1) ai = 99;
+      if (bi === -1) bi = 99;
+      return ai - bi;
     });
     var stagesContainer = document.createElement('div');
     stagesContainer.className = 'subtask-stages';

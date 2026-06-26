@@ -631,12 +631,18 @@ function applyBigTaskDropOverrides() {
       for (var i = 0; i < data[targetQuadrant].length; i++) {
         if (data[targetQuadrant][i].id === targetBlockId && data[targetQuadrant][i].blockName !== undefined) {
           if (!data[targetQuadrant][i].tasks) data[targetQuadrant][i].tasks = [];
-          data[targetQuadrant][i].tasks.push({
+          var newSubtask = {
             id: generateId(),
             text: poolData.text,
             completed: false,
             bigTaskRef: { bigTaskId: poolData.bigTaskId, subtaskId: poolData.subtaskId }
-          });
+          };
+          var stData = getBigSubtaskData(poolData.bigTaskId, poolData.subtaskId);
+          if (stData) {
+            var copiedStages = copyBigSubtaskStages(stData);
+            if (copiedStages) newSubtask.stages = copiedStages;
+          }
+          data[targetQuadrant][i].tasks.push(newSubtask);
           break;
         }
       }
@@ -676,12 +682,18 @@ function applyBigTaskDropOverrides() {
       for (var i3 = 0; i3 < d3[tQ2].length; i3++) {
         if (d3[tQ2][i3].id === tBId2 && d3[tQ2][i3].blockName !== undefined) {
           if (!d3[tQ2][i3].tasks) d3[tQ2][i3].tasks = [];
-          d3[tQ2][i3].tasks.push({
+          var newBSubtask = {
             id: generateId(),
             text: bData.text,
             completed: false,
             bigTaskRef: { bigTaskId: bData.btId, subtaskId: bData.stId }
-          });
+          };
+          var stData2 = getBigSubtaskData(bData.btId, bData.stId);
+          if (stData2) {
+            var copiedStages2 = copyBigSubtaskStages(stData2);
+            if (copiedStages2) newBSubtask.stages = copiedStages2;
+          }
+          d3[tQ2][i3].tasks.push(newBSubtask);
           break;
         }
       }
@@ -736,14 +748,20 @@ function addPoolTaskToQuadrant(quadrantKey, poolData) {
       data[quadrantKey].push(existing);
     }
   } else {
-    data[quadrantKey].push({
+    var newTask = {
       id: generateId(),
       text: poolData.text,
       completed: false,
       progress: '100%',
       bigTaskRef: { bigTaskId: poolData.bigTaskId, subtaskId: poolData.subtaskId },
       weight: poolData.weight
-    });
+    };
+    var stData = getBigSubtaskData(poolData.bigTaskId, poolData.subtaskId);
+    if (stData) {
+      var copiedStages = copyBigSubtaskStages(stData);
+      if (copiedStages) newTask.stages = copiedStages;
+    }
+    data[quadrantKey].push(newTask);
   }
   saveDateData(currentDate, data);
   toggleBigSubtaskComplete(poolData.bigTaskId, poolData.subtaskId, false);

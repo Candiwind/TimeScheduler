@@ -707,14 +707,19 @@ function moveBigtaskSubToQuadrant(quadrantKey, dragData) {
     }
   } else {
     var st = getBigSubtaskData(dragData.btId, dragData.stId);
-    data[quadrantKey].push({
+    var newTask = {
       id: generateId(),
       text: (st ? st.text : dragData.text),
       completed: false,
       progress: '100%',
       dueDate: '',
       bigTaskRef: { bigTaskId: dragData.btId, subtaskId: dragData.stId }
-    });
+    };
+    if (st) {
+      var copiedStages = copyBigSubtaskStages(st);
+      if (copiedStages) newTask.stages = copiedStages;
+    }
+    data[quadrantKey].push(newTask);
   }
   saveDateData(currentDate, data);
   renderAll(currentDate);

@@ -662,7 +662,7 @@ function applyBigTaskDropOverrides() {
       for (var i2 = 0; i2 < d2[tQ].length; i2++) {
         if (d2[tQ][i2].id === tBId && d2[tQ][i2].blockName !== undefined) {
           if (!d2[tQ][i2].tasks) d2[tQ][i2].tasks = [];
-          d2[tQ][i2].tasks.push({ id: generateId(), text: fData.text, completed: false });
+          d2[tQ][i2].tasks.push({ id: generateId(), text: fData.text, completed: false, timeSlot: getDefaultTimeSlot() });
           break;
         }
       }
@@ -686,6 +686,7 @@ function applyBigTaskDropOverrides() {
             id: generateId(),
             text: bData.text,
             completed: false,
+            timeSlot: getDefaultTimeSlot(),
             bigTaskRef: { bigTaskId: bData.btId, subtaskId: bData.stId }
           };
           var stData2 = getBigSubtaskData(bData.btId, bData.stId);
@@ -740,6 +741,7 @@ function addPoolTaskToQuadrant(quadrantKey, poolData) {
         text: subtask.text,
         completed: false,
         progress: '100%',
+        timeSlot: subtask.timeSlot || getDefaultTimeSlot(),
         bigTaskRef: subtask.bigTaskRef
       });
     } else {
@@ -754,7 +756,8 @@ function addPoolTaskToQuadrant(quadrantKey, poolData) {
       completed: false,
       progress: '100%',
       bigTaskRef: { bigTaskId: poolData.bigTaskId, subtaskId: poolData.subtaskId },
-      weight: poolData.weight
+      weight: poolData.weight,
+      timeSlot: (poolData.timeSlot) || getDefaultTimeSlot()
     };
     var stData = getBigSubtaskData(poolData.bigTaskId, poolData.subtaskId);
     if (stData) {
@@ -775,7 +778,8 @@ function addFutureDragToQuadrant(quadrantKey, fData) {
     text: fData.text,
     completed: false,
     progress: '100%',
-    dueDate: ''
+    dueDate: '',
+    timeSlot: getDefaultTimeSlot()
   };
   data[quadrantKey].push(task);
   saveDateData(currentDate, data);

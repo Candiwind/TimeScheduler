@@ -1,7 +1,7 @@
 // quadrant-ops.js - Quadrant task CRUD operations
 function addTask(quadrantKey) {
   var data = loadDateData(currentDate);
-  var task = { id: generateId(), text: '新任务', completed: false, progress: '100%', dueDate: '' };
+  var task = { id: generateId(), text: '新任务', completed: false, progress: '100%', dueDate: '', timeSlot: getDefaultTimeSlot() };
   data[quadrantKey].push(task);
   saveDateData(currentDate, data);
   renderQuadrantOnly(quadrantKey);
@@ -32,7 +32,7 @@ function addSubTask(quadrantKey, blockId) {
   for (var i = 0; i < data[quadrantKey].length; i++) {
     if (data[quadrantKey][i].id === blockId && data[quadrantKey][i].blockName !== undefined) {
       if (!data[quadrantKey][i].tasks) data[quadrantKey][i].tasks = [];
-      data[quadrantKey][i].tasks.push({ id: generateId(), text: '新子任务', completed: false });
+      data[quadrantKey][i].tasks.push({ id: generateId(), text: '新子任务', completed: false, timeSlot: getDefaultTimeSlot() });
       break;
     }
   }
@@ -321,7 +321,7 @@ function splitSubtaskIntoStages(quadrantKey, blockId, subtaskId) {
   var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
   if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
   subtask.stages = stageNames.map(function(name) {
-    return { id: generateId(), text: name, completed: false };
+    return { id: generateId(), text: name, completed: false, timeSlot: getDefaultTimeSlot() };
   });
   // Auto-sync completed state
   subtask.completed = false;
@@ -361,7 +361,7 @@ function addStage(quadrantKey, blockId, subtaskId) {
       for (var j = 0; j < tasks.length; j++) {
         if (tasks[j].id === subtaskId) {
           if (!tasks[j].stages) tasks[j].stages = [];
-          tasks[j].stages.push({ id: generateId(), text: text, completed: false });
+          tasks[j].stages.push({ id: generateId(), text: text, completed: false, timeSlot: getDefaultTimeSlot() });
           tasks[j].completed = false;
           break;
         }
@@ -435,7 +435,7 @@ function splitTaskIntoStages(quadrantKey, taskId) {
   var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
   if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
   task.stages = stageNames.map(function(name) {
-    return { id: generateId(), text: name, completed: false };
+    return { id: generateId(), text: name, completed: false, timeSlot: getDefaultTimeSlot() };
   });
   task.completed = false;
   saveDateData(currentDate, data);
@@ -464,7 +464,7 @@ function addTaskStage(quadrantKey, taskId) {
   for (var i = 0; i < data[quadrantKey].length; i++) {
     if (data[quadrantKey][i].id === taskId && !data[quadrantKey][i].blockName) {
       if (!data[quadrantKey][i].stages) data[quadrantKey][i].stages = [];
-      data[quadrantKey][i].stages.push({ id: generateId(), text: text, completed: false });
+      data[quadrantKey][i].stages.push({ id: generateId(), text: text, completed: false, timeSlot: getDefaultTimeSlot() });
       data[quadrantKey][i].completed = false;
       break;
     }

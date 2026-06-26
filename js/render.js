@@ -185,9 +185,8 @@ function renderTimeView(date) {
     });
   }
 
-  // Group by timeSlot
+  // Group by timeSlot — items without timeSlot get a default based on current time
   var slotGroups = {};
-  var noSlotItems = [];
   allItems.forEach(function(entry) {
     var item = entry.item;
     if (item.blockName !== undefined) {
@@ -197,20 +196,13 @@ function renderTimeView(date) {
           if (item.tasks[ti].timeSlot) { foundSlot = item.tasks[ti].timeSlot; break; }
         }
       }
-      if (foundSlot) {
-        if (!slotGroups[foundSlot]) slotGroups[foundSlot] = [];
-        slotGroups[foundSlot].push(entry);
-      } else {
-        noSlotItems.push(entry);
-      }
+      var effectiveSlot = foundSlot || getDefaultTimeSlot();
+      if (!slotGroups[effectiveSlot]) slotGroups[effectiveSlot] = [];
+      slotGroups[effectiveSlot].push(entry);
     } else {
-      var slot = item.timeSlot || null;
-      if (slot) {
-        if (!slotGroups[slot]) slotGroups[slot] = [];
-        slotGroups[slot].push(entry);
-      } else {
-        noSlotItems.push(entry);
-      }
+      var slot = item.timeSlot || getDefaultTimeSlot();
+      if (!slotGroups[slot]) slotGroups[slot] = [];
+      slotGroups[slot].push(entry);
     }
   });
 
@@ -223,8 +215,6 @@ function renderTimeView(date) {
     SLOT_ORDER.forEach(function(sk) {
       if (slotGroups[sk]) allEntries = allEntries.concat(slotGroups[sk]);
     });
-    allEntries = allEntries.concat(noSlotItems);
-
     allEntries.forEach(function(entry) {
       var item = entry.item;
       var qKey = entry.quadrantKey;
@@ -240,13 +230,9 @@ function renderTimeView(date) {
             _stageData: stage,
             _parentName: item.text || '未命名任务'
           };
-          var tSlot = stage.timeSlot || null;
-          if (tSlot) {
-            if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
-            slotGroups[tSlot].push(childEntry);
-          } else {
-            noSlotItems.push(childEntry);
-          }
+          var tSlot = stage.timeSlot || getDefaultTimeSlot();
+          if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
+          slotGroups[tSlot].push(childEntry);
         });
       }
 
@@ -261,13 +247,9 @@ function renderTimeView(date) {
             _subtaskData: subtask,
             _parentName: item.blockName || '未命名任务块'
           };
-          var tSlot = subtask.timeSlot || null;
-          if (tSlot) {
-            if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
-            slotGroups[tSlot].push(subEntry);
-          } else {
-            noSlotItems.push(subEntry);
-          }
+          var tSlot = subtask.timeSlot || getDefaultTimeSlot();
+          if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
+          slotGroups[tSlot].push(subEntry);
 
           // Also distribute stages of this subtask
           if (subtask.stages && subtask.stages.length > 0) {
@@ -281,13 +263,9 @@ function renderTimeView(date) {
                 _stageData: stage,
                 _parentName: chain
               };
-              var ssSlot = stage.timeSlot || null;
-              if (ssSlot) {
-                if (!slotGroups[ssSlot]) slotGroups[ssSlot] = [];
-                slotGroups[ssSlot].push(ssEntry);
-              } else {
-                noSlotItems.push(ssEntry);
-              }
+              var ssSlot = stage.timeSlot || getDefaultTimeSlot();
+              if (!slotGroups[ssSlot]) slotGroups[ssSlot] = [];
+              slotGroups[ssSlot].push(ssEntry);
             });
           }
         });
@@ -461,56 +439,6 @@ function renderTimeView(date) {
     frag.appendChild(section);
   });
 
-  // No-timeSlot section (at bottom)
-  if (noSlotItems.length > 0) {
-    sortGroup(noSlotItems);
-    var noSlotSection = document.createElement('div');
-    noSlotSection.className = 'timeview-section timeview-noslot';
-
-    var nsHeader = document.createElement('div');
-    nsHeader.className = 'timeview-header';
-    nsHeader.innerHTML = '⬚ 无时段要求 <span class="timeview-count">' + noSlotItems.length + '</span>';
-    noSlotSection.appendChild(nsHeader);
-
-    var nsContainer = document.createElement('div');
-    nsContainer.className = 'timeview-items';
-
-    noSlotItems.forEach(function(entry) {
-      var qKey = entry.quadrantKey;
-      var el;
-
-      if (entry._childType === 'stage') {
-        el = createStageElementForTask(entry._stageData, qKey, entry.item.id);
-        el = wrapChildEl(el, entry._parentName, qKey);
-      } else if (entry._childType === 'subtask') {
-        el = createSubTaskElement(entry._subtaskData, qKey, entry.item.id);
-        el = wrapChildEl(el, entry._parentName, qKey);
-      } else if (entry._childType === 'subtask-stage') {
-        el = createStageElement(entry._stageData, qKey, entry.item.id, entry._subtaskData.id);
-        el = wrapChildEl(el, entry._parentName, qKey);
-      } else {
-        var isParent = parentsWithChildren[qKey + '::' + entry.item.id];
-        if (isParent) {
-          el = createCompactParentEl(entry);
-        } else {
-          var item = entry.item;
-          if (item.blockName !== undefined) {
-            el = createTaskBlockElement(item, qKey, 0);
-          } else {
-            el = createTaskElement(item, qKey, 0);
-          }
-          if (QUADRANT_BG[qKey]) {
-            el.style.backgroundColor = QUADRANT_BG[qKey];
-          }
-        }
-      }
-      nsContainer.appendChild(el);
-    });
-
-    noSlotSection.appendChild(nsContainer);
-    frag.appendChild(noSlotSection);
-  }
-
   // Hide quadrant containers, show time view
   var allQuadrants = grid.querySelectorAll('.quadrant');
   for (var qi = 0; qi < allQuadrants.length; qi++) {
@@ -523,6 +451,24 @@ function renderTimeView(date) {
     empty.textContent = searchTerm ? '无匹配任务' : '当前日期没有任务';
     frag.appendChild(empty);
   }
+
+  // Auto-adjust grid columns based on how many timeSlot sections have items
+  var nonEmptyCount = 0;
+  SLOT_ORDER.forEach(function(sk) { if (slotGroups[sk] && slotGroups[sk].length > 0) nonEmptyCount++; });
+  var cols;
+  if (nonEmptyCount <= 1)      cols = 1;
+  else if (nonEmptyCount === 2) cols = 2;
+  else if (nonEmptyCount === 3) cols = 3;
+  else if (nonEmptyCount === 4) cols = 2;
+  else                          cols = 3; // 5 or 6
+  // Cap columns by viewport width for responsive behavior
+  var vw = window.innerWidth;
+  if (vw <= 600)       cols = Math.min(cols, 1);
+  else if (vw <= 1000) cols = Math.min(cols, 2);
+  else                 cols = Math.min(cols, 3);
+  var colStr = '';
+  for (var ci = 0; ci < cols; ci++) { colStr += (ci > 0 ? ' ' : '') + '1fr'; }
+  timeviewContainer.style.gridTemplateColumns = colStr;
 
   timeviewContainer.innerHTML = '';
   timeviewContainer.appendChild(frag);

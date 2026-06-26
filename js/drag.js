@@ -699,6 +699,7 @@ function moveBigtaskSubToQuadrant(quadrantKey, dragData) {
         text: subtask.text,
         completed: false,
         progress: '100%',
+        timeSlot: subtask.timeSlot || getDefaultTimeSlot(),
         bigTaskRef: subtask.bigTaskRef
       });
     } else {
@@ -713,6 +714,7 @@ function moveBigtaskSubToQuadrant(quadrantKey, dragData) {
       completed: false,
       progress: '100%',
       dueDate: '',
+      timeSlot: (st && st.timeSlot) || getDefaultTimeSlot(),
       bigTaskRef: { bigTaskId: dragData.btId, subtaskId: dragData.stId }
     };
     if (st) {

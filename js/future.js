@@ -88,6 +88,7 @@ function importBigSubtaskToToday(btId, msId, stId) {
     completed: false,
     progress: '100%',
     dueDate: '',
+    timeSlot: (subtaskData && subtaskData.timeSlot) || getDefaultTimeSlot(),
     bigTaskRef: { bigTaskId: btId, subtaskId: stId, milestoneId: msId }
   };
   var copiedStages = copyBigSubtaskStages(subtaskData);

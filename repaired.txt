@@ -156,10 +156,17 @@
    子项（阶段/子任务）可独立删除，删除后自动重新渲染；
    支持撤销删除（Toast undo）。
    涉及文件：render.js / style.css
-10. ✅ 时间视图改为3×2网格布局：6个时段以3列2行网格排列（早/上/中 + 下/傍/晚），
-   替代原先垂直堆叠布局，空间利用率更高。"无时段"section横跨3列。
-   响应式：≤1000px→2列，≤600px→1列。
+10. ✅ 时间视图改为智能网格布局：根据有任务的时段数量自动调整列数
+   （1时段→1列, 2时段→2列, 3时段→3列, 4时段→2×2, 5时段→3+2, 6时段→3×2），
+   替代原先垂直堆叠布局，空间利用率更高。
+   响应式由JS动态适配（≤600px→max1列, ≤1000px→max2列）。
    涉及文件：style.css / render.js
+11. ✅ 消除"无时段要求"分类：时间视图移除"无时段要求"section，所有任务/子任务/阶段
+   默认按当前时间自动分配时段（getDefaultTimeSlot：5-8点→早晨, 8-12→上午,
+   12-14→中午, 14-17→下午, 17-20→傍晚, 其他→晚上）。
+   修复全部16处创建路径（addTask/addSubTask/addStage/splitStages/migrateBigTask/
+   importBigSubtask/addPoolTask/moveBigtaskSub等），确保新条目始终含timeSlot。
+   涉及文件：timeslot.js / render.js / quadrant-ops.js / store.js / future.js / bigtask.js / drag.js
 
 
 ────────────────────────────────────────

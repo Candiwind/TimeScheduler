@@ -478,7 +478,7 @@ function splitBigSubtaskIntoStages(bigTaskId, subtaskId) {
   var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
   if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
   subtask.stages = stageNames.map(function(name) {
-    return { id: generateId(), text: name, completed: false };
+    return { id: generateId(), text: name, completed: false, timeSlot: getDefaultTimeSlot() };
   });
   subtask.completed = false;
   saveBigTasks(tasks);
@@ -496,7 +496,7 @@ function addBigSubtaskStage(bigTaskId, subtaskId) {
           ms.tasks.forEach(function(t) {
             if (t.id === subtaskId) {
               if (!t.stages) t.stages = [];
-              t.stages.push({ id: generateId(), text: text, completed: false });
+              t.stages.push({ id: generateId(), text: text, completed: false, timeSlot: getDefaultTimeSlot() });
               t.completed = false;
             }
           });
@@ -788,6 +788,7 @@ function migrateBigTaskSubtasks(date) {
                   completed: false,
                   progress: '100%',
                   dueDate: '',
+                  timeSlot: t.timeSlot || getDefaultTimeSlot(),
                   bigTaskRef: { bigTaskId: bt.id, subtaskId: t.id, milestoneId: ms.id }
                 };
                 var copiedStages = copyBigSubtaskStages(t);
@@ -937,7 +938,7 @@ function _migratePlanPool(poolKey, date, shouldMigrate) {
           blockName: ft.blockName,
           progress: '100%',
           tasks: keptTasks.map(function(st) {
-            return { id: generateId(), text: st.text, completed: false };
+            return { id: generateId(), text: st.text, completed: false, timeSlot: getDefaultTimeSlot() };
           })
         };
         data[ft.targetQuadrant].push(block);

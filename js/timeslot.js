@@ -1,4 +1,16 @@
 // timeslot.js - Time-of-day slot selector for tasks
+
+// Return a reasonable default timeSlot based on the current time of day
+function getDefaultTimeSlot() {
+  var h = new Date().getHours();
+  if (h >= 5 && h < 8)   return 'early_morn';
+  if (h >= 8 && h < 12)  return 'forenoon';
+  if (h >= 12 && h < 14) return 'noon';
+  if (h >= 14 && h < 17) return 'afternoon';
+  if (h >= 17 && h < 20) return 'dusk';
+  return 'night'; // 20:00–4:59
+}
+
 function updateTaskTimeSlot(quadrantKey, taskId, blockId, slotKey) {
   var data = loadDateData(currentDate);
   if (blockId) {

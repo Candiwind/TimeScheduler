@@ -371,7 +371,7 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 /* ============ Time View ============ */
 #timeview-container {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr; /* two time slots per row */
   gap: 12px;
   align-content: start;
   grid-column: 1 / -1; /* span full width of parent quadrant-grid */

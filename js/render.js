@@ -585,20 +585,14 @@ function renderTimeView(date) {
     frag.appendChild(empty);
   }
 
-  // Auto-adjust grid columns based on how many timeSlot sections have items
+  // Auto-adjust grid columns: "two time slots per row" principle (matches quadrant 2×2 layout).
+  // 1 slot → 1 col; 2+ slots → 2 cols per row (6 slots = 2×3, 4 slots = 2×2, etc.)
   var nonEmptyCount = 0;
   SLOT_ORDER.forEach(function(sk) { if (slotGroups[sk] && slotGroups[sk].length > 0) nonEmptyCount++; });
-  var cols;
-  if (nonEmptyCount <= 1)      cols = 1;
-  else if (nonEmptyCount === 2) cols = 2;
-  else if (nonEmptyCount === 3) cols = 3;
-  else if (nonEmptyCount === 4) cols = 2;
-  else                          cols = 3; // 5 or 6
+  var cols = nonEmptyCount <= 1 ? 1 : 2;
   // Cap columns by viewport width for responsive behavior
   var vw = window.innerWidth;
-  if (vw <= 600)       cols = Math.min(cols, 1);
-  else if (vw <= 1000) cols = Math.min(cols, 2);
-  else                 cols = Math.min(cols, 3);
+  if (vw <= 600) cols = 1; // mobile: single column
   var colStr = '';
   for (var ci = 0; ci < cols; ci++) { colStr += (ci > 0 ? ' ' : '') + '1fr'; }
   timeviewContainer.style.gridTemplateColumns = colStr;

@@ -448,36 +448,29 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 [data-theme="dark"] .timeview-items .subtask-item.completed {
   opacity: 1;
 }
-/* Compact parent card (children distributed to other sections) */
-.timeview-compact-parent {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px dashed var(--border);
-  font-size: 12px;
+/* Nested membership in time view: 小任务 / 阶段 indented under their parent header */
+.timeview-items .timeview-indent-1 {
+  margin-left: 14px;
+  border-left: 2px solid var(--border);
 }
-.timeview-compact-parent.completed .timeview-compact-name {
-  text-decoration: line-through;
-  opacity: 0.55;
+.timeview-items .timeview-indent-2 {
+  margin-left: 28px;
+  border-left: 2px solid var(--border);
 }
-.timeview-compact-badge {
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.timeview-compact-name {
-  flex: 1;
+/* Orphan stage label: its 小任务 row lives in another slot, so name it explicitly */
+.timeview-orphan-label {
+  margin-left: 14px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-style: italic;
+  color: var(--text3);
+  border-left: 2px solid var(--border);
+  border-radius: 4px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
 }
-.timeview-compact-hint {
-  font-size: 10px;
-  color: var(--text3);
-  white-space: nowrap;
-}
+[data-theme="dark"] .timeview-orphan-label { color: var(--text4); }
 
 /* Parent group header (replaces compact card — quadrant-view style) */
 .timeview-parent-header {
@@ -514,51 +507,6 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   color: var(--text3);
   white-space: nowrap;
   margin-right: 4px;
-}
-.timeview-compact-parent .task-checkbox {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
-}
-.timeview-compact-parent .task-delete-btn {
-  flex-shrink: 0;
-}
-[data-theme="dark"] .timeview-compact-hint {
-  color: var(--text4);
-}
-
-/* Child items distributed from parent in time view */
-.timeview-child-item {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.timeview-parent-ref {
-  font-size: 10px;
-  color: var(--text3);
-  padding: 1px 8px 0 8px;
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.timeview-child-item .subtask-stage-item,
-.timeview-child-item .subtask-item {
-  margin: 0;
-  border-radius: 6px;
-}
-.timeview-child-item .subtask-stage-item.completed,
-.timeview-child-item .subtask-item.completed {
-  opacity: 1;
-}
-.timeview-child-item .subtask-stage-item.completed .task-text,
-.timeview-child-item .subtask-item.completed .task-text {
-  text-decoration: line-through;
-  opacity: 0.55;
-}
-[data-theme="dark"] .timeview-parent-ref {
-  color: var(--text4);
 }
 
 .quadrant {

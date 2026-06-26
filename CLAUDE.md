@@ -2,7 +2,7 @@
 
 ## 版本号规则
 
-- 每次完成修改后尝试 push 到 github上。如果没有指定版本要求，则维持原版本（github 仓库的 main 分支）。帮我上传github之前先上传gitee，github等网通了之后再传。gitee默认一定上传
+- 每次完成修改后尝试 push 到 github上。如果没有指定版本要求，则维持原版本（github 仓库的 main 分支）。帮我上传 github 之前先上传 gitee，github 等网通了之后再传。gitee 默认一定上传
 - 除非用户明确说明要发布新版本，否则每次功能更新后**不要**自行添加新版本号（如 V1.3、V1.4 等）。
 - 修改记录（repaired.txt）中的新条目应归入当前最新版本下，而不是新建版本段落。
 - commit message 中也不应包含新版本号，直接描述修改内容即可。

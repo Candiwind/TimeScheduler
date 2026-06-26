@@ -139,6 +139,13 @@
    图标按钮尺寸(28px)、完成badge字号(11px)、时段badge字号(9px)；
    缩短按钮文字（缓存、导入、📈、📋），确保任务数达三位数时第一行不换行。
    涉及文件：style.css / index.html
+6. ✅ 修复时间视图切换回象限视图失效：renderTimeView 原先用 innerHTML 清空 .quadrant-grid
+   导致4个象限容器被销毁，切换回象限视图时 renderQuadrant 找不到容器。改为隐藏/显示机制：
+   时间视图隐藏 .quadrant 元素、显示 #timeview-container；象限视图恢复显示。
+   涉及文件：index.html / render.js
+7. ✅ 时间视图任务显示象限背景色：任务元素按所属象限渲染浅色背景
+   （I红/II蓝/III黄/IV绿），已完成任务保留背景色仅文字划线，暗色模式适配。
+   涉及文件：render.js / style.css
 
 
 ────────────────────────────────────────

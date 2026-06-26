@@ -138,10 +138,22 @@ function filterItems(items, term) {
 }
 
 // ============ Time-Slot View (group tasks by completion time across all quadrants) ============
+
+// Light background colors per quadrant for time view
+var QUADRANT_BG = {
+  I:  'rgba(255,179,179,0.18)',
+  II: 'rgba(179,212,255,0.18)',
+  III:'rgba(255,245,179,0.22)',
+  IV: 'rgba(195,240,195,0.18)'
+};
+
 function renderTimeView(date) {
   var data = loadDateData(date);
   var grid = document.querySelector('.quadrant-grid');
   if (!grid) return;
+
+  var timeviewContainer = document.getElementById('timeview-container');
+  if (!timeviewContainer) return;
 
   // Collect all items from all quadrants with quadrant metadata
   var allItems = [];
@@ -174,7 +186,6 @@ function renderTimeView(date) {
   allItems.forEach(function(entry) {
     var item = entry.item;
     if (item.blockName !== undefined) {
-      // Blocks: check subtasks for timeSlot hints
       var foundSlot = null;
       if (item.tasks) {
         for (var ti = 0; ti < item.tasks.length; ti++) {
@@ -237,11 +248,17 @@ function renderTimeView(date) {
     group.forEach(function(entry) {
       var item = entry.item;
       var qKey = entry.quadrantKey;
+      var el;
       if (item.blockName !== undefined) {
-        itemsContainer.appendChild(createTaskBlockElement(item, qKey, 0));
+        el = createTaskBlockElement(item, qKey, 0);
       } else {
-        itemsContainer.appendChild(createTaskElement(item, qKey, 0));
+        el = createTaskElement(item, qKey, 0);
       }
+      // Apply quadrant background color
+      if (QUADRANT_BG[qKey]) {
+        el.style.backgroundColor = QUADRANT_BG[qKey];
+      }
+      itemsContainer.appendChild(el);
     });
 
     section.appendChild(itemsContainer);
@@ -265,21 +282,27 @@ function renderTimeView(date) {
     noSlotItems.forEach(function(entry) {
       var item = entry.item;
       var qKey = entry.quadrantKey;
+      var el;
       if (item.blockName !== undefined) {
-        nsContainer.appendChild(createTaskBlockElement(item, qKey, 0));
+        el = createTaskBlockElement(item, qKey, 0);
       } else {
-        nsContainer.appendChild(createTaskElement(item, qKey, 0));
+        el = createTaskElement(item, qKey, 0);
       }
+      if (QUADRANT_BG[qKey]) {
+        el.style.backgroundColor = QUADRANT_BG[qKey];
+      }
+      nsContainer.appendChild(el);
     });
 
     noSlotSection.appendChild(nsContainer);
     frag.appendChild(noSlotSection);
   }
 
-  // Apply time-view layout styles
-  grid.style.display = 'flex';
-  grid.style.flexDirection = 'column';
-  grid.style.gap = '12px';
+  // Hide quadrant containers, show time view
+  var allQuadrants = grid.querySelectorAll('.quadrant');
+  for (var qi = 0; qi < allQuadrants.length; qi++) {
+    allQuadrants[qi].style.display = 'none';
+  }
 
   if (!frag.childNodes.length) {
     var empty = document.createElement('div');
@@ -288,17 +311,36 @@ function renderTimeView(date) {
     frag.appendChild(empty);
   }
 
-  grid.innerHTML = '';
-  grid.appendChild(frag);
+  timeviewContainer.innerHTML = '';
+  timeviewContainer.appendChild(frag);
+  timeviewContainer.style.display = '';
+
+  // Apply time-view layout styles to the grid
+  grid.style.display = 'flex';
+  grid.style.flexDirection = 'column';
+  grid.style.gap = '12px';
 }
 
 // Reset quadrant-grid to default layout (for quadrant view)
 function resetGridLayout() {
   var grid = document.querySelector('.quadrant-grid');
-  if (grid) {
-    grid.style.display = '';
-    grid.style.flexDirection = '';
-    grid.style.gap = '';
+  if (!grid) return;
+  // Reset inline styles
+  grid.style.display = '';
+  grid.style.flexDirection = '';
+  grid.style.gap = '';
+
+  // Show quadrant containers
+  var allQuadrants = grid.querySelectorAll('.quadrant');
+  for (var qi = 0; qi < allQuadrants.length; qi++) {
+    allQuadrants[qi].style.display = '';
+  }
+
+  // Hide time view container
+  var timeviewContainer = document.getElementById('timeview-container');
+  if (timeviewContainer) {
+    timeviewContainer.style.display = 'none';
+    timeviewContainer.innerHTML = '';
   }
 }
 

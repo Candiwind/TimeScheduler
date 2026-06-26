@@ -411,12 +411,27 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   margin: 0;
   border-radius: 6px;
 }
-/* Show a subtle quadrant indicator on task items in time view */
-.timeview-items .task-item::before {
-  content: attr(data-quadrant-indicator);
-  font-size: 12px;
-  margin-right: 4px;
-  opacity: 0.7;
+/* Completed tasks in time view: keep quadrant bg visible, only strike through text */
+.timeview-items .task-item.completed {
+  opacity: 1;
+}
+.timeview-items .task-item.completed .task-text {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.timeview-items .subtask-item.completed {
+  opacity: 1;
+}
+.timeview-items .subtask-item.completed .task-text {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+/* Dark mode: completed bg overrides for time view (keep inline quadrant bg) */
+[data-theme="dark"] .timeview-items .task-item.completed {
+  opacity: 1;
+}
+[data-theme="dark"] .timeview-items .subtask-item.completed {
+  opacity: 1;
 }
 
 .quadrant {

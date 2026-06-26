@@ -369,14 +369,25 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 }
 
 /* ============ Time View ============ */
+#timeview-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  align-content: start;
+  grid-column: 1 / -1; /* span full width of parent quadrant-grid */
+}
 .timeview-section {
   background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* prevent grid blowout */
 }
 .timeview-section.timeview-noslot {
   opacity: 0.85;
+  grid-column: 1 / -1; /* span full width */
 }
 .timeview-header {
   padding: 8px 14px;
@@ -1016,6 +1027,7 @@ kbd {
   .planpool-tab { padding: 3px 10px; font-size: 11px; }
   .planpool-panel-header { font-size: 12px; }
   .app-header h1 { font-size: 14px; }
+  #timeview-container { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 600px) {
   #app { padding: 4px; }
@@ -1040,4 +1052,5 @@ kbd {
   .task-delete-btn, .task-defer-btn, .task-extra-btn { width: 26px; height: 26px; font-size: 15px; }
   .quadrant-footer .btn-add-block { width: 32px; height: 32px; }
   .planpool-tab { padding: 4px 10px; font-size: 11px; }
+  #timeview-container { grid-template-columns: 1fr; }
 }

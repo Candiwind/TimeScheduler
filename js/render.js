@@ -527,11 +527,6 @@ function renderTimeView(date) {
   timeviewContainer.innerHTML = '';
   timeviewContainer.appendChild(frag);
   timeviewContainer.style.display = '';
-
-  // Apply time-view layout styles to the grid
-  grid.style.display = 'flex';
-  grid.style.flexDirection = 'column';
-  grid.style.gap = '12px';
 }
 
 // Reset quadrant-grid to default layout (for quadrant view)

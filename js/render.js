@@ -176,6 +176,11 @@ function renderTimeView(date) {
         }
         return false;
       }
+      // Also check stages text for matches
+      if (item.stages) {
+        var stageMatch = item.stages.some(function(s) { return s.text && s.text.toLowerCase().indexOf(term) !== -1; });
+        if (stageMatch) return true;
+      }
       return item.text && item.text.toLowerCase().indexOf(term) !== -1;
     });
   }
@@ -209,16 +214,123 @@ function renderTimeView(date) {
     }
   });
 
-  // Sort within each timeSlot group: quadrant order I→II→III→IV, then incomplete first
+  // ---- Flatten children: distribute stages/subtasks to their own timeSlot sections ----
+  function flattenChildren() {
+    // Collect all parent entries (original items)
+    var allEntries = [];
+    SLOT_ORDER.forEach(function(sk) {
+      if (slotGroups[sk]) allEntries = allEntries.concat(slotGroups[sk]);
+    });
+    allEntries = allEntries.concat(noSlotItems);
+
+    allEntries.forEach(function(entry) {
+      var item = entry.item;
+      var qKey = entry.quadrantKey;
+
+      // Task with stages: distribute each stage to its own timeSlot
+      if (!item.blockName && item.stages && item.stages.length > 0) {
+        item.stages.forEach(function(stage) {
+          var childEntry = {
+            item: item,
+            quadrantKey: qKey,
+            _childType: 'stage',
+            _stageData: stage,
+            _parentName: item.text || '未命名任务'
+          };
+          var tSlot = stage.timeSlot || null;
+          if (tSlot) {
+            if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
+            slotGroups[tSlot].push(childEntry);
+          } else {
+            noSlotItems.push(childEntry);
+          }
+        });
+      }
+
+      // Block with subtasks: distribute each subtask to its own timeSlot
+      if (item.blockName && item.tasks && item.tasks.length > 0) {
+        item.tasks.forEach(function(subtask) {
+          var subEntry = {
+            item: item,
+            quadrantKey: qKey,
+            _childType: 'subtask',
+            _subtaskData: subtask,
+            _parentName: item.blockName || '未命名任务块'
+          };
+          var tSlot = subtask.timeSlot || null;
+          if (tSlot) {
+            if (!slotGroups[tSlot]) slotGroups[tSlot] = [];
+            slotGroups[tSlot].push(subEntry);
+          } else {
+            noSlotItems.push(subEntry);
+          }
+
+          // Also distribute stages of this subtask
+          if (subtask.stages && subtask.stages.length > 0) {
+            subtask.stages.forEach(function(stage) {
+              var ssEntry = {
+                item: item,
+                quadrantKey: qKey,
+                _childType: 'subtask-stage',
+                _subtaskData: subtask,
+                _stageData: stage,
+                _parentName: subtask.text || '未命名子任务'
+              };
+              var ssSlot = stage.timeSlot || null;
+              if (ssSlot) {
+                if (!slotGroups[ssSlot]) slotGroups[ssSlot] = [];
+                slotGroups[ssSlot].push(ssEntry);
+              } else {
+                noSlotItems.push(ssEntry);
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+  flattenChildren();
+
+  // Sort within each timeSlot group: parents first, then children, both by quadrant+completion
   var quadOrder = { I: 0, II: 1, III: 2, IV: 3 };
+  function getCompleted(entry) {
+    if (entry._childType) {
+      if (entry._stageData) return entry._stageData.completed;
+      if (entry._subtaskData) return entry._subtaskData.completed;
+    }
+    return entry.item.completed;
+  }
   function sortGroup(group) {
     group.sort(function(a, b) {
+      // Parents before children
+      var aChild = a._childType ? 1 : 0;
+      var bChild = b._childType ? 1 : 0;
+      if (aChild !== bChild) return aChild - bChild;
+      // Then by quadrant
       var qa = quadOrder[a.quadrantKey] !== undefined ? quadOrder[a.quadrantKey] : 99;
       var qb = quadOrder[b.quadrantKey] !== undefined ? quadOrder[b.quadrantKey] : 99;
       if (qa !== qb) return qa - qb;
-      if (a.item.completed !== b.item.completed) return a.item.completed ? 1 : -1;
+      // Then incomplete first
+      var aDone = getCompleted(a) ? 1 : 0;
+      var bDone = getCompleted(b) ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
       return 0;
     });
+  }
+
+  // Helper: wrap a child element with parent reference label
+  function wrapChildEl(childEl, parentName, qKey) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'timeview-child-item';
+    var ref = document.createElement('div');
+    ref.className = 'timeview-parent-ref';
+    ref.textContent = '↳ ' + parentName;
+    wrapper.appendChild(ref);
+    wrapper.appendChild(childEl);
+    if (QUADRANT_BG[qKey]) {
+      childEl.style.backgroundColor = QUADRANT_BG[qKey];
+    }
+    return wrapper;
   }
 
   var frag = document.createDocumentFragment();
@@ -246,17 +358,28 @@ function renderTimeView(date) {
     itemsContainer.className = 'timeview-items';
 
     group.forEach(function(entry) {
-      var item = entry.item;
       var qKey = entry.quadrantKey;
       var el;
-      if (item.blockName !== undefined) {
-        el = createTaskBlockElement(item, qKey, 0);
+
+      if (entry._childType === 'stage') {
+        el = createStageElementForTask(entry._stageData, qKey, entry.item.id);
+        el = wrapChildEl(el, entry._parentName, qKey);
+      } else if (entry._childType === 'subtask') {
+        el = createSubTaskElement(entry._subtaskData, qKey, entry.item.id);
+        el = wrapChildEl(el, entry._parentName, qKey);
+      } else if (entry._childType === 'subtask-stage') {
+        el = createStageElement(entry._stageData, qKey, entry.item.id, entry._subtaskData.id);
+        el = wrapChildEl(el, entry._parentName, qKey);
       } else {
-        el = createTaskElement(item, qKey, 0);
-      }
-      // Apply quadrant background color
-      if (QUADRANT_BG[qKey]) {
-        el.style.backgroundColor = QUADRANT_BG[qKey];
+        var item = entry.item;
+        if (item.blockName !== undefined) {
+          el = createTaskBlockElement(item, qKey, 0);
+        } else {
+          el = createTaskElement(item, qKey, 0);
+        }
+        if (QUADRANT_BG[qKey]) {
+          el.style.backgroundColor = QUADRANT_BG[qKey];
+        }
       }
       itemsContainer.appendChild(el);
     });
@@ -280,16 +403,28 @@ function renderTimeView(date) {
     nsContainer.className = 'timeview-items';
 
     noSlotItems.forEach(function(entry) {
-      var item = entry.item;
       var qKey = entry.quadrantKey;
       var el;
-      if (item.blockName !== undefined) {
-        el = createTaskBlockElement(item, qKey, 0);
+
+      if (entry._childType === 'stage') {
+        el = createStageElementForTask(entry._stageData, qKey, entry.item.id);
+        el = wrapChildEl(el, entry._parentName, qKey);
+      } else if (entry._childType === 'subtask') {
+        el = createSubTaskElement(entry._subtaskData, qKey, entry.item.id);
+        el = wrapChildEl(el, entry._parentName, qKey);
+      } else if (entry._childType === 'subtask-stage') {
+        el = createStageElement(entry._stageData, qKey, entry.item.id, entry._subtaskData.id);
+        el = wrapChildEl(el, entry._parentName, qKey);
       } else {
-        el = createTaskElement(item, qKey, 0);
-      }
-      if (QUADRANT_BG[qKey]) {
-        el.style.backgroundColor = QUADRANT_BG[qKey];
+        var item = entry.item;
+        if (item.blockName !== undefined) {
+          el = createTaskBlockElement(item, qKey, 0);
+        } else {
+          el = createTaskElement(item, qKey, 0);
+        }
+        if (QUADRANT_BG[qKey]) {
+          el.style.backgroundColor = QUADRANT_BG[qKey];
+        }
       }
       nsContainer.appendChild(el);
     });

@@ -73,28 +73,28 @@ mark {
 
 /* ============ Header ============ */
 .app-header {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-  padding: 8px 16px; background: var(--surface); border-radius: var(--radius);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+  padding: 6px 12px; background: var(--surface); border-radius: var(--radius);
   box-shadow: var(--shadow-sm); margin-bottom: 8px; transition: background var(--t);
 }
-.app-header h1 { font-size: 18px; font-weight: 700; white-space: nowrap; }
+.app-header h1 { font-size: 15px; font-weight: 700; white-space: nowrap; }
 .header-completion {
   display: flex; align-items: center; gap: 2px;
-  font-size: 12px; font-weight: 600; color: var(--accent);
-  padding: 3px 10px; background: rgba(74,144,217,0.08); border: 1px solid rgba(74,144,217,0.15);
-  border-radius: 14px; white-space: nowrap; margin-right: auto;
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  padding: 2px 8px; background: rgba(74,144,217,0.08); border: 1px solid rgba(74,144,217,0.15);
+  border-radius: 12px; white-space: nowrap; margin-right: auto;
 }
 [data-theme="dark"] .header-completion {
   background: rgba(125,189,242,0.08); border-color: rgba(125,189,242,0.15);
 }
 .header-completion span { font-weight: 700; }
-.header-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-left: 8px; }
-.header-slot-breakdown { display: flex; align-items: center; gap: 4px; margin-right: auto; }
+.header-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-left: 4px; }
+.header-slot-breakdown { display: flex; align-items: center; gap: 3px; margin-right: auto; }
 .header-slot-badge {
-  display: flex; align-items: center; gap: 2px;
-  font-size: 10px; font-weight: 600; color: var(--accent);
-  padding: 2px 6px; background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.12);
-  border-radius: 10px; white-space: nowrap;
+  display: flex; align-items: center; gap: 1px;
+  font-size: 9px; font-weight: 600; color: var(--accent);
+  padding: 1px 5px; background: rgba(74,144,217,0.06); border: 1px solid rgba(74,144,217,0.12);
+  border-radius: 8px; white-space: nowrap;
 }
 [data-theme="dark"] .header-slot-badge {
   background: rgba(125,189,242,0.06); border-color: rgba(125,189,242,0.12);
@@ -125,17 +125,17 @@ mark {
 .btn-info    { background: #5bc0de; }
 .btn-cancel  { background: #999; }
 .btn-danger  { background: #d9534f; }
-.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 4px; }
+.btn-sm { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
 .btn-icon {
-  width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--surface); color: var(--text); font-size: 16px; cursor: pointer;
+  width: 28px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--surface); color: var(--text); font-size: 14px; cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: all var(--t);
 }
 .btn-icon:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 /* ============ Form Inputs ============ */
 input[type="date"], input[type="text"].search-input {
-  padding: 6px 10px; border: 1px solid var(--border2); border-radius: 6px;
-  font-size: 13px; font-family: inherit; background: var(--surface); color: var(--text);
+  padding: 5px 8px; border: 1px solid var(--border2); border-radius: 5px;
+  font-size: 12px; font-family: inherit; background: var(--surface); color: var(--text);
   transition: all var(--t);
 }
 input[type="date"]:focus, input[type="text"].search-input:focus {
@@ -925,16 +925,16 @@ kbd {
   .planpool-tabs { gap: 1px; }
   .planpool-tab { padding: 3px 10px; font-size: 11px; }
   .planpool-panel-header { font-size: 12px; }
-  .app-header h1 { font-size: 16px; }
+  .app-header h1 { font-size: 14px; }
 }
 @media (max-width: 600px) {
   #app { padding: 4px; }
-  .app-header { flex-direction: column; align-items: stretch; padding: 8px 10px; }
-  .app-header h1 { font-size: 15px; text-align: center; margin-right: 0; }
+  .app-header { flex-direction: column; align-items: stretch; padding: 6px 8px; }
+  .app-header h1 { font-size: 14px; text-align: center; margin-right: 0; }
   .header-actions { justify-content: center; }
   .toolbar { flex-direction: column; align-items: stretch; padding: 6px 10px; }
   .btn { font-size: 11px; padding: 6px 12px; }
-  .btn-sm { padding: 6px 10px; font-size: 11px; }
+  .btn-sm { padding: 4px 8px; font-size: 10px; }
   .stats-grid { grid-template-columns: 1fr; }
   .search-input { width: 100%; }
   .bigtask-card-header { gap: 4px; padding: 6px 8px; }

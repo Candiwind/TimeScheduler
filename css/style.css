@@ -433,6 +433,48 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 [data-theme="dark"] .timeview-items .subtask-item.completed {
   opacity: 1;
 }
+/* Compact parent card (children distributed to other sections) */
+.timeview-compact-parent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  font-size: 12px;
+}
+.timeview-compact-parent.completed .timeview-compact-name {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.timeview-compact-badge {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.timeview-compact-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.timeview-compact-hint {
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+.timeview-compact-parent .task-checkbox {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.timeview-compact-parent .task-delete-btn {
+  flex-shrink: 0;
+}
+[data-theme="dark"] .timeview-compact-hint {
+  color: var(--text4);
+}
+
 /* Child items distributed from parent in time view */
 .timeview-child-item {
   margin: 0;

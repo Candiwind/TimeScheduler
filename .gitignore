@@ -1,0 +1,3 @@
+# Claude Code local configuration (API credentials, model preferences)
+.claude/settings.json
+.claude/settings/

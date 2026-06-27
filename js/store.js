@@ -330,10 +330,40 @@ function saveBigTasks(tasks) {
   }
 }
 
+// Today's date as a local YYYY-MM-DD string (for recording completion timestamps).
+// Uses local time to stay consistent with Util.calcDaysLeft.
+function todayLocalDateStr() {
+  var d = new Date();
+  var mm = d.getMonth() + 1;
+  var dd = d.getDate();
+  return d.getFullYear() + '-' + (mm < 10 ? '0' + mm : mm) + '-' + (dd < 10 ? '0' + dd : dd);
+}
+
+// Count big tasks that are still in progress (progress < 100).
+// Completed big tasks no longer occupy an active slot — they don't count toward
+// the "现存" (active) total shown in the panel header nor the MAX_BIG_TASKS limit.
+function countActiveBigTasks(tasks) {
+  var n = 0;
+  for (var i = 0; i < tasks.length; i++) {
+    if ((tasks[i].progress || 0) < 100) n++;
+  }
+  return n;
+}
+
+// Overdue days for a completed big task: how many days completedDate exceeded targetDate.
+// Returns 0 when not completed, missing dates, or finished on/before the target date.
+function bigTaskOverdueDays(bt) {
+  if (!bt || !bt.completedDate || !bt.targetDate) return 0;
+  var comp = new Date(bt.completedDate + 'T00:00:00');
+  var tgt = new Date(bt.targetDate + 'T00:00:00');
+  var diff = Math.round((comp - tgt) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+}
+
 function addBigTask(task) {
   var tasks = loadBigTasks();
-  if (tasks.length >= MAX_BIG_TASKS) {
-    alert('大任务最多 ' + MAX_BIG_TASKS + ' 个，建议不超过 3 个。请先完成或删除现有大任务。');
+  if (countActiveBigTasks(tasks) >= MAX_BIG_TASKS) {
+    alert('活跃大任务最多 ' + MAX_BIG_TASKS + ' 个，建议不超过 3 个。已完成的大任务不再占用名额，可删除或先完成现有大任务。');
     return null;
   }
   tasks.push(task);
@@ -381,6 +411,13 @@ function recalcBigTaskProgress(bigTask) {
     });
   }
   bigTask.progress = total > 0 ? Math.round((done / total) * 100) : 0;
+  // Record the completion date when first reaching 100% (for overdue display),
+  // and clear it whenever progress drops back below 100%.
+  if (bigTask.progress >= 100) {
+    if (!bigTask.completedDate) bigTask.completedDate = todayLocalDateStr();
+  } else {
+    bigTask.completedDate = null;
+  }
   return bigTask;
 }
 

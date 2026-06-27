@@ -40,7 +40,7 @@ function renderBigTaskPanel() {
   var emptyEl = document.getElementById('bigTaskEmpty');
   var countEl = document.getElementById('bigTaskCount');
 
-  if (countEl) countEl.textContent = bigTasks.length;
+  if (countEl) countEl.textContent = countActiveBigTasks(bigTasks);
 
   if (bigTasks.length === 0) {
     listEl.innerHTML = '';
@@ -105,7 +105,15 @@ function renderBigTaskPanel() {
       var bt = null;
       for (var bi = 0; bi < bts.length; bi++) { if (bts[bi].id === btId) { bt = bts[bi]; break; } }
       var newProgress = (bt && bt.progress >= 100) ? 0 : 100;
-      updateBigTask(btId, { progress: newProgress });
+      var updates = { progress: newProgress };
+      // Stamp the completion date when first completed (keeps overdue calc accurate);
+      // clear it when toggled back to incomplete so re-completing records a fresh date.
+      if (newProgress >= 100) {
+        if (!bt.completedDate) updates.completedDate = todayLocalDateStr();
+      } else {
+        updates.completedDate = null;
+      }
+      updateBigTask(btId, updates);
       renderBigTaskPanel();
     });
   });
@@ -370,7 +378,16 @@ function renderBigTaskCardHTML(bt, idx) {
   h += '<div class="bigtask-card-progress-bar"><div class="bigtask-card-progress-fill" style="width:' + (bt.progress || 0) + '%"></div></div>';
   h += '<span class="bigtask-card-progress-text">' + (bt.progress || 0) + '%</span>';
   h += '</div>';
-  h += '<span class="bigtask-card-countdown' + countdownClass + '">' + (daysLeft >= 0 ? '倒计时 ' + daysLeft + ' 天' : '已逾期') + '</span>';
+  if (bt.progress >= 100) {
+    var overdueDays = bigTaskOverdueDays(bt);
+    if (overdueDays > 0) {
+      h += '<span class="bigtask-card-countdown urgent">逾期完成 ' + overdueDays + ' 天</span>';
+    } else {
+      h += '<span class="bigtask-card-countdown">✅ 已完成</span>';
+    }
+  } else {
+    h += '<span class="bigtask-card-countdown' + countdownClass + '">' + (daysLeft >= 0 ? '倒计时 ' + daysLeft + ' 天' : '已逾期') + '</span>';
+  }
   h += '<button class="bigtask-complete-btn' + (bt.progress >= 100 ? ' completed' : '') + '" data-bt-id="' + bt.id + '" title="' + (bt.progress >= 100 ? '标记为未完成' : '标记为完成') + '" style="font-size:14px;padding:0;width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">' + (bt.progress >= 100 ? '✅' : '⬜') + '</button>';
   h += '<span class="bigtask-card-toggle" style="font-size:10px;color:var(--text3);transition:transform var(--t);">▼</span>';
   h += '<button class="task-delete-btn bigtask-delete-btn" data-big-task-id="' + bt.id + '" title="删除大任务">&times;</button>';

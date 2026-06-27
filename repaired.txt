@@ -207,6 +207,18 @@
    删除确认更准确)。分布逻辑(flattenChildren)不变，故无重复/无遗漏/时段正确的不变量保持。
    涉及文件：render.js / style.css
    验证：test/test-timeview-grouping.js（5场景17断言：嵌套层级/孤立标签/多父不交叉/独立项按象限穿插）
+5. ✅ 大任务完成后更新现存数量+显示逾期完成天数：
+   (1) 现存数量改为统计"未完成"大任务（progress<100）。面板标题 #bigTaskCount 由 bigTasks.length
+   改为 countActiveBigTasks(bigTasks)；addBigTask 的 MAX_BIG_TASKS(=5) 上限也改用 countActiveBigTasks
+   判定——已完成的大任务不再占用名额，完成一个即可释放一个活跃名额。新增 countActiveBigTasks 辅助。
+   (2) 进度首次达到 100% 时记录 completedDate（本地日期），用于逾期统计。两条完成路径均覆盖：
+   自动路径（子任务/阶段勾选、AI导入、拖拽等触发 recalcBigTaskProgress）在函数内统一盖章/清除；
+   手动路径（完成按钮）在 updateBigTask 的 updates 里同步设置/清除。回退到未完成时清除 completedDate，
+   再次完成则重新盖章（不留陈旧日期）；已有 completedDate 不会被后续 recalc 覆盖。
+   卡片渲染：progress>=100 时若 bigTaskOverdueDays>0 显示"逾期完成 N 天"(红色 urgent)，否则显示"✅ 已完成"。
+   新增 todayLocalDateStr / bigTaskOverdueDays 辅助。
+   涉及文件：store.js / bigtask.js
+   验证：test/test-bigtask-completion.js（6场景28断言：活跃计数/逾期天数/recalc盖章与回退/手动按钮payload/MAX名额释放）
 
 
 ────────────────────────────────────────

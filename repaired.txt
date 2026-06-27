@@ -240,6 +240,12 @@
    从 ~90 行重复遍历缩减为各自 4-8 行。以后统计口径改动只需改一处。
    (2) 合并 showTimeSlotPickerCustom 与 showTimeSlotPicker 为统一的 showTimeSlotPicker(el, qk, tid, bid, opts)。
    (3) 删除 app.js 中未引用死代码 rebindDragEvents / setupDragDrop（拖拽事件已在 create*Element 中直接绑定）。
+9. ✅ 数据安全加固——滚动备份 + schema 版本号 + 配额检测：
+   (1) 备份从同步镜像改为滚动保留最近 3 个快照（_backup / _backup_1 / _backup_2），
+   逻辑错误导致的损坏不会同时覆盖所有备份——检测到越早有更多恢复机会。
+   损坏恢复时按新旧顺序依次尝试所有备份层。
+   (2) 新增 SCHEMA_VERSION / SCHEMA_VERSION_KEY，为未来数据结构变更提供迁移检测锚点。
+   (3) 存储空间不足时估算使用率并给出具体清理建议（导出JSON后清理历史日期），替代通用提示。
 
 
 ────────────────────────────────────────

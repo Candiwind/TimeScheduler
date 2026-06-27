@@ -2,40 +2,88 @@
 
 var STORAGE_KEY = 'quadrant_task_data';
 var SYNC_FILENAME = 'quadrant_tasks_backup.json';
+var SCHEMA_VERSION_KEY = 'quadrant_schema_version';
+var SCHEMA_VERSION = 1;
 
 // Check if running in Capacitor native app
 function isCapacitorNative() {
   return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 }
 var STORAGE_BACKUP_KEY = 'quadrant_task_data_backup';
+var MAX_ROLLING_BACKUPS = 3;  // Keep last 3 snapshots (rotating)
 
 function loadAllData() {
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch (e) { /* fall through to backup */ }
-  // Try backup recovery
-  try {
-    var backup = localStorage.getItem(STORAGE_BACKUP_KEY);
-    if (backup) {
-      console.warn('Primary data corrupted, recovering from backup');
-      var recovered = JSON.parse(backup);
-      localStorage.setItem(STORAGE_KEY, backup);
-      return recovered;
-    }
-  } catch (e2) { /* unrecoverable */ }
+  } catch (e) { /* fall through to backups */ }
+  // Try recovery from rolling backups: _backup → _backup_1 → _backup_2 → ...
+  var tryKeys = [STORAGE_BACKUP_KEY];
+  for (var bi = 1; bi <= MAX_ROLLING_BACKUPS; bi++) {
+    tryKeys.push(STORAGE_BACKUP_KEY + '_' + bi);
+  }
+  for (var k = 0; k < tryKeys.length; k++) {
+    try {
+      var backup = localStorage.getItem(tryKeys[k]);
+      if (backup) {
+        console.warn('Primary data corrupted, recovering from backup: ' + tryKeys[k]);
+        var recovered = JSON.parse(backup);
+        localStorage.setItem(STORAGE_KEY, backup);
+        return recovered;
+      }
+    } catch (e2) { /* continue to next backup */ }
+  }
   return {};
+}
+
+// Rotate backups: shift existing snapshots +1, then store newest as _backup.
+// This prevents a single malformed save from destroying both primary and backup
+// simultaneously — older snapshots survive if the bug is detected in time.
+function _rotateRollingBackups(json) {
+  try {
+    // Shift: _backup_2 → _backup_3, _backup_1 → _backup_2, _backup → _backup_1
+    for (var i = MAX_ROLLING_BACKUPS - 1; i >= 1; i--) {
+      var older = localStorage.getItem(STORAGE_BACKUP_KEY + '_' + i);
+      if (older !== null) {
+        localStorage.setItem(STORAGE_BACKUP_KEY + '_' + (i + 1), older);
+      }
+    }
+    var current = localStorage.getItem(STORAGE_BACKUP_KEY);
+    if (current !== null) {
+      localStorage.setItem(STORAGE_BACKUP_KEY + '_1', current);
+    }
+    localStorage.setItem(STORAGE_BACKUP_KEY, json);
+  } catch (e) { /* silently skip backup rotation on quota — primary is already saved */ }
 }
 
 function saveAllData(data) {
   try {
     var json = JSON.stringify(data);
     localStorage.setItem(STORAGE_KEY, json);
-    // Keep a backup
-    localStorage.setItem(STORAGE_BACKUP_KEY, json);
+    // Rolling backup: keeps up to 3 prior snapshots so old versions survive
+    // even if a logic bug corrupts data for several consecutive saves
+    _rotateRollingBackups(json);
+    // Record schema version for future migration detection
+    try { localStorage.setItem(SCHEMA_VERSION_KEY, String(SCHEMA_VERSION)); } catch (e) {}
   } catch (e) {
-    alert('存储空间不足，请清理部分数据后重试');
+    var usedPct = estimateQuotaPct();
+    var hint = usedPct > 80
+      ? '\n\n当前已使用约 ' + usedPct + '% 的存储空间。建议导出 JSON 备份后清理历史日期或删除旧数据。'
+      : '';
+    alert('存储空间不足，请清理部分数据后重试' + hint);
   }
+}
+
+// Estimate localStorage usage percentage (rough, cross-browser approximation)
+function estimateQuotaPct() {
+  try {
+    var total = 0;
+    for (var i = 0; i < localStorage.length; i++) {
+      total += localStorage.getItem(localStorage.key(i)).length;
+    }
+    // Most browsers allocate ~5 MB for localStorage
+    return Math.round(total / (5 * 1024 * 1024) * 100);
+  } catch (e) { return 0; }
 }
 
 function loadDateData(date) {

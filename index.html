@@ -69,6 +69,16 @@
         <button class="btn btn-sm btn-primary" id="btnAddBigTask">+ 新建大任务</button>
         <button class="btn btn-sm btn-info" id="btnClaudePlan" data-tooltip="用 AI 调研规划大任务">🤖 AI 规划</button>
       </div>
+      <!-- Completed Big Task Cache (auto-populated when a big task finishes) -->
+      <div class="bigtask-cache collapsed" id="bigTaskCache" style="display:none;">
+        <div class="bigtask-cache-header" id="bigTaskCacheToggle">
+          <span>📦 大任务缓存库（已完成归档，<span id="bigTaskCacheCount">0</span> 个）</span>
+          <span class="bigtask-cache-toggle-icon">▼</span>
+        </div>
+        <div class="bigtask-cache-body" id="bigTaskCacheBody">
+          <div class="bigtask-cache-list" id="bigTaskCacheList"></div>
+        </div>
+      </div>
     </div>
   </div>
 

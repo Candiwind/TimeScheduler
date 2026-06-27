@@ -13,6 +13,13 @@ function setupBigTaskPanel() {
 
   document.getElementById('btnAddBigTask').addEventListener('click', showAddBigTaskModal);
   document.getElementById('btnClaudePlan').addEventListener('click', showAIPlanModal);
+
+  var cacheToggle = document.getElementById('bigTaskCacheToggle');
+  if (cacheToggle) {
+    cacheToggle.addEventListener('click', function() {
+      document.getElementById('bigTaskCache').classList.toggle('collapsed');
+    });
+  }
 }
 
 // ============ Render ============
@@ -360,6 +367,77 @@ function renderBigTaskPanel() {
   });
 
   renderBigTaskPool();
+  renderBigTaskCache();
+  flushArchiveToasts();
+}
+
+// ============ Completed Big Task Cache ============
+
+// Show one undo toast per big task archived during the most recent saveBigTasks.
+function flushArchiveToasts() {
+  if (!_pendingArchiveToasts || _pendingArchiveToasts.length === 0) return;
+  var items = _pendingArchiveToasts.slice();
+  _pendingArchiveToasts = [];
+  items.forEach(function(it) {
+    Toast.show('📦 大任务「' + it.name + '」已完成，已自动归档到缓存库', function() {
+      if (restoreBigTaskFromCache(it.id)) renderBigTaskPanel();
+    });
+  });
+}
+
+function renderBigTaskCache() {
+  var section = document.getElementById('bigTaskCache');
+  var listEl = document.getElementById('bigTaskCacheList');
+  var countEl = document.getElementById('bigTaskCacheCount');
+  if (!section || !listEl) return;
+
+  var cache = loadBigTaskCache();
+  if (countEl) countEl.textContent = cache.length;
+
+  if (cache.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+
+  listEl.innerHTML = '';
+  // Newest first
+  cache.slice().reverse().forEach(function(bt) {
+    var overdue = bigTaskOverdueDays(bt);
+    var metaParts = [];
+    if (bt.targetDate) metaParts.push('截止 ' + bt.targetDate);
+    if (bt.completedDate) metaParts.push('完成 ' + bt.completedDate);
+    if (overdue > 0) metaParts.push('逾期 ' + overdue + ' 天');
+
+    var div = document.createElement('div');
+    div.className = 'bigtask-cache-item';
+    div.innerHTML =
+      '<span class="bigtask-cache-icon">✅</span>' +
+      '<div class="bigtask-cache-info">' +
+        '<div class="bigtask-cache-name">' + Util.escHtml(bt.name || '未命名') + '</div>' +
+        '<div class="bigtask-cache-meta">' + (metaParts.length ? Util.escHtml(metaParts.join(' · ')) : '无日期') + '</div>' +
+      '</div>' +
+      '<button class="task-defer-btn bt-cache-restore-btn" data-cache-id="' + bt.id + '" title="恢复到活跃列表" style="width:20px;height:20px;font-size:11px;padding:0;">↩</button>' +
+      '<button class="task-delete-btn bt-cache-delete-btn" data-cache-id="' + bt.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;">&times;</button>';
+    listEl.appendChild(div);
+  });
+
+  listEl.querySelectorAll('.bt-cache-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (restoreBigTaskFromCache(this.dataset.cacheId)) renderBigTaskPanel();
+    });
+  });
+  listEl.querySelectorAll('.bt-cache-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从缓存库永久删除该已完成大任务？')) {
+        deleteBigTaskFromCache(this.dataset.cacheId);
+        renderBigTaskPanel();
+      }
+    });
+  });
 }
 
 function renderBigTaskCardHTML(bt, idx) {

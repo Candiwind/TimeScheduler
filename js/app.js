@@ -29,6 +29,9 @@ function initApp() {
   migrateWeekTasks(today);
   migrateMonthTasks(today);
   seedCacheIndexIfEmpty(); // Backward compat: seed cache index with existing dates (one-time)
+  // Silent migration: archive any legacy completed big tasks into the cache library.
+  saveBigTasks(loadBigTasks());
+  _pendingArchiveToasts = []; // don't toast for migrations on load
   renderAll(today);
   renderBigTaskPanel();
   renderPlanPoolPanel();

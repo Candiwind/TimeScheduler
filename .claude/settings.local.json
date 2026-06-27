@@ -5,7 +5,12 @@
       "Edit(*)",
       "Write(*)",
       "WebSearch(*)",
-      "WebFetch(*)"
+      "WebFetch(*)",
+      "mcp__filesystem__read_text_file",
+      "mcp__filesystem__edit_file",
+      "Bash(MEM=\"C:/Users/Administrator/.claude/projects/d--BaiduSyncdisk-CodingProject-VibeCodingProject-TimeScheduler/memory\" && ls -la \"$MEM\" 2>/dev/null && echo \"---MEMORY.md---\" && cat \"$MEM/MEMORY.md\" 2>/dev/null || echo \"\\(MEMORY.md not found\\)\")",
+      "Read(//c/Users/Administrator/.claude/projects/d--BaiduSyncdisk-CodingProject-VibeCodingProject-TimeScheduler/memory/**)",
+      "mcp__filesystem__directory_tree"
     ]
   }
 }

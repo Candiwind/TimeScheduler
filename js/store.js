@@ -313,6 +313,15 @@ function ensureDateData(date) {
 var BIG_TASK_KEY = 'quadrant_big_tasks';
 var MAX_BIG_TASKS = 5;
 
+// ============ Big Task Cache (archive of completed big tasks) ============
+// When a big task reaches 100% it is auto-archived here, keeping the active
+// list (BIG_TASK_KEY) to in-progress tasks only. The cache preserves the full
+// plan (milestones/subtasks/stages + completedDate) for history & restore.
+var BIG_TASK_CACHE_KEY = 'quadrant_big_tasks_cache';
+// Names/ids of tasks archived during the most recent saveBigTasks — UI layer
+// (bigtask.js renderBigTaskPanel) flushes these into undo toasts.
+var _pendingArchiveToasts = [];
+
 function loadBigTasks() {
   try {
     var raw = localStorage.getItem(BIG_TASK_KEY);
@@ -322,12 +331,85 @@ function loadBigTasks() {
   }
 }
 
-function saveBigTasks(tasks) {
+function loadBigTaskCache() {
   try {
-    localStorage.setItem(BIG_TASK_KEY, JSON.stringify(tasks));
+    var raw = localStorage.getItem(BIG_TASK_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveBigTaskCache(arr) {
+  try {
+    localStorage.setItem(BIG_TASK_CACHE_KEY, JSON.stringify(arr));
   } catch (e) {
     alert('存储空间不足');
   }
+}
+
+// Persist active big tasks. As a side effect, any task that has reached 100%
+// (progress >= 100) and is NOT flagged suppressAutoArchive is automatically
+// moved into the big task cache library. Tasks flagged suppressAutoArchive
+// (restored from cache) stay visible until their progress drops below 100%,
+// at which point the flag is cleared so a future completion re-archives them.
+function saveBigTasks(tasks) {
+  var active = [];
+  var toArchive = [];
+  for (var i = 0; i < tasks.length; i++) {
+    var t = tasks[i];
+    if ((t.progress || 0) >= 100 && !t.suppressAutoArchive) {
+      toArchive.push(t);
+    } else {
+      if ((t.progress || 0) < 100) t.suppressAutoArchive = false; // genuinely active again
+      active.push(t);
+    }
+  }
+  if (toArchive.length > 0) {
+    var cache = loadBigTaskCache();
+    toArchive.forEach(function(bt) {
+      var exists = false;
+      for (var k = 0; k < cache.length; k++) { if (cache[k].id === bt.id) { exists = true; break; } }
+      if (!exists) {
+        var snap = JSON.parse(JSON.stringify(bt));
+        delete snap.suppressAutoArchive;
+        cache.push(snap);
+        _pendingArchiveToasts.push({ id: bt.id, name: bt.name || '未命名' });
+      }
+    });
+    saveBigTaskCache(cache);
+  }
+  try {
+    localStorage.setItem(BIG_TASK_KEY, JSON.stringify(active));
+  } catch (e) {
+    alert('存储空间不足');
+  }
+}
+
+// Move an archived big task back to the active list. Flagged suppressAutoArchive
+// so the next saveBigTasks does not immediately re-archive it. Returns true on success.
+function restoreBigTaskFromCache(cacheId) {
+  var cache = loadBigTaskCache();
+  var idx = -1;
+  for (var i = 0; i < cache.length; i++) { if (cache[i].id === cacheId) { idx = i; break; } }
+  if (idx < 0) return false;
+  var bt = cache.splice(idx, 1)[0];
+  saveBigTaskCache(cache);
+  var tasks = loadBigTasks();
+  var dup = false;
+  for (var j = 0; j < tasks.length; j++) { if (tasks[j].id === bt.id) { dup = true; break; } }
+  if (!dup) {
+    bt.suppressAutoArchive = true;
+    tasks.push(bt);
+    saveBigTasks(tasks);
+  }
+  return true;
+}
+
+// Permanently remove an archived big task from the cache library.
+function deleteBigTaskFromCache(cacheId) {
+  var cache = loadBigTaskCache().filter(function(c) { return c.id !== cacheId; });
+  saveBigTaskCache(cache);
 }
 
 // Today's date as a local YYYY-MM-DD string (for recording completion timestamps).

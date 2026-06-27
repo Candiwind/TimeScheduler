@@ -219,6 +219,15 @@
    新增 todayLocalDateStr / bigTaskOverdueDays 辅助。
    涉及文件：store.js / bigtask.js
    验证：test/test-bigtask-completion.js（6场景28断言：活跃计数/逾期天数/recalc盖章与回退/手动按钮payload/MAX名额释放）
+6. ✅ 大任务完成后自动归档至缓存库：
+   (1) saveBigTasks 自动检测 progress>=100 的任务，移入 BIG_TASK_CACHE_KEY 缓存库并清出活跃列表。
+   已完成的旧数据在 initApp 时 silent migration 一次归档（不弹 toast）。
+   (2) suppressAutoArchive 标志位防止恢复后立即重新归档；progress 降至 <100 时自动清除标志位。
+   (3) 大任务面板底部新增"大任务缓存库"可折叠区域，展示已归档任务的截止/完成日期及逾期天数，
+   支持恢复（↩）回活跃列表和永久删除。
+   (4) render.js getBigTaskName 扩展为同时查询活跃列表和缓存库，保证时间视图中已归档任务的 🎯 名称仍能解析。
+   涉及文件：store.js / bigtask.js / index.html / css/style.css / render.js / app.js
+   验证：test/test-bigtask-cache.js（9场景30断言：归档/去重/suppress/恢复/删除/端到端生命周期）
 
 
 ────────────────────────────────────────

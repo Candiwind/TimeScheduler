@@ -448,11 +448,18 @@ function renderTimeView(date) {
     }
   }
 
-  // Helper: look up big task name by ID
+  // Helper: look up big task name by ID (checks active tasks, then the
+  // completed-task cache so archived big tasks still resolve their name).
   function getBigTaskName(btId) {
     var tasks = loadBigTasks();
     for (var i = 0; i < tasks.length; i++) {
       if (tasks[i].id === btId) return tasks[i].name;
+    }
+    if (typeof loadBigTaskCache === 'function') {
+      var cache = loadBigTaskCache();
+      for (var j = 0; j < cache.length; j++) {
+        if (cache[j].id === btId) return cache[j].name;
+      }
     }
     return null;
   }

@@ -514,7 +514,7 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 2px;
-  border-left: 3px solid var(--primary);
+  border-left: 3px solid var(--accent);
 }
 .timeview-parent-badge {
   font-size: 14px;
@@ -582,7 +582,7 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 
 /* ============ Quadrant Header Add Buttons ============ */
 .quadrant-add-btn {
-  width: 22px; height: 22px; padding: 0; border: 1px solid rgba(0,0,0,0.12);
+  width: 24px; height: 24px; padding: 0; border: 1px solid rgba(0,0,0,0.12);
   background: rgba(255,255,255,0.55); color: var(--text2);
   font-size: 12px; border-radius: 5px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
@@ -643,7 +643,7 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .task-text:hover { color: var(--accent); }
 .task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
 .task-delete-btn {
-  width: 22px; height: 22px; border: none; background: transparent; color: var(--text3);
+  width: 24px; height: 24px; border: none; background: transparent; color: var(--text3);
   font-size: 16px; cursor: pointer; border-radius: 50%; display: flex;
   align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--t);
 }
@@ -719,7 +719,7 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 [data-theme="dark"] .quadrant-iv .subtask-item.completed { background: rgba(150,240,150,0.15); border-color: rgba(150,240,150,0.25); }
 /* Split stages button */
 .split-stages-btn {
-  width: 18px; height: 18px; flex-shrink: 0;
+  width: 22px; height: 22px; flex-shrink: 0;
   border: 1px solid var(--border2); background: transparent;
   color: var(--text3); font-size: 10px; cursor: pointer; border-radius: 4px;
   padding: 0; display: inline-flex; align-items: center; justify-content: center;
@@ -974,7 +974,7 @@ kbd {
 
 /* ============ Defer Button ============ */
 .task-defer-btn {
-  width: 22px; height: 22px; border: none; background: transparent; color: var(--text3);
+  width: 24px; height: 24px; border: none; background: transparent; color: var(--text3);
   font-size: 13px; cursor: pointer; border-radius: 50%; display: flex;
   align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--t);
   line-height: 1;
@@ -983,7 +983,7 @@ kbd {
 
 /* ============ Extra Button ============ */
 .task-extra-btn {
-  width: 22px; height: 22px; border: none; background: transparent; color: var(--text3);
+  width: 24px; height: 24px; border: none; background: transparent; color: var(--text3);
   font-size: 13px; cursor: pointer; border-radius: 50%; display: flex;
   align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--t);
   line-height: 1;
@@ -1068,6 +1068,7 @@ kbd {
   .task-item { padding: 8px 10px; font-size: 13px; }
   .subtask-item { padding: 6px 8px; font-size: 12px; }
   .task-checkbox { width: 18px; height: 18px; }
-  .task-delete-btn, .task-defer-btn, .task-extra-btn { width: 26px; height: 26px; font-size: 15px; }
+  .task-delete-btn, .task-defer-btn, .task-extra-btn,
+  .quadrant-add-btn, .split-stages-btn, .task-timeslot-btn { width: 30px; height: 30px; font-size: 15px; }
   .planpool-tab { padding: 4px 10px; font-size: 11px; }
 }

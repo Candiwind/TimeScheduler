@@ -228,6 +228,12 @@
    (4) render.js getBigTaskName 扩展为同时查询活跃列表和缓存库，保证时间视图中已归档任务的 🎯 名称仍能解析。
    涉及文件：store.js / bigtask.js / index.html / css/style.css / render.js / app.js
    验证：test/test-bigtask-cache.js（9场景30断言：归档/去重/suppress/恢复/删除/端到端生命周期）
+7. ✅ CSS 缺陷修复与触摸目标优化：
+   (1) 修复 var(--primary) 和 var(--text4) 未定义导致时间视图父标题左边框和大任务名颜色失效。
+   (2) 移除常驻 will-change:transform 反模式（所有 task-item/subtask-item/task-block），释放合成层内存。
+   (3) 删除无效 CSS draggable:true 声明和 .btn-add-block 死规则。
+   (4) 桌面端小按钮（delete/defer/extra/quadrant-add/split-stages/time-slot）22→24px / 18→22px，
+   移动端统一 30px 且补全被遗漏的象限添加/拆分/时段选择按钮。
 
 
 ────────────────────────────────────────

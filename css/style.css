@@ -144,6 +144,31 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .search-input { width: 180px; }
 .search-input::placeholder { color: var(--text3); }
 
+/* ============ Keyboard Accessibility — Focus-visible ============ */
+.task-text:focus-visible,
+.principle-text:focus-visible,
+.block-name:focus-visible,
+.planpool-item-text:focus-visible,
+.planpool-block-name:focus-visible,
+.planpool-subtask-text:focus-visible,
+.bigtask-card-name:focus-visible,
+.bigtask-subtask-text:focus-visible,
+.milestone-name:focus-visible,
+.stage-text:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 2px;
+}
+.bigtask-card:focus-visible,
+.bigtask-milestone:focus-visible,
+.bigtask-cache-item:focus-visible,
+.planpool-item:focus-visible,
+.planpool-block:focus-visible,
+.principles-panel-header:focus-visible,
+.bigtask-panel-header:focus-visible,
+.planpool-panel-header:focus-visible,
+.bigtask-cache-header:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius);
+}
+
 /* ============ Hint Bar ============ */
 .hint-bar {
   padding: 8px 36px 8px 14px; margin-bottom: 8px; border-radius: 8px;

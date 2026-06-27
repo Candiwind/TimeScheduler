@@ -53,6 +53,9 @@ function renderBigTaskPanel() {
     listEl.innerHTML = '';
     listEl.appendChild(emptyEl || document.createElement('div'));
     document.getElementById('bigTaskPool').style.display = 'none';
+    // 即使没有活跃大任务，也要渲染缓存库和归档 toast
+    renderBigTaskCache();
+    flushArchiveToasts();
     return;
   }
 

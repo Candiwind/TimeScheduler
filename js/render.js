@@ -108,7 +108,7 @@ function renderQuadrant(key, items) {
   if (!filtered || filtered.length === 0) {
     var empty = document.createElement('div');
     empty.className = 'empty-hint';
-    empty.textContent = searchTerm ? '无匹配任务' : '拖拽任务到此处，或点击下方按钮添加';
+    empty.textContent = searchTerm ? '无匹配任务' : '拖拽任务到此处，或点击上方按钮添加';
     frag.appendChild(empty);
   } else {
     filtered.forEach(function(item, index) {

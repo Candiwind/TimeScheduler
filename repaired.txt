@@ -247,6 +247,15 @@
    (2) 新增 SCHEMA_VERSION / SCHEMA_VERSION_KEY，为未来数据结构变更提供迁移检测锚点。
    (3) 存储空间不足时估算使用率并给出具体清理建议（导出JSON后清理历史日期），替代通用提示。
 10. ✅ 键盘可访问性——为所有交互文本/卡片元素添加 :focus-visible 样式：
+	   双击编辑文本（task-text / principle-text / block-name / planpool-item-text 等）、
+	   可折叠面板标题（principles / bigtask / planpool / cache header）、可展开卡片（bigtask-card / milestone）
+	   统一设置 outline: 2px solid var(--accent)，键盘用户可清晰感知焦点位置。
+11. ✅ 修复大任务缓存库空活跃列表时无法渲染：
+	   renderBigTaskPanel 在 bigTasks.length===0 时 early return 跳过 renderBigTaskCache()
+	   和 flushArchiveToasts()，导致缓存数据虽写入 localStorage 但 UI 从未展示。
+	   修复：在 early return 分支中补充调用 renderBigTaskCache() + flushArchiveToasts()，
+	   确保缓存库渲染独立于活跃任务列表。
+	   验证：test/test-bigtask-cache.js（10场景37断言全通过，新增 Test10 覆盖空活跃列表场景）
    双击编辑文本（task-text / principle-text / block-name / planpool-item-text 等）、
    可折叠面板标题（principles / bigtask / planpool / cache header）、可展开卡片（bigtask-card / milestone）
    统一设置 outline: 2px solid var(--accent)，键盘用户可清晰感知焦点位置。

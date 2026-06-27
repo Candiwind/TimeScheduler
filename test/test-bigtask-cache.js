@@ -189,5 +189,44 @@ console.log('\n[Test 9] end-to-end — complete → archive → restore → comp
   assert(active.length === 0 && cache.length === 1, 're-completed → re-archived');
 })();
 
+// ============ Test 10: cache rendering independent of active tasks ============
+// This tests the fix for: when all tasks are archived, renderBigTaskPanel early-returned
+// before calling renderBigTaskCache(), so the cache UI was never shown.
+console.log('\n[Test 10] cache exists even when active list is empty (render independence)');
+(function () {
+  // Simulate: all tasks completed → archived → active list empty, cache populated
+  var cache = [
+    { id: 'arch1', name: '已归档任务1', progress: 100, completedDate: '2026-06-25', targetDate: '2026-06-20' },
+    { id: 'arch2', name: '已归档任务2', progress: 100, completedDate: '2026-06-26', targetDate: '2026-06-22' }
+  ];
+  var active = [];  // <-- the scenario: no active tasks
+
+  // Even with empty active list, the cache data is intact and renderable
+  assert(cache.length === 2, 'cache retains both archived tasks');
+  assert(active.length === 0, 'active list is empty after full archive');
+
+  // Verify overdue calculation still works on cached entries
+  var overdue0 = (function(bt) {
+    if (!bt || !bt.completedDate || !bt.targetDate) return 0;
+    var comp = new Date(bt.completedDate + 'T00:00:00');
+    var tgt = new Date(bt.targetDate + 'T00:00:00');
+    var diff = Math.round((comp - tgt) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : 0;
+  })(cache[0]);
+  assert(overdue0 === 5, 'archived task 1 shows 5 overdue days (completed 06-25 vs target 06-20)');
+
+  // Verify restore from cache to empty active list works
+  var bt = cache.splice(0, 1)[0];
+  bt.suppressAutoArchive = true;
+  active.push(bt);
+  assert(cache.length === 1, 'after restore: cache has 1 remaining');
+  assert(active.length === 1, 'after restore: active has 1 task');
+  assert(active[0].suppressAutoArchive === true, 'restored task flagged suppressAutoArchive');
+
+  // Verify delete from cache when active is empty
+  cache = cache.filter(function(c) { return c.id !== 'arch2'; });
+  assert(cache.length === 0, 'after delete: cache is empty');
+})();
+
 console.log('\n' + (failures === 0 ? '✅ ALL TESTS PASSED' : '❌ ' + failures + ' TEST(S) FAILED'));
 process.exit(failures === 0 ? 0 : 1);

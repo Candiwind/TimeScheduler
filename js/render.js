@@ -622,25 +622,7 @@ function resetGridLayout() {
 
 function countAllTasks(items) {
   var count = 0;
-  items.forEach(function(item) {
-    if (item.blockName !== undefined) {
-      if (item.tasks) {
-        item.tasks.forEach(function(t) {
-          if (t.stages && t.stages.length > 0) {
-            count += t.stages.length;
-          } else {
-            count++;
-          }
-        });
-      }
-    } else {
-      if (item.stages && item.stages.length > 0) {
-        count += item.stages.length;
-      } else {
-        count++;
-      }
-    }
-  });
+  walkLeafItems(items, function() { count++; });
   return count;
 }
 
@@ -1315,26 +1297,9 @@ function updateDateDisplay(date) {
 
 function calcQuadrantCompletion(items) {
   var total = 0, done = 0;
-  items.forEach(function(item) {
-    if (item.blockName !== undefined) {
-      if (item.tasks) {
-        item.tasks.forEach(function(t) {
-          if (t.stages && t.stages.length > 0) {
-            t.stages.forEach(function(s) { total++; if (s.completed) done++; });
-          } else {
-            total++;
-            if (t.completed) done++;
-          }
-        });
-      }
-    } else {
-      if (item.stages && item.stages.length > 0) {
-        item.stages.forEach(function(s) { total++; if (s.completed) done++; });
-      } else {
-        total++;
-        if (item.completed) done++;
-      }
-    }
+  walkLeafItems(items, function(leaf) {
+    total++;
+    if (leaf.completed) done++;
   });
   return { total: total, done: done, rate: total > 0 ? done / total : 0 };
 }
@@ -1376,33 +1341,9 @@ function calcTimeSlotCompletion(data) {
     'night': '傍晚 + 晚上'
   };
   QUADRANT_KEYS.forEach(function(key) {
-    var items = data[key] || [];
-    items.forEach(function(item) {
-      if (item.blockName !== undefined) {
-        if (item.tasks) {
-          item.tasks.forEach(function(t) {
-            if (t.stages && t.stages.length > 0) {
-              t.stages.forEach(function(s) {
-                var g = slotToGroup[s.timeSlot];
-                if (g) { groups[g].total++; if (s.completed) groups[g].done++; }
-              });
-            } else {
-              var g = slotToGroup[t.timeSlot];
-              if (g) { groups[g].total++; if (t.completed) groups[g].done++; }
-            }
-          });
-        }
-      } else {
-        if (item.stages && item.stages.length > 0) {
-          item.stages.forEach(function(s) {
-            var g = slotToGroup[s.timeSlot];
-            if (g) { groups[g].total++; if (s.completed) groups[g].done++; }
-          });
-        } else {
-          var g = slotToGroup[item.timeSlot];
-          if (g) { groups[g].total++; if (item.completed) groups[g].done++; }
-        }
-      }
+    walkLeafItems(data[key] || [], function(leaf, info) {
+      var g = slotToGroup[info.timeSlot];
+      if (g) { groups[g].total++; if (leaf.completed) groups[g].done++; }
     });
   });
   return groups;
@@ -1525,21 +1466,19 @@ function createTimeSlotBtn(currentKey, quadrantKey, taskId, blockId, opts) {
   btn.setAttribute('data-slot-key', slot.key);
   btn.addEventListener('click', function(e) {
     e.stopPropagation();
-    if (opts && opts.setFn) {
-      showTimeSlotPickerCustom(btn, opts.setFn);
-    } else {
-      showTimeSlotPicker(btn, quadrantKey, taskId, blockId);
-    }
+    showTimeSlotPicker(btn, quadrantKey, taskId, blockId, opts);
   });
   return btn;
 }
 
-function showTimeSlotPickerCustom(anchorEl, setFn) {
+function showTimeSlotPicker(anchorEl, quadrantKey, taskId, blockId, opts) {
   var existing = document.getElementById('timeslotPicker');
   if (existing) existing.remove();
+
   var picker = document.createElement('div');
   picker.id = 'timeslotPicker';
   picker.className = 'timeslot-picker';
+
   TIME_SLOTS.forEach(function(slot) {
     var opt = document.createElement('div');
     opt.className = 'timeslot-option';
@@ -1549,7 +1488,11 @@ function showTimeSlotPickerCustom(anchorEl, setFn) {
     opt.innerHTML = '<span class="timeslot-icon">' + slot.icon + '</span><span class="timeslot-label">' + slot.label + '</span>';
     opt.addEventListener('click', function(ev) {
       ev.stopPropagation();
-      setFn(slot.key);
+      if (opts && opts.setFn) {
+        opts.setFn(slot.key);
+      } else {
+        updateTaskTimeSlot(quadrantKey, taskId, blockId, slot.key);
+      }
       anchorEl.innerHTML = slot.icon;
       anchorEl.setAttribute('data-slot-key', slot.key);
       anchorEl.title = slot.title;
@@ -1557,51 +1500,12 @@ function showTimeSlotPickerCustom(anchorEl, setFn) {
     });
     picker.appendChild(opt);
   });
+
   // Position near the button
   var rect = anchorEl.getBoundingClientRect();
   picker.style.position = 'fixed';
   picker.style.top = (rect.bottom + 4) + 'px';
   picker.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
-  document.body.appendChild(picker);
-  setTimeout(function() {
-    document.addEventListener('click', function closePicker() {
-      if (picker.parentNode) picker.remove();
-      document.removeEventListener('click', closePicker);
-    });
-  }, 0);
-}
-
-function showTimeSlotPicker(anchorEl, quadrantKey, taskId, blockId) {
-  // Remove existing picker
-  var existing = document.getElementById('timeslotPicker');
-  if (existing) existing.remove();
-
-  var picker = document.createElement('div');
-  picker.id = 'timeslotPicker';
-  picker.className = 'timeslot-picker';
-
-  TIME_SLOTS.forEach(function(slot) {
-    var opt = document.createElement('div');
-    opt.className = 'timeslot-option';
-    if (slot.key === (anchorEl.getAttribute('data-slot-key') || '')) {
-      opt.classList.add('active');
-    }
-    opt.innerHTML = '<span class="timeslot-icon">' + slot.icon + '</span><span class="timeslot-label">' + slot.label + '</span>';
-    opt.addEventListener('click', function(ev) {
-      ev.stopPropagation();
-      updateTaskTimeSlot(quadrantKey, taskId, blockId, slot.key);
-      anchorEl.innerHTML = slot.icon;
-      anchorEl.setAttribute('data-slot-key', slot.key);
-      anchorEl.title = slot.title;
-      picker.remove();
-    });
-    picker.appendChild(opt);
-  });
-
-  // Position near the anchor
-  var rect = anchorEl.getBoundingClientRect();
-  picker.style.left = rect.left + 'px';
-  picker.style.top = (rect.bottom + 4) + 'px';
 
   document.body.appendChild(picker);
 

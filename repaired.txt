@@ -234,6 +234,12 @@
    (3) 删除无效 CSS draggable:true 声明和 .btn-add-block 死规则。
    (4) 桌面端小按钮（delete/defer/extra/quadrant-add/split-stages/time-slot）22→24px / 18→22px，
    移动端统一 30px 且补全被遗漏的象限添加/拆分/时段选择按钮。
+8. ✅ 重复逻辑抽取与死代码清理：
+   (1) 新增 walkLeafItems 统一遍历函数（util.js），统一块→子任务→阶段三级嵌套的"叶子项"遍历逻辑。
+   calcQuadrantCompletion / calcTimeSlotCompletion / countAllTasks 三处改用 walkLeafItems，
+   从 ~90 行重复遍历缩减为各自 4-8 行。以后统计口径改动只需改一处。
+   (2) 合并 showTimeSlotPickerCustom 与 showTimeSlotPicker 为统一的 showTimeSlotPicker(el, qk, tid, bid, opts)。
+   (3) 删除 app.js 中未引用死代码 rebindDragEvents / setupDragDrop（拖拽事件已在 create*Element 中直接绑定）。
 
 
 ────────────────────────────────────────

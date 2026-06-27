@@ -269,34 +269,7 @@ function updateSearchResult() {
   }
 }
 
-// ============ Drag Binding ============
-function setupDragDrop() {
-  // Handled via rebindDragEvents after each render
-}
-
-function rebindDragEvents() {
-  document.querySelectorAll('.task-item').forEach(function(el) {
-    el.addEventListener('dragstart', handleDragStart);
-    el.addEventListener('dragend', handleDragEnd);
-    el.addEventListener('dragover', handleTaskDragOver);
-    el.addEventListener('dragleave', handleTaskDragLeave);
-    el.addEventListener('drop', handleTaskDrop);
-  });
-  document.querySelectorAll('.task-block').forEach(function(el) {
-    el.addEventListener('dragstart', handleDragStart);
-    el.addEventListener('dragend', handleDragEnd);
-    el.addEventListener('dragover', handleBlockDragOver);
-    el.addEventListener('dragleave', handleBlockDragLeave);
-    el.addEventListener('drop', handleBlockDrop);
-  });
-  document.querySelectorAll('.subtask-item').forEach(function(el) {
-    el.addEventListener('dragstart', handleDragStart);
-    el.addEventListener('dragend', handleDragEnd);
-    el.addEventListener('dragover', handleSubtaskDragOver);
-    el.addEventListener('dragleave', handleSubtaskDragLeave);
-    el.addEventListener('drop', handleSubtaskDrop);
-  });
-}
+// Drag handlers are bound per-element in createTaskElement / createSubTaskElement / createTaskBlockElement.
 
 // Override renderAll (drag handlers are bound in create*Element functions)
 var _originalRenderAll = renderAll;

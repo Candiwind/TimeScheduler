@@ -227,50 +227,86 @@ var CloudSync = (function() {
   // ============ GitHub Gist 云同步 ============
 
   /**
-   * 设置 Gist 同步
+   * 设置 Gist 同步（支持两种模式）
+   * - 仅拉取：只需 Gist ID（Gist 须为公开），手机端最简配置
+   * - 拉取+推送：需要 Gist ID + Token，两端全自动
    */
   function setupGistSync() {
-    var gistId = prompt('请输入 GitHub Gist ID（在 gist.github.com 创建私密 Gist 后获取）：',
-                        syncInfo.gistId || '');
+    var gistId = prompt(
+      '请输入 GitHub Gist ID：\n\n' +
+      '如何获取？\n' +
+      '1. 打开 gist.github.com\n' +
+      '2. 创建一个新 Gist（建议设为 🔓公开，方便手机免 Token 读取）\n' +
+      '3. 从浏览器地址栏复制 Gist ID（如 abc123def456）\n\n' +
+      '仅需拉取数据 → 输入 Gist ID 即可（Gist 须公开）\n' +
+      '需要推送数据 → 还需输入 Token',
+      syncInfo.gistId || '');
     if (!gistId) return;
 
-    var token = prompt('请输入 GitHub Personal Access Token（需要 gist 权限）：\n' +
-                       '创建地址：https://github.com/settings/tokens/new\n' +
-                       '勾选 gist 权限即可',
-                       syncInfo.gistToken || '');
-    if (!token) return;
+    // 先尝试无 Token 连接（验证 Gist 是否公开可读）
+    fetchGist(gistId, null).then(function(gistData) {
+      // Gist 公开可读，仅拉取模式
+      saveGistConfig(gistId, '', '仅拉取模式（公开Gist）');
+      showToast('✅ Gist 已连接（仅拉取模式）\n' +
+                '手机端无需 Token 即可自动同步\n\n' +
+                '如需在手机端也能推送数据，请再次设置并输入 Token。');
+      // 立即拉取一次
+      pullFromGist(false);
+    }).catch(function() {
+      // 公开读取失败，需要 Token
+      var token = prompt(
+        '该 Gist 为私密或不存在，需要 Token 才能访问。\n\n' +
+        'GitHub Personal Access Token 获取步骤：\n' +
+        '1. 打开 github.com/settings/tokens/new\n' +
+        '2. 勾选 gist 权限\n' +
+        '3. 生成后复制 Token\n\n' +
+        '请输入 Token：',
+        syncInfo.gistToken || '');
+      if (!token) return;
 
-    // 验证 token
-    testGistConnection(gistId, token).then(function(ok) {
-      if (!ok) {
-        alert('连接失败，请检查 Gist ID 和 Token 是否正确。');
-        return;
-      }
+      // 用 Token 重试
+      fetchGist(gistId, token).then(function() {
+        saveGistConfig(gistId, token, '完整模式（私密Gist）');
+        showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
+        pullFromGist(false);
+      }).catch(function(err) {
+        alert('连接失败：' + err.message + '\n请检查 Gist ID 和 Token 是否正确。');
+      });
+    });
+  }
 
-      syncInfo.gistId = gistId;
-      syncInfo.gistToken = token;
-      syncInfo.enabled = true;
-      syncInfo.mode = 'gist';
+  function saveGistConfig(gistId, token, desc) {
+    syncInfo.gistId = gistId;
+    syncInfo.gistToken = token;
+    syncInfo.enabled = true;
+    syncInfo.mode = 'gist';
+    localStorage.setItem(GIST_ID_KEY, gistId);
+    localStorage.setItem(GIST_TOKEN_KEY, token);
+    localStorage.setItem(SYNC_ENABLED_KEY, '1');
+    localStorage.setItem('cloudsync_mode', 'gist');
+    console.log('[云同步] Gist 配置已保存:', desc);
+    updateSyncIndicator();
+  }
 
-      localStorage.setItem(GIST_ID_KEY, gistId);
-      localStorage.setItem(GIST_TOKEN_KEY, token);
-      localStorage.setItem(SYNC_ENABLED_KEY, '1');
-      localStorage.setItem('cloudsync_mode', 'gist');
-
-      showToast('✅ Gist 云同步已就绪\n点击「推送」即可上传数据');
-      updateSyncIndicator();
-
-    }).catch(function(err) {
-      alert('连接失败：' + err.message);
+  function fetchGist(gistId, token) {
+    var headers = { 'Accept': 'application/vnd.github.v3+json' };
+    if (token) headers['Authorization'] = 'token ' + token;
+    return fetch('https://api.github.com/gists/' + gistId, { headers: headers }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
     });
   }
 
   /**
-   * 推送数据到 Gist
+   * 推送数据到 Gist（需要 Token）
    */
   function pushToGist() {
-    if (!syncInfo.gistId || !syncInfo.gistToken) {
+    if (!syncInfo.gistId) {
       alert('请先设置 Gist 同步。');
+      return;
+    }
+    if (!syncInfo.gistToken) {
+      alert('当前为仅拉取模式，不支持推送。\n\n如需推送，请重新设置 Gist 同步并输入 Token。');
       return;
     }
 
@@ -301,26 +337,28 @@ var CloudSync = (function() {
       updateSyncIndicator();
     }).catch(function(err) {
       console.error('推送失败:', err);
-      alert('推送失败：' + err.message + '\n请检查 Token 是否有 gist 权限。');
+      alert('推送失败：' + err.message + '\n请检查 Token 是否有效、是否有 gist 权限。');
     });
   }
 
   /**
-   * 从 Gist 拉取数据
+   * 从 Gist 拉取数据（自动带 Token 如果已配置）
    */
   function pullFromGist(silent) {
     if (!syncInfo.gistId) return Promise.resolve(null);
 
-    return fetch('https://api.github.com/gists/' + syncInfo.gistId, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    }).then(function(res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+    var headers = { 'Accept': 'application/vnd.github.v3+json' };
+    if (syncInfo.gistToken) headers['Authorization'] = 'token ' + syncInfo.gistToken;
+
+    return fetch('https://api.github.com/gists/' + syncInfo.gistId, { headers: headers }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status + ' — Gist 不可访问（私密 Gist 需要 Token）');
       return res.json();
     }).then(function(gist) {
       var file = gist.files && gist.files[SYNC_FILE_NAME];
-      if (!file || !file.content) return null;
+      if (!file || !file.content) {
+        if (!silent) alert('Gist 中未找到数据文件，请先在电脑端推送一次。');
+        return null;
+      }
 
       var data = JSON.parse(file.content);
       importAllData(data);
@@ -330,12 +368,15 @@ var CloudSync = (function() {
       localStorage.setItem(LAST_SYNC_KEY, now);
       updateSyncIndicator();
 
+      // 触发页面重新渲染
+      refreshAllViews();
+
       return data;
     }).catch(function(err) {
       if (!silent) {
-        console.error('拉取失败:', err);
         alert('拉取失败：' + err.message);
       }
+      console.error('[云同步] 拉取失败:', err.message);
       return null;
     });
   }
@@ -391,19 +432,30 @@ var CloudSync = (function() {
   }
 
   /**
+   * 刷新所有视图（导入数据后调用）
+   */
+  function refreshAllViews() {
+    try {
+      if (typeof renderAll === 'function' && typeof currentDate !== 'undefined') {
+        renderAll(currentDate);
+      }
+      if (typeof renderBigTaskPanel === 'function') renderBigTaskPanel();
+      if (typeof renderPlanPoolPanel === 'function') renderPlanPoolPanel();
+      if (typeof renderPrinciplesPanel === 'function') renderPrinciplesPanel();
+      if (typeof renderBigTaskCache === 'function') renderBigTaskCache();
+      if (typeof renderCachedDatesPanel === 'function') renderCachedDatesPanel();
+    } catch(e) {
+      console.warn('[云同步] 刷新视图失败:', e);
+    }
+  }
+
+  /**
    * 自动从 Gist 拉取（页面加载时静默调用）
    */
   function autoPullFromGist() {
     pullFromGist(true).then(function(data) {
       if (data) {
         console.log('[云同步] 自动拉取成功');
-        // 触发页面重新渲染
-        if (typeof renderAll === 'function' && typeof currentDate !== 'undefined') {
-          renderAll(currentDate);
-        }
-        if (typeof renderBigTaskPanel === 'function') renderBigTaskPanel();
-        if (typeof renderPlanPoolPanel === 'function') renderPlanPoolPanel();
-        if (typeof renderPrinciplesPanel === 'function') renderPrinciplesPanel();
       }
     });
   }
@@ -583,15 +635,20 @@ var CloudSync = (function() {
       '<button class="btn btn-sm btn-primary" onclick="CloudSync.setupBaiduSync()" style="width:100%;margin-bottom:12px;">' +
       '📁 选择百度网盘同步目录</button>';
 
-    html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式二：Gist 云同步</b>（电脑手机全自动，需 GitHub Token）</p>' +
+    html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式二：Gist 云同步</b>（推荐！电脑手机全自动）</p>' +
       '<button class="btn btn-sm btn-info" onclick="CloudSync.setupGistSync()" style="width:100%;margin-bottom:4px;">' +
       '🔑 设置 Gist 同步</button>';
 
+    // 显示当前 Gist 模式详情
     if (syncInfo.enabled && syncInfo.mode === 'gist') {
+      var hasToken = syncInfo.gistToken;
       html += '<div style="display:flex;gap:4px;margin-top:4px;">' +
-        '<button class="btn btn-sm btn-success" onclick="CloudSync.pushToGist()" style="flex:1;">📤 推送</button>' +
+        '<button class="btn btn-sm btn-success" onclick="CloudSync.pushToGist()" style="flex:1;"' + (hasToken ? '' : ' disabled') + '>📤 推送' + (hasToken ? '' : '(需Token)') + '</button>' +
         '<button class="btn btn-sm btn-info" onclick="CloudSync.pullFromGist()" style="flex:1;">📥 拉取</button>' +
         '</div>';
+      if (!hasToken) {
+        html += '<p style="font-size:10px;color:var(--text3);margin:4px 0 0;">⚠️ 当前为仅拉取模式，如需推送请重新设置并输入 Token</p>';
+      }
     }
 
     if (syncInfo.enabled) {
@@ -600,8 +657,8 @@ var CloudSync = (function() {
     }
 
     html += '<p style="font-size:10px;color:var(--text3);margin:12px 0 0;line-height:1.5;">' +
-      '💡 <b>百度网盘模式：</b>电脑修改数据后自动保存到百度网盘同步目录，手机在百度网盘APP中下载JSON文件后导入。<br>' +
-      '💡 <b>Gist 模式：</b>数据存储在私密 GitHub Gist，两端自动同步。需创建 Gist + Personal Access Token（gist 权限）。' +
+      '💡 <b>百度网盘模式：</b>电脑修改数据后自动保存到网盘同步目录，手机在网盘APP下载 JSON 后导入。<br>' +
+      '💡 <b>Gist 模式（推荐）：</b>创建公开 Gist → 手机只需输入 Gist ID 即可拉取；输入 Token 后还可推送。' +
       '</p>';
 
     html += '</div>';

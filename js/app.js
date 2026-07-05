@@ -3,6 +3,9 @@ function initApp() {
   var today = new Date().toISOString().split('T')[0];
   currentDate = today;
 
+  // 初始化源码编辑器（捕获原始页面源码）
+  SourceEditor.init();
+
   // Restore saved view mode
   var savedViewMode = localStorage.getItem('quadrant_view_mode');
   if (savedViewMode === 'time' || savedViewMode === 'quadrant') {
@@ -150,6 +153,14 @@ function setupButtons() {
   });
 
   document.getElementById('btnDarkMode').addEventListener('click', toggleTheme);
+
+  // 源码编辑器按钮
+  var btnSourceEditor = document.getElementById('btnSourceEditor');
+  if (btnSourceEditor) {
+    btnSourceEditor.addEventListener('click', function() {
+      SourceEditor.open();
+    });
+  }
 
   // Secondary toolbar toggle
   document.getElementById('btnToggleMore').addEventListener('click', function() {

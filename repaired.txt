@@ -256,9 +256,30 @@
 	   修复：在 early return 分支中补充调用 renderBigTaskCache() + flushArchiveToasts()，
 	   确保缓存库渲染独立于活跃任务列表。
 	   验证：test/test-bigtask-cache.js（10场景37断言全通过，新增 Test10 覆盖空活跃列表场景）
-   双击编辑文本（task-text / principle-text / block-name / planpool-item-text 等）、
-   可折叠面板标题（principles / bigtask / planpool / cache header）、可展开卡片（bigtask-card / milestone）
-   统一设置 outline: 2px solid var(--accent)，键盘用户可清晰感知焦点位置。
+	   12. ✅ 修复夜间模式 Highlight 样式：mark 元素背景从渐变（仅覆盖底部40%）改为纯色覆盖完整字体高度；
+	    夜间模式下 font color 从浏览器默认黑色改为 #e8e8e8（亮色），确保暗色背景上可读。
+	    涉及文件：css/style.css
+	13. ✅ PWA 增强——manifest.json 补全：新增 scope、display_override、categories、screenshots、
+	    shortcuts、purpose 等字段，提升华为/QQ/夸克等浏览器添加到桌面兼容性。
+	    涉及文件：manifest.json
+	14. ✅ Service Worker 重写——增强缓存策略：预缓存所有核心资源 + 逐个失败容错、激活时清理旧版缓存、
+	    强制 skipWaiting+claim 立即接管、HTML 请求后台 Stale-While-Revalidate 更新、
+	    离线时返回中文离线提示页、注册时监听 updatefound 提示版本更新。
+	    涉及文件：service-worker.js / index.html
+	15. ✅ PWA meta 标签补全：新增 X-UA-Compatible、viewport-fit=cover、shrink-to-fit=no、
+	    apple-mobile-web-app-status-bar-style、mobile-web-app-capable、msapplication-TileColor、
+	    format-detection、HandheldFriendly、application-name、apple-touch-icon 多尺寸链接。
+	    涉及文件：index.html
+	16. ✅ 手机端源码编辑器：支持 HTML/CSS/JS 三 tab 编辑、👁预览/✏编辑一键切换（iframe 预览）、
+	    localStorage 自动保存（刷新不丢失）、📥导出完整 HTML 文件下载、🔄重置为原始代码。
+	    编辑器全屏适配手机、软键盘弹出时 textarea 自动收缩(max-height:50vh)、
+	    按钮触摸目标≥36px、暗色模式适配。
+	    涉及文件：js/source-editor.js（新增）/ index.html / js/app.js / css/style.css
+	17. ✅ 移动端触摸目标从 26px 提升至 48px（符合华为手机多浏览器适配要求）：
+	    任务行 min-height:48px、操作按钮 48×48px、checkbox 22px、普通按钮 min-height:48px、
+	    小按钮 min-height:36px、图标按钮 48×48px、Tab 按钮 min-height:48px。
+	    task-item/subtask-item 字体适当放大（14px/13px → 提升可读性）。
+	    涉及文件：css/style.css
 
 
 ────────────────────────────────────────

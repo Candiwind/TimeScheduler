@@ -2,10 +2,23 @@
 <html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
+<!-- PWA / 移动端 Web App 兼容 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="任务管理">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#4a90d9">
+<meta name="msapplication-TileColor" content="#4a90d9">
+<meta name="format-detection" content="telephone=no">
+<meta name="HandheldFriendly" content="true">
+<!-- 安卓 Chrome / 华为浏览器 / QQ浏览器 / 夸克浏览器 PWA -->
+<meta name="application-name" content="四象限任务管理器">
+<!-- iOS Safari 桌面图标 -->
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>四象限任务管理器 v4</title>
 <link rel="stylesheet" href="css/style.css">
@@ -26,6 +39,7 @@
       <button class="btn btn-info btn-sm" id="btnShowStats" title="统计面板">📈</button>
       <button class="btn btn-sm" id="btnDailyReport" style="background:#5b9bd5;color:#fff;" title="生成日报">📋</button>
       <button class="btn-icon" id="btnDarkMode" data-tooltip="切换暗色模式" title="暗色模式 (Ctrl+D)">🌙</button>
+      <button class="btn btn-sm btn-info" id="btnSourceEditor" title="手机端源码编辑">📝 编辑源码</button>
       <button class="btn btn-sm btn-cancel" id="btnToggleMore" title="展开/折叠更多功能">⚙️</button>
     </div>
   </header>
@@ -190,8 +204,26 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
+  // Service Worker 注册（PWA 离线缓存核心）
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js');
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('service-worker.js').then(function(reg) {
+        console.log('[PWA] Service Worker 注册成功，scope:', reg.scope);
+        // 检测更新
+        reg.addEventListener('updatefound', function() {
+          var newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', function() {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[PWA] 检测到新版本，刷新页面后生效');
+              }
+            });
+          }
+        });
+      }).catch(function(err) {
+        console.warn('[PWA] Service Worker 注册失败:', err);
+      });
+    });
   }
 </script>
 <script src="js/util.js"></script>
@@ -213,6 +245,7 @@
 <script src="js/future.js"></script>
 <script src="js/bigtask.js"></script>
 <script src="js/daily-report.js"></script>
+<script src="js/source-editor.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

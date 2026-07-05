@@ -1,23 +1,47 @@
 {
   "name": "四象限任务管理器",
   "short_name": "任务管理",
-  "description": "基于艾森豪威尔矩阵的四象限任务管理器",
+  "description": "基于艾森豪威尔矩阵的四象限任务管理器，支持大任务规划、时段分布、日报生成",
   "start_url": "index.html",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#f5f7fa",
   "theme_color": "#4a90d9",
   "orientation": "portrait-primary",
+  "categories": ["productivity", "utilities"],
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
-  "lang": "zh-CN"
+  "screenshots": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "label": "四象限任务管理界面"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "添加任务",
+      "short_name": "添加",
+      "description": "快速添加新任务",
+      "url": "index.html?action=add",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

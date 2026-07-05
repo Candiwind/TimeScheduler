@@ -63,12 +63,14 @@ body {
 
 /* Highlight marker */
 mark {
-  background: linear-gradient(180deg, transparent 60%, #ffe066 60%);
+  background: #ffe066;
+  color: #333;
   padding: 0 2px;
   border-radius: 2px;
 }
 [data-theme="dark"] mark {
-  background: linear-gradient(180deg, transparent 60%, #8a7a30 60%);
+  background: #8a7a30;
+  color: #e8e8e8;
 }
 
 /* ============ Header ============ */
@@ -1059,6 +1061,88 @@ kbd {
 .quadrant-grid { contain: layout style; }
 .quadrant { contain: layout style paint; }
 
+/* ============ Source Code Editor ============ */
+.source-editor-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 5000;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: stretch; justify-content: stretch;
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.source-editor-overlay.active { opacity: 1; }
+.source-editor-panel {
+  flex: 1; display: flex; flex-direction: column;
+  background: var(--surface); margin: 0;
+  transition: background var(--t);
+  /* 手机端全屏显示编辑器 */
+}
+.source-editor-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; background: var(--surface2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.source-editor-title {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin-right: auto;
+}
+.source-editor-header-actions {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.source-editor-tabs {
+  display: flex; gap: 0; flex-shrink: 0;
+  border-bottom: 2px solid var(--border);
+  background: var(--surface2);
+}
+.source-editor-tab {
+  flex: 1; padding: 10px 12px; border: none; background: transparent;
+  font-size: 13px; font-weight: 600; color: var(--text2); cursor: pointer;
+  transition: all var(--t); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; /* 与父级 border 重叠 */
+}
+.source-editor-tab:hover { color: var(--accent); background: var(--accent-light); }
+.source-editor-tab.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+  background: var(--surface);
+}
+.source-editor-body {
+  flex: 1; display: flex; flex-direction: column;
+  min-height: 0; position: relative;
+}
+.source-editor-textarea {
+  flex: 1; width: 100%; min-height: 300px;
+  padding: 14px; border: none; outline: none; resize: none;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 13px; line-height: 1.6;
+  background: var(--surface); color: var(--text);
+  tab-size: 2; white-space: pre; overflow-wrap: normal; overflow-x: auto;
+  transition: background var(--t), color var(--t);
+}
+.source-editor-textarea::placeholder { color: var(--text3); }
+.source-editor-preview {
+  flex: 1; width: 100%; border: none;
+  background: #fff; /* iframe 内页面需要白色背景 */
+}
+.source-editor-footer {
+  display: flex; align-items: center; gap: 12px;
+  padding: 6px 14px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text2); flex-shrink: 0;
+  flex-wrap: wrap; background: var(--surface2);
+}
+.source-editor-status { font-weight: 600; color: var(--accent); white-space: nowrap; }
+.source-editor-hint { color: var(--text3); font-size: 10px; }
+.source-editor-preview-actions {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  z-index: 10; display: flex; gap: 8px;
+}
+
+/* Dark mode for source editor */
+[data-theme="dark"] .source-editor-textarea {
+  background: #181830;
+}
+[data-theme="dark"] .source-editor-preview {
+  background: #15152a;
+}
+
 /* ============ Responsive ============ */
 @media (max-width: 1200px) {
   .quadrant-grid { gap: 10px; }
@@ -1078,8 +1162,8 @@ kbd {
   .app-header h1 { font-size: 14px; text-align: center; margin-right: 0; }
   .header-actions { justify-content: center; }
   .toolbar { flex-direction: column; align-items: stretch; padding: 6px 10px; }
-  .btn { font-size: 11px; padding: 6px 12px; }
-  .btn-sm { padding: 4px 8px; font-size: 10px; }
+  .btn { font-size: 12px; padding: 8px 16px; min-height: 48px; }
+  .btn-sm { padding: 6px 12px; font-size: 11px; min-height: 36px; }
   .stats-grid { grid-template-columns: 1fr; }
   .search-input { width: 100%; }
   .bigtask-card-header { gap: 4px; padding: 6px 8px; }
@@ -1090,10 +1174,21 @@ kbd {
   .quadrant { min-height: 150px; border-radius: 8px; }
   .quadrant-tasks { max-height: 35vh; padding: 6px; }
   .timeview-items { max-height: 30vh; }
-  .task-item { padding: 8px 10px; font-size: 13px; }
-  .subtask-item { padding: 6px 8px; font-size: 12px; }
-  .task-checkbox { width: 18px; height: 18px; }
+  .task-item { padding: 10px 12px; font-size: 14px; min-height: 48px; }
+  .subtask-item { padding: 8px 10px; font-size: 13px; min-height: 48px; }
+  .task-checkbox { width: 22px; height: 22px; }
   .task-delete-btn, .task-defer-btn, .task-extra-btn,
-  .quadrant-add-btn, .split-stages-btn, .task-timeslot-btn { width: 30px; height: 30px; font-size: 15px; }
-  .planpool-tab { padding: 4px 10px; font-size: 11px; }
+  .quadrant-add-btn, .split-stages-btn, .task-timeslot-btn { width: 48px; height: 48px; font-size: 18px; }
+  .btn-icon { width: 48px; height: 48px; font-size: 20px; }
+  .planpool-tab { padding: 6px 12px; font-size: 11px; min-height: 36px; }
+  /* 源码编辑器移动端适配 */
+  .source-editor-header { padding: 8px 10px; gap: 4px; }
+  .source-editor-header-actions { gap: 2px; }
+  .source-editor-header-actions .btn { min-height: 36px; padding: 5px 10px; font-size: 11px; }
+  .source-editor-tab { padding: 12px 8px; font-size: 13px; min-height: 48px; }
+  .source-editor-textarea { font-size: 14px; padding: 10px; }
+  .source-editor-footer { flex-direction: column; gap: 2px; text-align: center; }
+  .source-editor-hint { font-size: 10px; }
+  /* 软键盘弹出时编辑器区域自动收缩 */
+  .source-editor-textarea { max-height: 50vh; }
 }

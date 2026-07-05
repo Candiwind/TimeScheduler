@@ -231,23 +231,37 @@ var CloudSync = (function() {
    * - 仅拉取：只需 Gist ID（Gist 须为公开），手机端最简配置
    * - 拉取+推送：需要 Gist ID + Token，两端全自动
    */
-  function setupGistSync() {
-    var existingToken = syncInfo.gistToken || '';
-    var tokenHint = existingToken ?
-      '（检测到已保存的 Token，将优先使用）\n\n' :
-      '（公开 Gist 无需 Token 即可拉取）\n\n';
+  /**
+   * 设置 Gist 同步（支持两种模式）
+   * - 仅拉取：只需 Gist ID（Gist 须为公开），手机端最简配置
+   * - 拉取+推送：需要 Gist ID + Token，两端全自动
+   * @param {string} [gistId] 直接传入则跳过 prompt
+   * @param {string} [token] 直接传入则跳过 prompt；空字符串=仅拉取
+   */
+  function setupGistSync(gistId, token) {
+    var fromForm = (typeof gistId !== 'undefined');
 
-    var gistId = prompt(
-      '请输入 GitHub Gist ID：\n\n' +
-      '如何获取？\n' +
-      '1. 打开 gist.github.com\n' +
-      '2. 创建一个新 Gist（建议设为 🔓公开，方便手机免 Token 读取）\n' +
-      '3. 从浏览器地址栏复制 Gist ID（如 abc123def456）\n\n' +
-      tokenHint +
-      '仅需拉取数据 → 输入 Gist ID 即可（Gist 须公开）\n' +
-      '需要推送数据 → 还需输入 Token',
-      syncInfo.gistId || '');
-    if (!gistId) return;
+    if (!fromForm) {
+      var existingToken = syncInfo.gistToken || '';
+      var tokenHint = existingToken ?
+        '（检测到已保存的 Token，将优先使用）\n\n' :
+        '（公开 Gist 无需 Token 即可拉取）\n\n';
+
+      gistId = prompt(
+        '请输入 GitHub Gist ID：\n\n' +
+        '如何获取？\n' +
+        '1. 打开 gist.github.com\n' +
+        '2. 创建一个新 Gist（建议设为 🔓公开，方便手机免 Token 读取）\n' +
+        '3. 从浏览器地址栏复制 Gist ID（如 abc123def456）\n\n' +
+        tokenHint +
+        '仅需拉取数据 → 输入 Gist ID 即可（Gist 须公开）\n' +
+        '需要推送数据 → 还需输入 Token',
+        syncInfo.gistId || '');
+      if (!gistId) return;
+      token = undefined; // 走下面的逻辑
+    }
+
+    var existingToken = (typeof token !== 'undefined' && token !== null) ? token : (syncInfo.gistToken || '');
 
     // 已有 Token → 优先用 Token（保留推送能力）
     if (existingToken) {
@@ -255,61 +269,66 @@ var CloudSync = (function() {
         saveGistConfig(gistId, existingToken, '完整模式（已有Token）');
         showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
         pullFromGist(false);
+        if (fromForm) openSyncSettings();
       }).catch(function() {
-        // Token 失效，提示重新输入
-        var newToken = prompt(
-          '已保存的 Token 失效，请重新输入。\n\n' +
-          'GitHub Personal Access Token 获取步骤：\n' +
-          '1. 打开 github.com/settings/tokens/new\n' +
-          '2. 勾选 gist 权限\n' +
-          '3. 生成后复制 Token\n\n' +
-          '或留空切换到仅拉取模式（需 Gist 为公开）：',
-          '');
-        if (newToken) {
-          fetchGist(gistId, newToken).then(function() {
-            saveGistConfig(gistId, newToken, '完整模式（新Token）');
-            showToast('✅ Gist 已连接（拉取+推送模式）');
-            pullFromGist(false);
-          }).catch(function(err) {
-            alert('连接失败：' + err.message);
-          });
+        if (fromForm) {
+          // 表单模式：Token 可能不对，提示但不降级（用户可在表单中清除Token重试）
+          alert('连接失败：Token 无效或 Gist ID 不存在。\n请检查后重试，或清空 Token 尝试公开访问。');
         } else {
-          // 用户留空，尝试公开模式
-          fetchGist(gistId, null).then(function() {
-            saveGistConfig(gistId, '', '仅拉取模式（公开Gist，Token已失效）');
-            showToast('⚠️ Token 已清除，当前为仅拉取模式\n手机端仍可免 Token 读取');
-            pullFromGist(false);
-          }).catch(function(err) {
-            alert('公开访问也失败：' + err.message + '\n请创建新 Token 后重试。');
-          });
+          // Prompt 模式：引导重新输入
+          var newToken = prompt(
+            '已保存的 Token 失效，请重新输入。\n\n' +
+            '或留空切换到仅拉取模式（需 Gist 为公开）：',
+            '');
+          if (newToken) {
+            fetchGist(gistId, newToken).then(function() {
+              saveGistConfig(gistId, newToken, '完整模式（新Token）');
+              showToast('✅ Gist 已连接（拉取+推送模式）');
+              pullFromGist(false);
+            }).catch(function(err) {
+              alert('连接失败：' + err.message);
+            });
+          } else {
+            fetchGist(gistId, null).then(function() {
+              saveGistConfig(gistId, '', '仅拉取模式（公开Gist，Token已失效）');
+              showToast('⚠️ Token 已清除，当前为仅拉取模式');
+              pullFromGist(false);
+            }).catch(function(err) {
+              alert('公开访问也失败：' + err.message);
+            });
+          }
         }
       });
     } else {
       // 无 Token → 先试公开访问
       fetchGist(gistId, null).then(function(gistData) {
         saveGistConfig(gistId, '', '仅拉取模式（公开Gist）');
-        showToast('✅ Gist 已连接（仅拉取模式）\n' +
-                  '手机端无需 Token 即可自动同步\n\n' +
-                  '如需推送数据，请再次设置并输入 Token。');
+        if (fromForm) {
+          showToast('✅ Gist 已连接（仅拉取模式）\n手机端无需 Token 即可自动同步');
+        } else {
+          showToast('✅ Gist 已连接（仅拉取模式）\n' +
+                    '手机端无需 Token 即可自动同步\n\n' +
+                    '如需推送数据，请再次设置并输入 Token。');
+        }
         pullFromGist(false);
+        if (fromForm) openSyncSettings();
       }).catch(function() {
-        var token = prompt(
-          '该 Gist 为私密或不存在，需要 Token 才能访问。\n\n' +
-          'GitHub Personal Access Token 获取步骤：\n' +
-          '1. 打开 github.com/settings/tokens/new\n' +
-          '2. 勾选 gist 权限\n' +
-          '3. 生成后复制 Token\n\n' +
-          '请输入 Token：',
-          '');
-        if (!token) return;
-
-        fetchGist(gistId, token).then(function() {
-          saveGistConfig(gistId, token, '完整模式（私密Gist）');
-          showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
-          pullFromGist(false);
-        }).catch(function(err) {
-          alert('连接失败：' + err.message + '\n请检查 Gist ID 和 Token 是否正确。');
-        });
+        if (fromForm) {
+          alert('无法访问该 Gist。\n\n可能原因：\n1. Gist ID 不存在\n2. Gist 为私密，需填写 Token');
+        } else {
+          var newToken = prompt(
+            '该 Gist 为私密或不存在，需要 Token 才能访问。\n\n' +
+            '请输入 Token（留空取消）：',
+            '');
+          if (!newToken) return;
+          fetchGist(gistId, newToken).then(function() {
+            saveGistConfig(gistId, newToken, '完整模式（私密Gist）');
+            showToast('✅ Gist 已连接（拉取+推送模式）');
+            pullFromGist(false);
+          }).catch(function(err) {
+            alert('连接失败：' + err.message);
+          });
+        }
       });
     }
   }
@@ -657,7 +676,7 @@ var CloudSync = (function() {
    * 打开同步设置对话框
    */
   function openSyncSettings() {
-    var html = '<div style="max-width:420px;">' +
+    var html = '<div style="max-width:440px;">' +
       '<h3 style="margin:0 0 12px;font-size:16px;">☁️ 云同步设置</h3>';
 
     if (syncInfo.enabled) {
@@ -670,28 +689,50 @@ var CloudSync = (function() {
         '⚪ 未配置同步。选择以下一种方式开始：</div>';
     }
 
+    // --- 百度网盘 ---
     html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式一：百度网盘同步</b>（电脑端全自动，手机端手动导入）</p>' +
-      '<button class="btn btn-sm btn-primary" onclick="CloudSync.setupBaiduSync()" style="width:100%;margin-bottom:12px;">' +
+      '<button class="btn btn-sm btn-primary" onclick="CloudSync.setupBaiduSync()" style="width:100%;margin-bottom:14px;">' +
       '📁 选择百度网盘同步目录</button>';
 
-    html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式二：Gist 云同步</b>（推荐！电脑手机全自动）</p>' +
-      '<button class="btn btn-sm btn-info" onclick="CloudSync.setupGistSync()" style="width:100%;margin-bottom:4px;">' +
-      '🔑 设置 Gist 同步</button>';
+    // --- Gist 云同步（表单直接嵌入对话框）---
+    html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式二：Gist 云同步</b>（推荐！电脑手机全自动）</p>';
 
-    // 显示当前 Gist 模式详情
+    // Gist ID 输入
+    html += '<label style="font-size:11px;color:var(--text2);display:block;margin-bottom:2px;">' +
+      'Gist ID <span style="color:var(--text3);">— 从 gist.github.com 地址栏复制</span></label>' +
+      '<input id="gistIdInput" type="text" placeholder="例如：abc123def456789" ' +
+      'value="' + (syncInfo.gistId || '') + '" ' +
+      'style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;' +
+      'background:var(--surface);color:var(--text);margin-bottom:8px;box-sizing:border-box;">';
+
+    // Token 输入（可选）
+    html += '<label style="font-size:11px;color:var(--text2);display:block;margin-bottom:2px;">' +
+      'Token <span style="color:var(--text3);">— 可选，需要推送时填写（github.com/settings/tokens → 勾选 gist）</span></label>' +
+      '<input id="gistTokenInput" type="password" placeholder="例如：ghp_xxxxxxxxxxxxxxxxxxxx" ' +
+      'value="' + (syncInfo.gistToken || '') + '" ' +
+      'style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;' +
+      'background:var(--surface);color:var(--text);margin-bottom:8px;box-sizing:border-box;">';
+
+    // 连接按钮
+    html += '<button class="btn btn-sm btn-info" id="btnGistConnect" style="width:100%;margin-bottom:4px;">' +
+      '🔗 连接 Gist</button>';
+    html += '<p style="font-size:10px;color:var(--text3);margin:0 0 14px;">' +
+      '公开 Gist → 仅填 Gist ID 即可 · 私密 Gist → 还需填 Token</p>';
+
+    // 当前 Gist 模式的操作按钮
     if (syncInfo.enabled && syncInfo.mode === 'gist') {
       var hasToken = syncInfo.gistToken;
       html += '<div style="display:flex;gap:4px;margin-top:4px;">' +
-        '<button class="btn btn-sm btn-success" onclick="CloudSync.pushToGist()" style="flex:1;"' + (hasToken ? '' : ' disabled') + '>📤 推送' + (hasToken ? '' : '(需Token)') + '</button>' +
-        '<button class="btn btn-sm btn-info" onclick="CloudSync.pullFromGist()" style="flex:1;">📥 拉取</button>' +
+        '<button class="btn btn-sm btn-success" id="btnGistPush" style="flex:1;"' + (hasToken ? '' : ' disabled') + '>📤 推送' + (hasToken ? '' : '(需Token)') + '</button>' +
+        '<button class="btn btn-sm btn-info" id="btnGistPull" style="flex:1;">📥 拉取</button>' +
         '</div>';
       if (!hasToken) {
-        html += '<p style="font-size:10px;color:var(--text3);margin:4px 0 0;">⚠️ 当前为仅拉取模式，如需推送请重新设置并输入 Token</p>';
+        html += '<p style="font-size:10px;color:var(--text3);margin:4px 0 0;">⚠️ 当前为仅拉取模式，在上方填写 Token 后点"连接 Gist"即可推送</p>';
       }
     }
 
     if (syncInfo.enabled) {
-      html += '<button class="btn btn-sm btn-cancel" onclick="CloudSync.disableSync()" style="width:100%;margin-top:8px;">' +
+      html += '<button class="btn btn-sm btn-cancel" id="btnGistDisable" style="width:100%;margin-top:8px;">' +
         '❌ 禁用云同步</button>';
     }
 
@@ -705,6 +746,39 @@ var CloudSync = (function() {
     showModal('cloud-sync-modal', html, [
       { text: '关闭', className: 'btn-cancel', action: closeModal }
     ]);
+
+    // 绑定按钮事件（innerHTML 的 onclick 在某些情况下不可靠，用 addEventListener 更稳）
+    setTimeout(function() {
+      var connectBtn = document.getElementById('btnGistConnect');
+      if (connectBtn) {
+        connectBtn.addEventListener('click', function() {
+          var gid = document.getElementById('gistIdInput').value.trim();
+          if (!gid) { alert('请输入 Gist ID'); return; }
+          var tok = document.getElementById('gistTokenInput').value.trim();
+          setupGistSync(gid, tok);
+        });
+      }
+
+      var pushBtn = document.getElementById('btnGistPush');
+      if (pushBtn) {
+        pushBtn.addEventListener('click', function() { CloudSync.pushToGist(); });
+      }
+
+      var pullBtn = document.getElementById('btnGistPull');
+      if (pullBtn) {
+        pullBtn.addEventListener('click', function() { CloudSync.pullFromGist(); });
+      }
+
+      var disableBtn = document.getElementById('btnGistDisable');
+      if (disableBtn) {
+        disableBtn.addEventListener('click', function() { CloudSync.disableSync(); });
+      }
+
+      var baiduBtn = document.querySelector('#cloud-sync-modal .btn-primary');
+      if (baiduBtn) {
+        baiduBtn.addEventListener('click', function() { CloudSync.setupBaiduSync(); });
+      }
+    }, 50);
   }
 
   // 简单模态框

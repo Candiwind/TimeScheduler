@@ -676,6 +676,7 @@ function createTaskElement(item, quadrantKey, index) {
   if (item.bigTaskRef) {
     el.dataset.bigTaskId = item.bigTaskRef.bigTaskId;
     el.dataset.bigSubtaskId = item.bigTaskRef.subtaskId;
+    el.classList.add('is-bigtask-sub');
   }
 
   // Highlight toggle (star button - highlights entire task text)
@@ -957,6 +958,7 @@ function createSubTaskElement(task, quadrantKey, blockId, opts) {
   if (task.bigTaskRef) {
     el.dataset.bigTaskId = task.bigTaskRef.bigTaskId;
     el.dataset.bigSubtaskId = task.bigTaskRef.subtaskId;
+    el.classList.add('is-bigtask-sub');
   }
 
   // Highlight toggle (star button - highlights entire task text)

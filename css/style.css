@@ -669,6 +669,16 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 }
 .task-text:hover { color: var(--accent); }
 .task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+/* 大任务子任务：文本允许换行，完整显示内容（保留用户输入的换行符 + 自动断行）*/
+.is-bigtask-sub .task-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* 大任务子任务左侧加细色条，便于识别归属 */
+.task-item.is-bigtask-sub,
+.subtask-item.is-bigtask-sub {
+  border-left: 3px solid var(--accent);
+}
 .task-delete-btn {
   width: 24px; height: 24px; border: none; background: transparent; color: var(--text3);
   font-size: 16px; cursor: pointer; border-radius: 50%; display: flex;
@@ -1221,10 +1231,10 @@ kbd {
     margin-bottom: 2px;
     border-bottom: 1px dashed var(--border);
   }
-  /* 任务文本允许换行，完整显示（不截断） */
+  /* 任务文本允许换行，完整显示（保留换行符 + 自动断行，不截断） */
   .task-item .task-text,
   .subtask-item .task-text {
-    white-space: normal;
+    white-space: pre-wrap;
     word-break: break-word;
   }
   /* 第二行操作按钮均分宽度：不溢出、触摸目标充足 */

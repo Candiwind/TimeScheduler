@@ -309,6 +309,13 @@
    - 百度网盘    → 💻 电脑端自动写入网盘
    手机端修改数据可同步：配置时同时填 Gist ID + Token 即可双向，store.js 每次保存触发 onDataChanged → 防抖推送。
    涉及文件：js/cloud-sync.js
+21. ✅ 大任务子任务在象限中的内容分行显示：
+   (1) createTaskElement / createSubTaskElement 对带 bigTaskRef 的元素加 is-bigtask-sub 标记 class。
+   (2) 桌面端 .is-bigtask-sub .task-text 改用 white-space:pre-wrap + word-break:break-word，
+       保留用户输入的换行符并自动断行，长内容完整显示（不再被 nowrap+ellipsis 截断成一行）。
+   (3) 大任务子任务左侧加 accent 色条，便于识别归属。
+   (4) 手机端 .task-text 统一改用 pre-wrap，换行符保留。
+   涉及文件：js/render.js / css/style.css
 
 （暂无）
 

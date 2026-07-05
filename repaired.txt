@@ -295,6 +295,20 @@
    (4) 推送按钮在仅拉取模式下 disabled 并标注"(需Token)"，点击时给出明确提示。
    (5) SW 缓存版本升至 v3，确保更新后的 cloud-sync.js 能被客户端拉取。
    涉及文件：js/cloud-sync.js / service-worker.js
+19. ✅ 手机端竖屏条目布局优化——解决一行放不下 checkbox+文本+5个按钮导致挤压重叠：
+   (1) task-item / subtask-item 在 ≤600px 下 flex-wrap，task-left（checkbox+文本）独占第一行，
+       操作按钮（高亮/额外/推迟/时段/删除/拆分）折到第二行均分宽度（flex:1 1 0, min-width:44px），
+       不溢出、触摸目标充足。
+   (2) 任务文本在手机端允许换行（white-space:normal + word-break），完整显示不再被截断。
+   (3) 第一行与第二行之间用虚线分隔，视觉层次清晰。
+   (4) block-header / subtask-stage-item 同样允许 flex-wrap，防止长标题+控件溢出。
+   涉及文件：css/style.css
+20. ✅ 云同步方向明确化——对话框状态栏显示当前同步方向：
+   - Gist + Token → ⬆️⬇️ 双向同步（本端改动 3 秒后自动推送）
+   - Gist 仅 ID  → ⬇️ 仅拉取（本端改动不会上传，需填 Token 才能双向）
+   - 百度网盘    → 💻 电脑端自动写入网盘
+   手机端修改数据可同步：配置时同时填 Gist ID + Token 即可双向，store.js 每次保存触发 onDataChanged → 防抖推送。
+   涉及文件：js/cloud-sync.js
 
 （暂无）
 

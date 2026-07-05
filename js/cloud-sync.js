@@ -38,7 +38,7 @@ var CloudSync = (function() {
    * 初始化：恢复之前的同步配置
    */
   // 版本标记——用于排查浏览器是否缓存了旧代码
-  var CODE_VERSION = '2026-07-05-fix-dateData-structure';
+  var CODE_VERSION = '2026-07-05-mobile-layout-sync-direction';
 
   function init() {
     console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
@@ -821,8 +821,23 @@ var CloudSync = (function() {
       '<h3 style="margin:0 0 12px;font-size:16px;">☁️ 云同步设置</h3>';
 
     if (syncInfo.enabled) {
+      // 同步方向说明
+      var dirLabel = '';
+      var dirColor = 'var(--text2)';
+      if (syncInfo.mode === 'gist') {
+        if (syncInfo.gistToken) {
+          dirLabel = '⬆️⬇️ 双向同步（本端改动 3 秒后自动推送）';
+          dirColor = '#2e7d32';
+        } else {
+          dirLabel = '⬇️ 仅拉取（本端改动不会上传，需在下方填 Token 才能双向）';
+          dirColor = '#e65100';
+        }
+      } else if (syncInfo.mode === 'baidu-disk') {
+        dirLabel = '💻 电脑端自动写入网盘（手机端需手动导入）';
+      }
       html += '<div style="padding:8px 12px;background:var(--accent-light);border-radius:8px;margin-bottom:12px;font-size:12px;">' +
         '🟢 已启用：' + (syncInfo.mode === 'baidu-disk' ? '百度网盘同步' : 'Gist 云同步') + '<br>' +
+        '同步方向：<b style="color:' + dirColor + '">' + dirLabel + '</b><br>' +
         '上次同步：' + (syncInfo.lastSync ? new Date(syncInfo.lastSync).toLocaleString('zh-CN') : '从未') +
         '</div>';
     } else {

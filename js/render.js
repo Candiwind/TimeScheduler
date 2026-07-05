@@ -1004,8 +1004,11 @@ function createSubTaskElement(task, quadrantKey, blockId, opts) {
   // Time slot selector icon
   var timeSlotBtn2 = createTimeSlotBtn(task.timeSlot || '', quadrantKey, task.id, blockId);
 
-  el.appendChild(checkbox);
-  el.appendChild(textSpan);
+  var left = document.createElement('div');
+  left.className = 'task-left';
+  left.appendChild(checkbox);
+  left.appendChild(textSpan);
+  el.appendChild(left);
   el.appendChild(hlBtn);
   el.appendChild(bonusBtn);
   el.appendChild(deferBtn);
@@ -1176,8 +1179,11 @@ function createStageElement(stage, quadrantKey, blockId, subtaskId) {
     if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
   });
 
-  stageRow.appendChild(stageCheckbox);
-  stageRow.appendChild(stageText);
+  var stageLeft = document.createElement('div');
+  stageLeft.className = 'task-left';
+  stageLeft.appendChild(stageCheckbox);
+  stageLeft.appendChild(stageText);
+  stageRow.appendChild(stageLeft);
   stageRow.appendChild(hlBtn);
   stageRow.appendChild(bonusBtn);
   stageRow.appendChild(deferBtn);
@@ -1271,8 +1277,11 @@ function createStageElementForTask(stage, quadrantKey, taskId) {
     if (innerEl) innerEl.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
   });
 
-  stageRow.appendChild(stageCheckbox);
-  stageRow.appendChild(stageText);
+  var stageLeft = document.createElement('div');
+  stageLeft.className = 'task-left';
+  stageLeft.appendChild(stageCheckbox);
+  stageLeft.appendChild(stageText);
+  stageRow.appendChild(stageLeft);
   stageRow.appendChild(hlBtn);
   stageRow.appendChild(bonusBtn);
   stageRow.appendChild(deferBtn);

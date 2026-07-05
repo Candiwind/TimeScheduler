@@ -669,7 +669,23 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 }
 .task-text:hover { color: var(--accent); }
 .task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
-/* 大任务子任务：文本允许换行，完整显示内容（保留用户输入的换行符 + 自动断行）*/
+/* 块内小任务 / 阶段 / 大任务子任务：统一分行模式——
+   checkbox+文字独占第一行（文字 pre-wrap 不定多行），操作图标按钮折到第二行 */
+.subtask-item,
+.subtask-stage-item,
+.task-item.is-bigtask-sub {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+.subtask-item > .task-left,
+.subtask-stage-item > .task-left,
+.task-item.is-bigtask-sub > .task-left {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.subtask-item .task-text,
+.subtask-stage-item .stage-text,
 .is-bigtask-sub .task-text {
   white-space: pre-wrap;
   word-break: break-word;
@@ -1217,14 +1233,15 @@ kbd {
 
   /* === 条目布局优化：竖屏下文本独占一行，操作按钮折到第二行均分 ===
      解决窄屏一行放不下 checkbox+文本+5个按钮导致挤压重叠的问题 */
-  .task-item, .subtask-item {
+  .task-item, .subtask-item, .subtask-stage-item {
     flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
     gap: 4px 6px;
   }
   .task-item > .task-left,
-  .subtask-item > .task-left {
+  .subtask-item > .task-left,
+  .subtask-stage-item > .task-left {
     flex: 1 1 100%;
     min-width: 0;
     padding-bottom: 5px;
@@ -1233,7 +1250,8 @@ kbd {
   }
   /* 任务文本允许换行，完整显示（保留换行符 + 自动断行，不截断） */
   .task-item .task-text,
-  .subtask-item .task-text {
+  .subtask-item .task-text,
+  .subtask-stage-item .stage-text {
     white-space: pre-wrap;
     word-break: break-word;
   }
@@ -1247,7 +1265,11 @@ kbd {
   .subtask-item > .task-defer-btn,
   .subtask-item > .task-timeslot-btn,
   .subtask-item > .task-delete-btn,
-  .subtask-item > .split-stages-btn {
+  .subtask-item > .split-stages-btn,
+  .subtask-stage-item > .task-extra-btn,
+  .subtask-stage-item > .task-defer-btn,
+  .subtask-stage-item > .task-timeslot-btn,
+  .subtask-stage-item > .task-delete-btn {
     flex: 1 1 0;
     width: auto;
     min-width: 44px;
@@ -1260,10 +1282,5 @@ kbd {
   .block-header > .block-name {
     flex: 1 1 60%;
     min-width: 0;
-  }
-  /* 阶段行允许换行 */
-  .subtask-stage-item {
-    flex-wrap: wrap;
-    gap: 4px;
   }
 }

@@ -1,0 +1,664 @@
+// cloud-sync.js — 云盘数据同步模块
+// 电脑端：通过 File System Access API 自动写入百度网盘同步目录
+// 手机端：支持从文件导入 / URL 拉取最新数据
+// 同步配置持久化在 localStorage + IndexedDB（文件句柄）
+
+var CloudSync = (function() {
+  // 默认同步文件路径（百度网盘同步目录）
+  var DEFAULT_SYNC_DIR_NAME = 'AIPJCacheSync';
+  var SYNC_FILE_NAME = 'quadrant_tasks_backup.json';
+  var GIST_ID_KEY = 'cloudsync_gist_id';
+  var GIST_TOKEN_KEY = 'cloudsync_gist_token';
+  var SYNC_ENABLED_KEY = 'cloudsync_enabled';
+  var LAST_SYNC_KEY = 'cloudsync_last_sync';
+
+  // 文件句柄（File System Access API）
+  var fileHandle = null;
+  var syncDirHandle = null;
+
+  // IndexedDB 存储名
+  var DB_NAME = 'quadrant-cloud-sync';
+  var DB_VERSION = 1;
+  var STORE_NAME = 'file-handles';
+
+  // 同步状态
+  var syncInfo = {
+    enabled: false,
+    mode: null,        // 'baidu-disk' | 'gist'
+    lastSync: null,    // ISO timestamp
+    gistId: null,
+    gistToken: null,
+    syncDirPath: null
+  };
+
+  // 数据变更回调（外部注册）
+  var onDataChangeCallback = null;
+
+  /**
+   * 初始化：恢复之前的同步配置
+   */
+  function init() {
+    // 恢复配置
+    syncInfo.enabled = localStorage.getItem(SYNC_ENABLED_KEY) === '1';
+    syncInfo.mode = localStorage.getItem('cloudsync_mode') || null;
+    syncInfo.lastSync = localStorage.getItem(LAST_SYNC_KEY) || null;
+    syncInfo.gistId = localStorage.getItem(GIST_ID_KEY) || null;
+    syncInfo.gistToken = localStorage.getItem(GIST_TOKEN_KEY) || null;
+    syncInfo.syncDirPath = localStorage.getItem('cloudsync_dir_path') || null;
+
+    // 尝试恢复文件句柄
+    if (syncInfo.enabled && syncInfo.mode === 'baidu-disk') {
+      restoreFileHandle();
+    }
+
+    // 如果有 gist 配置，尝试自动拉取
+    if (syncInfo.enabled && syncInfo.mode === 'gist' && syncInfo.gistId) {
+      autoPullFromGist();
+    }
+  }
+
+  /**
+   * 注册数据变更回调（store.js saveDateData 后调用）
+   */
+  function onDataChanged() {
+    if (!syncInfo.enabled) return;
+
+    if (syncInfo.mode === 'baidu-disk' && fileHandle) {
+      autoExportToDisk();
+    }
+    if (syncInfo.mode === 'gist' && syncInfo.gistId && syncInfo.gistToken) {
+      debouncePushToGist();
+    }
+  }
+
+  // ============ 百度网盘同步（File System Access API） ============
+
+  /**
+   * 设置百度网盘同步目录
+   * 引导用户选择 D:\BaiduSyncdisk\WorkingFiles\AIPJCacheSync 目录
+   */
+  function setupBaiduSync() {
+    // 检查浏览器是否支持 File System Access API
+    if (!window.showDirectoryPicker) {
+      alert('您的浏览器不支持文件系统访问 API。\n\n' +
+            '请使用以下浏览器：\n' +
+            '• Chrome / Edge（桌面版）\n' +
+            '• QQ 浏览器 / 夸克浏览器（桌面模式）\n\n' +
+            '手机端请使用 Gist 云同步方式。');
+      return;
+    }
+
+    var hint = '请选择百度网盘同步目录：\n\n' +
+               DEFAULT_SYNC_DIR_NAME + '\n\n' +
+               '通常路径为：\n' +
+               'D:\\BaiduSyncdisk\\WorkingFiles\\' + DEFAULT_SYNC_DIR_NAME + '\n\n' +
+               '（如果目录不存在，请先在资源管理器中创建它）';
+
+    alert(hint);
+
+    // 请求目录权限
+    window.showDirectoryPicker({ mode: 'readwrite' }).then(function(dirHandle) {
+      syncDirHandle = dirHandle;
+      syncInfo.syncDirPath = dirHandle.name;
+      syncInfo.enabled = true;
+      syncInfo.mode = 'baidu-disk';
+
+      // 持久化配置
+      localStorage.setItem(SYNC_ENABLED_KEY, '1');
+      localStorage.setItem('cloudsync_mode', 'baidu-disk');
+      localStorage.setItem('cloudsync_dir_path', dirHandle.name);
+
+      // 持久化文件句柄
+      storeFileHandle(dirHandle);
+
+      // 立即执行一次导出
+      autoExportToDisk().then(function() {
+        showToast('✅ 百度网盘同步已就绪\n' +
+                  '每次修改数据后会自动保存到：\n' +
+                  dirHandle.name + '\\' + SYNC_FILE_NAME);
+      });
+
+      updateSyncIndicator();
+    }).catch(function(err) {
+      if (err.name !== 'AbortError') {
+        console.error('目录选择失败:', err);
+        alert('目录选择失败：' + err.message);
+      }
+    });
+  }
+
+  /**
+   * 自动导出数据到百度网盘同步目录
+   */
+  function autoExportToDisk() {
+    if (!syncDirHandle) return Promise.resolve();
+
+    var data = exportAllData();
+
+    return syncDirHandle.getFileHandle(SYNC_FILE_NAME, { create: true }).then(function(fh) {
+      return fh.createWritable();
+    }).then(function(writable) {
+      return writable.write(JSON.stringify(data, null, 2)).then(function() {
+        return writable.close();
+      });
+    }).then(function() {
+      var now = new Date().toISOString();
+      syncInfo.lastSync = now;
+      localStorage.setItem(LAST_SYNC_KEY, now);
+      console.log('[云同步] 已写入百度网盘:', SYNC_FILE_NAME, now);
+      updateSyncIndicator();
+    }).catch(function(err) {
+      console.warn('[云同步] 写入失败:', err);
+      // 权限可能过期，尝试恢复
+      restoreFileHandle();
+    });
+  }
+
+  /**
+   * 导出全部业务数据
+   */
+  function exportAllData() {
+    var exportObj = {
+      _version: 2,
+      _exportedAt: new Date().toISOString(),
+      _source: 'quadrant-task-manager-cloudsync',
+      cachedDatesIndex: loadCacheIndex ? loadCacheIndex() : [],
+      bigTasks: loadBigTasks ? loadBigTasks() : [],
+      bigTaskCache: (function() {
+        try { return JSON.parse(localStorage.getItem('quadrant_big_task_cache') || '[]'); }
+        catch(e) { return []; }
+      })(),
+      principles: loadPrinciples ? loadPrinciples() : {},
+      dateData: {}
+    };
+
+    // 遍历缓存日期，导出每个日期的象限数据
+    var dates = exportObj.cachedDatesIndex;
+    dates.forEach(function(date) {
+      try {
+        var raw = localStorage.getItem('quadrant_cached_' + date);
+        if (raw) exportObj.dateData[date] = JSON.parse(raw);
+      } catch(e) {}
+    });
+
+    // 也加入未来任务池数据
+    ['future', 'week', 'month'].forEach(function(pool) {
+      var key = 'quadrant_pool_' + pool;
+      try {
+        var poolRaw = localStorage.getItem(key);
+        if (poolRaw) exportObj['pool_' + pool] = JSON.parse(poolRaw);
+      } catch(e) {}
+    });
+
+    return exportObj;
+  }
+
+  /**
+   * 从同步目录导入数据
+   */
+  function importFromBaiduDisk() {
+    if (!window.showOpenFilePicker) {
+      alert('您的浏览器不支持文件选择 API，请手动导入 JSON 文件。');
+      return;
+    }
+
+    window.showOpenFilePicker({
+      types: [{
+        description: 'JSON 文件',
+        accept: { 'application/json': ['.json'] }
+      }]
+    }).then(function([fh]) {
+      return fh.getFile();
+    }).then(function(file) {
+      return file.text();
+    }).then(function(text) {
+      var data = JSON.parse(text);
+      importAllData(data);
+      showToast('✅ 已从云盘导入数据（包含 ' +
+                Object.keys(data.dateData || {}).length + ' 个缓存日期）');
+    }).catch(function(err) {
+      if (err.name !== 'AbortError') {
+        console.error('导入失败:', err);
+        alert('导入失败：' + err.message);
+      }
+    });
+  }
+
+  // ============ GitHub Gist 云同步 ============
+
+  /**
+   * 设置 Gist 同步
+   */
+  function setupGistSync() {
+    var gistId = prompt('请输入 GitHub Gist ID（在 gist.github.com 创建私密 Gist 后获取）：',
+                        syncInfo.gistId || '');
+    if (!gistId) return;
+
+    var token = prompt('请输入 GitHub Personal Access Token（需要 gist 权限）：\n' +
+                       '创建地址：https://github.com/settings/tokens/new\n' +
+                       '勾选 gist 权限即可',
+                       syncInfo.gistToken || '');
+    if (!token) return;
+
+    // 验证 token
+    testGistConnection(gistId, token).then(function(ok) {
+      if (!ok) {
+        alert('连接失败，请检查 Gist ID 和 Token 是否正确。');
+        return;
+      }
+
+      syncInfo.gistId = gistId;
+      syncInfo.gistToken = token;
+      syncInfo.enabled = true;
+      syncInfo.mode = 'gist';
+
+      localStorage.setItem(GIST_ID_KEY, gistId);
+      localStorage.setItem(GIST_TOKEN_KEY, token);
+      localStorage.setItem(SYNC_ENABLED_KEY, '1');
+      localStorage.setItem('cloudsync_mode', 'gist');
+
+      showToast('✅ Gist 云同步已就绪\n点击「推送」即可上传数据');
+      updateSyncIndicator();
+
+    }).catch(function(err) {
+      alert('连接失败：' + err.message);
+    });
+  }
+
+  /**
+   * 推送数据到 Gist
+   */
+  function pushToGist() {
+    if (!syncInfo.gistId || !syncInfo.gistToken) {
+      alert('请先设置 Gist 同步。');
+      return;
+    }
+
+    var data = exportAllData();
+    var payload = {
+      files: {}
+    };
+    payload.files[SYNC_FILE_NAME] = {
+      content: JSON.stringify(data, null, 2)
+    };
+
+    fetch('https://api.github.com/gists/' + syncInfo.gistId, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': 'token ' + syncInfo.gistToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      body: JSON.stringify(payload)
+    }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function() {
+      var now = new Date().toISOString();
+      syncInfo.lastSync = now;
+      localStorage.setItem(LAST_SYNC_KEY, now);
+      showToast('☁️ 数据已推送到云端');
+      updateSyncIndicator();
+    }).catch(function(err) {
+      console.error('推送失败:', err);
+      alert('推送失败：' + err.message + '\n请检查 Token 是否有 gist 权限。');
+    });
+  }
+
+  /**
+   * 从 Gist 拉取数据
+   */
+  function pullFromGist(silent) {
+    if (!syncInfo.gistId) return Promise.resolve(null);
+
+    return fetch('https://api.github.com/gists/' + syncInfo.gistId, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function(gist) {
+      var file = gist.files && gist.files[SYNC_FILE_NAME];
+      if (!file || !file.content) return null;
+
+      var data = JSON.parse(file.content);
+      importAllData(data);
+
+      var now = new Date().toISOString();
+      syncInfo.lastSync = now;
+      localStorage.setItem(LAST_SYNC_KEY, now);
+      updateSyncIndicator();
+
+      return data;
+    }).catch(function(err) {
+      if (!silent) {
+        console.error('拉取失败:', err);
+        alert('拉取失败：' + err.message);
+      }
+      return null;
+    });
+  }
+
+  // ============ 数据导入逻辑 ============
+
+  /**
+   * 导入全部数据到当前浏览器
+   */
+  function importAllData(data) {
+    if (!data || !data._version) {
+      alert('无效的同步数据文件。');
+      return;
+    }
+
+    var count = 0;
+
+    // 导入缓存日期索引
+    if (data.cachedDatesIndex && data.cachedDatesIndex.length > 0) {
+      localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(data.cachedDatesIndex));
+      count += data.cachedDatesIndex.length;
+    }
+
+    // 导入各日期的象限数据
+    if (data.dateData) {
+      Object.keys(data.dateData).forEach(function(date) {
+        localStorage.setItem('quadrant_cached_' + date, JSON.stringify(data.dateData[date]));
+      });
+    }
+
+    // 导入未来任务池
+    ['future', 'week', 'month'].forEach(function(pool) {
+      var key = 'pool_' + pool;
+      if (data[key]) {
+        localStorage.setItem('quadrant_pool_' + pool, JSON.stringify(data[key]));
+      }
+    });
+
+    // 导入原则
+    if (data.principles && data.principles.principles) {
+      localStorage.setItem('quadrant_principles', JSON.stringify(data.principles));
+    }
+
+    // 导入大任务
+    if (data.bigTasks) {
+      localStorage.setItem('quadrant_big_tasks', JSON.stringify(data.bigTasks));
+    }
+    if (data.bigTaskCache) {
+      localStorage.setItem('quadrant_big_task_cache', JSON.stringify(data.bigTaskCache));
+    }
+
+    console.log('[云同步] 已导入数据，缓存日期:', count);
+  }
+
+  /**
+   * 自动从 Gist 拉取（页面加载时静默调用）
+   */
+  function autoPullFromGist() {
+    pullFromGist(true).then(function(data) {
+      if (data) {
+        console.log('[云同步] 自动拉取成功');
+        // 触发页面重新渲染
+        if (typeof renderAll === 'function' && typeof currentDate !== 'undefined') {
+          renderAll(currentDate);
+        }
+        if (typeof renderBigTaskPanel === 'function') renderBigTaskPanel();
+        if (typeof renderPlanPoolPanel === 'function') renderPlanPoolPanel();
+        if (typeof renderPrinciplesPanel === 'function') renderPrinciplesPanel();
+      }
+    });
+  }
+
+  // 防抖推送定时器
+  var pushTimer = null;
+  function debouncePushToGist() {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(function() {
+      pushToGist();
+    }, 3000); // 3秒防抖，避免频繁 API 调用
+  }
+
+  /**
+   * 测试 Gist 连接
+   */
+  function testGistConnection(gistId, token) {
+    return fetch('https://api.github.com/gists/' + gistId, {
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    }).then(function(res) {
+      return res.ok;
+    }).catch(function() {
+      return false;
+    });
+  }
+
+  // ============ 文件句柄持久化（IndexedDB） ============
+
+  function openDB() {
+    return new Promise(function(resolve, reject) {
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function() {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+  }
+
+  function storeFileHandle(dirHandle) {
+    openDB().then(function(db) {
+      var tx = db.transaction(STORE_NAME, 'readwrite');
+      var store = tx.objectStore(STORE_NAME);
+      store.put(dirHandle, 'syncDirHandle');
+      tx.oncomplete = function() { db.close(); };
+    }).catch(function(err) {
+      console.warn('[云同步] 无法存储文件句柄:', err);
+    });
+  }
+
+  function restoreFileHandle() {
+    openDB().then(function(db) {
+      var tx = db.transaction(STORE_NAME, 'readonly');
+      var store = tx.objectStore(STORE_NAME);
+      var getReq = store.get('syncDirHandle');
+      getReq.onsuccess = function() {
+        if (getReq.result) {
+          syncDirHandle = getReq.result;
+          fileHandle = getReq.result;
+          // 验证权限
+          syncDirHandle.queryPermission({ mode: 'readwrite' }).then(function(state) {
+            if (state === 'granted') {
+              console.log('[云同步] 文件句柄已恢复，百度网盘同步就绪');
+              updateSyncIndicator();
+            } else if (state === 'prompt') {
+              syncDirHandle.requestPermission({ mode: 'readwrite' }).then(function(s) {
+                if (s === 'granted') updateSyncIndicator();
+              });
+            } else {
+              console.warn('[云同步] 文件句柄权限已过期，请重新设置同步目录');
+              syncDirHandle = null;
+              fileHandle = null;
+            }
+          });
+        }
+      };
+      tx.oncomplete = function() { db.close(); };
+    }).catch(function() {
+      // IndexedDB 不可用，忽略
+    });
+  }
+
+  // ============ Toast 提示 ============
+
+  function showToast(msg) {
+    if (typeof window.showToastMessage === 'function') {
+      window.showToastMessage(msg, 4000);
+    } else {
+      alert(msg);
+    }
+  }
+
+  // ============ 同步状态指示器 ============
+
+  function updateSyncIndicator() {
+    var el = document.getElementById('cloudSyncIndicator');
+    if (!el) return;
+
+    if (!syncInfo.enabled) {
+      el.innerHTML = '☁️ 未配置';
+      el.title = '点击配置云同步';
+      el.style.color = '';
+      return;
+    }
+
+    var modeLabel = syncInfo.mode === 'baidu-disk' ? '百度网盘' :
+                    syncInfo.mode === 'gist' ? 'Gist' : '未知';
+
+    var lastSyncStr = syncInfo.lastSync ? formatTimeAgo(syncInfo.lastSync) : '从未';
+
+    el.innerHTML = '☁️ ' + modeLabel + ' · ' + lastSyncStr;
+    el.title = '同步方式：' + modeLabel + '\n上次同步：' + (syncInfo.lastSync || '无');
+    el.style.color = 'var(--accent)';
+  }
+
+  function formatTimeAgo(isoStr) {
+    if (!isoStr) return '从未';
+    var diff = Date.now() - new Date(isoStr).getTime();
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    return Math.floor(diff / 86400000) + '天前';
+  }
+
+  /**
+   * 禁用云同步
+   */
+  function disableSync() {
+    syncInfo.enabled = false;
+    syncInfo.mode = null;
+    syncInfo.gistId = null;
+    syncInfo.gistToken = null;
+    syncDirHandle = null;
+    fileHandle = null;
+
+    localStorage.removeItem(SYNC_ENABLED_KEY);
+    localStorage.removeItem('cloudsync_mode');
+    localStorage.removeItem(GIST_ID_KEY);
+    localStorage.removeItem(GIST_TOKEN_KEY);
+    localStorage.removeItem('cloudsync_dir_path');
+
+    // 清除 IndexedDB 中的文件句柄
+    openDB().then(function(db) {
+      var tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete('syncDirHandle');
+      tx.oncomplete = function() { db.close(); };
+    }).catch(function() {});
+
+    updateSyncIndicator();
+    showToast('云同步已禁用');
+  }
+
+  /**
+   * 打开同步设置对话框
+   */
+  function openSyncSettings() {
+    var html = '<div style="max-width:420px;">' +
+      '<h3 style="margin:0 0 12px;font-size:16px;">☁️ 云同步设置</h3>';
+
+    if (syncInfo.enabled) {
+      html += '<div style="padding:8px 12px;background:var(--accent-light);border-radius:8px;margin-bottom:12px;font-size:12px;">' +
+        '🟢 已启用：' + (syncInfo.mode === 'baidu-disk' ? '百度网盘同步' : 'Gist 云同步') + '<br>' +
+        '上次同步：' + (syncInfo.lastSync ? new Date(syncInfo.lastSync).toLocaleString('zh-CN') : '从未') +
+        '</div>';
+    } else {
+      html += '<div style="padding:8px 12px;background:var(--surface3);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--text2);">' +
+        '⚪ 未配置同步。选择以下一种方式开始：</div>';
+    }
+
+    html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式一：百度网盘同步</b>（电脑端全自动，手机端手动导入）</p>' +
+      '<button class="btn btn-sm btn-primary" onclick="CloudSync.setupBaiduSync()" style="width:100%;margin-bottom:12px;">' +
+      '📁 选择百度网盘同步目录</button>';
+
+    html += '<p style="font-size:12px;color:var(--text2);margin:0 0 8px;"><b>方式二：Gist 云同步</b>（电脑手机全自动，需 GitHub Token）</p>' +
+      '<button class="btn btn-sm btn-info" onclick="CloudSync.setupGistSync()" style="width:100%;margin-bottom:4px;">' +
+      '🔑 设置 Gist 同步</button>';
+
+    if (syncInfo.enabled && syncInfo.mode === 'gist') {
+      html += '<div style="display:flex;gap:4px;margin-top:4px;">' +
+        '<button class="btn btn-sm btn-success" onclick="CloudSync.pushToGist()" style="flex:1;">📤 推送</button>' +
+        '<button class="btn btn-sm btn-info" onclick="CloudSync.pullFromGist()" style="flex:1;">📥 拉取</button>' +
+        '</div>';
+    }
+
+    if (syncInfo.enabled) {
+      html += '<button class="btn btn-sm btn-cancel" onclick="CloudSync.disableSync()" style="width:100%;margin-top:8px;">' +
+        '❌ 禁用云同步</button>';
+    }
+
+    html += '<p style="font-size:10px;color:var(--text3);margin:12px 0 0;line-height:1.5;">' +
+      '💡 <b>百度网盘模式：</b>电脑修改数据后自动保存到百度网盘同步目录，手机在百度网盘APP中下载JSON文件后导入。<br>' +
+      '💡 <b>Gist 模式：</b>数据存储在私密 GitHub Gist，两端自动同步。需创建 Gist + Personal Access Token（gist 权限）。' +
+      '</p>';
+
+    html += '</div>';
+
+    showModal('cloud-sync-modal', html, [
+      { text: '关闭', className: 'btn-cancel', action: closeModal }
+    ]);
+  }
+
+  // 简单模态框
+  function showModal(id, html, buttons) {
+    closeModal();
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = id;
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) closeModal();
+    });
+
+    var content = document.createElement('div');
+    content.className = 'modal-content';
+    content.innerHTML = html;
+
+    if (buttons && buttons.length > 0) {
+      var btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:16px;';
+      buttons.forEach(function(b) {
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm ' + (b.className || '');
+        btn.textContent = b.text;
+        btn.addEventListener('click', b.action);
+        btnRow.appendChild(btn);
+      });
+      content.appendChild(btnRow);
+    }
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+  }
+
+  function closeModal() {
+    var existing = document.querySelector('.modal-overlay');
+    if (existing) existing.remove();
+  }
+
+  // ============ 公开 API ============
+  return {
+    init: init,
+    onDataChanged: onDataChanged,
+    setupBaiduSync: setupBaiduSync,
+    importFromBaiduDisk: importFromBaiduDisk,
+    setupGistSync: setupGistSync,
+    pushToGist: pushToGist,
+    pullFromGist: pullFromGist,
+    disableSync: disableSync,
+    openSyncSettings: openSyncSettings,
+    updateSyncIndicator: updateSyncIndicator,
+    getSyncInfo: function() { return syncInfo; }
+  };
+})();

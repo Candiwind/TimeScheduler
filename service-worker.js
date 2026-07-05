@@ -27,6 +27,7 @@ const PRECACHE_ASSETS = [
   'js/bigtask.js',
   'js/daily-report.js',
   'js/source-editor.js',
+  'js/cloud-sync.js',
   'js/app.js',
   'manifest.json',
   'icon-192.png',

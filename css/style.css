@@ -1057,6 +1057,19 @@ kbd {
   background: var(--accent-light); color: var(--accent);
 }
 
+/* ============ Cloud Sync ============ */
+#cloud-sync-modal .modal-content { max-width: 440px; }
+#cloud-sync-modal h3 { margin: 0 0 12px; font-size: 16px; }
+#cloud-sync-modal .sync-status {
+  padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 12px;
+}
+#cloud-sync-modal .sync-status.active { background: var(--accent-light); }
+#cloud-sync-modal .sync-status.inactive { background: var(--surface3); color: var(--text2); }
+#cloud-sync-modal .sync-section-label {
+  font-size: 12px; color: var(--text2); margin: 0 0 4px;
+}
+#cloud-sync-modal .sync-section-label b { color: var(--text); }
+
 /* ============ Performance ============ */
 .quadrant-grid { contain: layout style; }
 .quadrant { contain: layout style paint; }

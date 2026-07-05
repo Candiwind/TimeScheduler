@@ -95,6 +95,10 @@ function saveDateData(date, quadrantData) {
   var all = loadAllData();
   all[date] = quadrantData;
   saveAllData(all);
+  // 通知云同步模块
+  if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+    CloudSync.onDataChanged();
+  }
 }
 
 // Deferred save: batches writes within the same event loop tick
@@ -109,6 +113,10 @@ function saveDateDataDeferred(date, quadrantData) {
       all[_deferredDateData.date] = _deferredDateData.data;
       saveAllData(all);
       _deferredDateData = null;
+      // 通知云同步模块
+      if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+        CloudSync.onDataChanged();
+      }
     }
     _deferredTimer = null;
   }, 0);

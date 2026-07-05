@@ -6,6 +6,9 @@ function initApp() {
   // 初始化源码编辑器（捕获原始页面源码）
   SourceEditor.init();
 
+  // 初始化云同步模块
+  CloudSync.init();
+
   // Restore saved view mode
   var savedViewMode = localStorage.getItem('quadrant_view_mode');
   if (savedViewMode === 'time' || savedViewMode === 'quadrant') {
@@ -153,6 +156,11 @@ function setupButtons() {
   });
 
   document.getElementById('btnDarkMode').addEventListener('click', toggleTheme);
+
+  // 云同步按钮
+  document.getElementById('btnCloudSync').addEventListener('click', function() {
+    CloudSync.openSyncSettings();
+  });
 
   // 源码编辑器按钮
   var btnSourceEditor = document.getElementById('btnSourceEditor');

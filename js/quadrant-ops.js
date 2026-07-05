@@ -6,15 +6,15 @@ function addTask(quadrantKey) {
   saveDateData(currentDate, data);
   renderQuadrantOnly(quadrantKey);
   setTimeout(function() {
-    var container = document.querySelector('#quadrant-' + quadrantKey + ' .quadrant-tasks');
-    if (container) {
-      var tasks = container.querySelectorAll('.task-item .task-text');
-      var last = tasks[tasks.length - 1];
-      if (last) {
-        startEdit(last, last.textContent, function(newVal) {
-          updateTaskText(quadrantKey, task.id, newVal);
-        });
-      }
+    // 用 task.id 精确定位新任务的 task-text，不能取 DOM 最后一个——
+    // 渲染排序为「未完成在前、已完成在后」，新任务(未完成)排在中间，
+    // 取最后一个会错误地命中已完成的旧任务。
+    var newEl = document.querySelector('#quadrant-' + quadrantKey + ' .quadrant-tasks .task-item[data-id="' + task.id + '"] .task-text');
+    if (newEl) {
+      startEdit(newEl, newEl.textContent, function(newVal) {
+        updateTaskText(quadrantKey, task.id, newVal);
+      });
+      newEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, 100);
 }

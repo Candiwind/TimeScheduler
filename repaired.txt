@@ -327,6 +327,11 @@
        三类条目布局完全一致。
    涉及文件：js/render.js / css/style.css
    验证：test/test-timeview-columns.js / test-timeview-distribution.js / test-timeview-grouping.js 全通过
+23. ✅ 修复添加新任务时编辑界面跳转到已完成任务的 bug：
+   addTask 原先取 DOM 最后一个 .task-text 进入编辑，但渲染排序为「未完成在前、已完成在后」，
+   新任务(未完成)排在中间，DOM 最后一个反而是已完成的旧任务——导致编辑框跳错对象。
+   改用 task.id 精确定位新任务的 task-text（data-id 选择器），并 scrollIntoView 滚到可视区。
+   涉及文件：js/quadrant-ops.js
 
 （暂无）
 

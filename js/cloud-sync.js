@@ -162,7 +162,10 @@ var CloudSync = (function() {
       _version: 2,
       _exportedAt: new Date().toISOString(),
       _source: 'quadrant-task-manager-cloudsync',
-      cachedDatesIndex: loadCacheIndex ? loadCacheIndex() : [],
+      cachedDatesIndex: (function() {
+        try { return JSON.parse(localStorage.getItem('quadrant_cached_dates_index') || '[]'); }
+        catch(e) { return []; }
+      })(),
       bigTasks: loadBigTasks ? loadBigTasks() : [],
       bigTaskCache: (function() {
         try { return JSON.parse(localStorage.getItem('quadrant_big_task_cache') || '[]'); }

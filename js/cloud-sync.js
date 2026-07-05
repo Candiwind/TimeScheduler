@@ -359,6 +359,8 @@ var CloudSync = (function() {
    * 推送数据到 Gist（需要 Token）
    */
   function pushToGist() {
+    console.log('[云同步] pushToGist 被调用');
+
     if (!syncInfo.gistId) {
       alert('请先设置 Gist 同步。');
       return;
@@ -368,6 +370,15 @@ var CloudSync = (function() {
       return;
     }
 
+    // 显示加载状态
+    var pushBtn = document.getElementById('btnGistPush');
+    var originalText = pushBtn ? pushBtn.textContent : '📤 推送';
+    if (pushBtn) {
+      pushBtn.disabled = true;
+      pushBtn.textContent = '⏳ 推送中...';
+    }
+    showToast('⏳ 正在推送到云端...');
+
     var data = exportAllData();
     var payload = {
       files: {}
@@ -376,6 +387,12 @@ var CloudSync = (function() {
       content: JSON.stringify(data, null, 2)
     };
 
+    console.log('[云同步] 开始 PATCH 请求...');
+
+    // 带超时的 fetch
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 15000);
+
     fetch('https://api.github.com/gists/' + syncInfo.gistId, {
       method: 'PATCH',
       headers: {
@@ -383,9 +400,12 @@ var CloudSync = (function() {
         'Content-Type': 'application/json',
         'Accept': 'application/vnd.github.v3+json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     }).then(function(res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      clearTimeout(timeoutId);
+      console.log('[云同步] 响应状态:', res.status);
+      if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' (Token无效)' : res.status === 404 ? ' (Gist不存在)' : ''));
       return res.json();
     }).then(function() {
       var now = new Date().toISOString();
@@ -393,9 +413,18 @@ var CloudSync = (function() {
       localStorage.setItem(LAST_SYNC_KEY, now);
       showToast('☁️ 数据已推送到云端');
       updateSyncIndicator();
+      console.log('[云同步] 推送成功');
     }).catch(function(err) {
-      console.error('推送失败:', err);
-      alert('推送失败：' + err.message + '\n请检查 Token 是否有效、是否有 gist 权限。');
+      clearTimeout(timeoutId);
+      var msg = err.name === 'AbortError' ? '请求超时（15秒），请检查网络连接' : err.message;
+      console.error('[云同步] 推送失败:', msg);
+      alert('推送失败：' + msg);
+    }).finally(function() {
+      // 恢复按钮
+      if (pushBtn) {
+        pushBtn.disabled = false;
+        pushBtn.textContent = originalText;
+      }
     });
   }
 
@@ -714,17 +743,19 @@ var CloudSync = (function() {
       'background:var(--surface);color:var(--text);margin-bottom:8px;box-sizing:border-box;">';
 
     // 连接按钮
-    html += '<button class="btn btn-sm btn-info" id="btnGistConnect" style="width:100%;margin-bottom:4px;">' +
+    html += '<button class="btn btn-sm btn-info" id="btnGistConnect" style="width:100%;margin-bottom:4px;" ' +
+      'onclick="var g=document.getElementById(\'gistIdInput\').value.trim();if(!g){alert(\'请输入Gist ID\');return;}var t=document.getElementById(\'gistTokenInput\').value.trim();CloudSync.setupGistSync(g,t);">' +
       '🔗 连接 Gist</button>';
     html += '<p style="font-size:10px;color:var(--text3);margin:0 0 14px;">' +
       '公开 Gist → 仅填 Gist ID 即可 · 私密 Gist → 还需填 Token</p>';
 
-    // 当前 Gist 模式的操作按钮
+    // 当前 Gist 模式的操作按钮（onclick 直接写在 HTML 里，比 addEventListener 更可靠）
     if (syncInfo.enabled && syncInfo.mode === 'gist') {
       var hasToken = syncInfo.gistToken;
       html += '<div style="display:flex;gap:4px;margin-top:4px;">' +
-        '<button class="btn btn-sm btn-success" id="btnGistPush" style="flex:1;"' + (hasToken ? '' : ' disabled') + '>📤 推送' + (hasToken ? '' : '(需Token)') + '</button>' +
-        '<button class="btn btn-sm btn-info" id="btnGistPull" style="flex:1;">📥 拉取</button>' +
+        '<button class="btn btn-sm btn-success" id="btnGistPush" style="flex:1;"' +
+        (hasToken ? ' onclick="CloudSync.pushToGist()"' : ' disabled') + '>📤 推送' + (hasToken ? '' : '(需Token)') + '</button>' +
+        '<button class="btn btn-sm btn-info" id="btnGistPull" style="flex:1;" onclick="CloudSync.pullFromGist()">📥 拉取</button>' +
         '</div>';
       if (!hasToken) {
         html += '<p style="font-size:10px;color:var(--text3);margin:4px 0 0;">⚠️ 当前为仅拉取模式，在上方填写 Token 后点"连接 Gist"即可推送</p>';
@@ -732,8 +763,8 @@ var CloudSync = (function() {
     }
 
     if (syncInfo.enabled) {
-      html += '<button class="btn btn-sm btn-cancel" id="btnGistDisable" style="width:100%;margin-top:8px;">' +
-        '❌ 禁用云同步</button>';
+      html += '<button class="btn btn-sm btn-cancel" id="btnGistDisable" style="width:100%;margin-top:8px;" ' +
+        'onclick="CloudSync.disableSync()">❌ 禁用云同步</button>';
     }
 
     html += '<p style="font-size:10px;color:var(--text3);margin:12px 0 0;line-height:1.5;">' +
@@ -747,38 +778,6 @@ var CloudSync = (function() {
       { text: '关闭', className: 'btn-cancel', action: closeModal }
     ]);
 
-    // 绑定按钮事件（innerHTML 的 onclick 在某些情况下不可靠，用 addEventListener 更稳）
-    setTimeout(function() {
-      var connectBtn = document.getElementById('btnGistConnect');
-      if (connectBtn) {
-        connectBtn.addEventListener('click', function() {
-          var gid = document.getElementById('gistIdInput').value.trim();
-          if (!gid) { alert('请输入 Gist ID'); return; }
-          var tok = document.getElementById('gistTokenInput').value.trim();
-          setupGistSync(gid, tok);
-        });
-      }
-
-      var pushBtn = document.getElementById('btnGistPush');
-      if (pushBtn) {
-        pushBtn.addEventListener('click', function() { CloudSync.pushToGist(); });
-      }
-
-      var pullBtn = document.getElementById('btnGistPull');
-      if (pullBtn) {
-        pullBtn.addEventListener('click', function() { CloudSync.pullFromGist(); });
-      }
-
-      var disableBtn = document.getElementById('btnGistDisable');
-      if (disableBtn) {
-        disableBtn.addEventListener('click', function() { CloudSync.disableSync(); });
-      }
-
-      var baiduBtn = document.querySelector('#cloud-sync-modal .btn-primary');
-      if (baiduBtn) {
-        baiduBtn.addEventListener('click', function() { CloudSync.setupBaiduSync(); });
-      }
-    }, 50);
   }
 
   // 简单模态框

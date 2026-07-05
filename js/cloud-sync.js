@@ -356,6 +356,65 @@ var CloudSync = (function() {
   }
 
   /**
+   * 诊断 Gist 连接：逐步检测问题出在哪一环
+   * 返回 "ok" 或错误描述
+   */
+  function diagnoseGistConnection(callback) {
+    var steps = [];
+    var report = function(msg) { steps.push(msg); console.log('[诊断]', msg); };
+
+    report('=== 开始诊断 Gist 连接 ===');
+
+    // 检查 1：配置
+    if (!syncInfo.gistId) { callback('未配置 Gist ID', steps); return; }
+    report('✓ Gist ID: ' + syncInfo.gistId);
+    if (!syncInfo.gistToken) { callback('未配置 Token（仅拉取模式无法推送）', steps); return; }
+    report('✓ Token: ' + syncInfo.gistToken.substring(0, 7) + '...');
+
+    // 检查 2：基本网络（GET api.github.com）
+    report('正在检测 api.github.com 连通性...');
+    fetch('https://api.github.com', { method: 'HEAD' }).then(function(res) {
+      report('✓ api.github.com 可达 (HTTP ' + res.status + ')');
+
+      // 检查 3：Gist 读取权限
+      report('正在检测 Gist 读取权限...');
+      return fetchGist(syncInfo.gistId, syncInfo.gistToken);
+    }).then(function(gist) {
+      report('✓ Gist 可读取 (' + (gist.description || '无描述') + ')');
+
+      // 检查 4：写入权限（最小测试）
+      report('正在检测 Gist 写入权限（发送空更新）...');
+      var testPayload = {
+        files: {}
+      };
+      testPayload.files[SYNC_FILE_NAME] = {
+        content: JSON.stringify({ _test: true, _timestamp: new Date().toISOString() }, null, 2)
+      };
+
+      return fetch('https://api.github.com/gists/' + syncInfo.gistId, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': 'token ' + syncInfo.gistToken,
+          'Accept': 'application/vnd.github+json'
+        },
+        body: JSON.stringify(testPayload)
+      }).then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' → Token 无效或权限不足' : res.status === 404 ? ' → Gist 不存在' : ''));
+        report('✓ Gist 写入成功 — 一切正常');
+
+        // 写入成功，回写原来的数据
+        report('诊断完成：所有检查通过，现在执行完整推送...');
+        return res.json().then(function() {
+          callback('ok', steps);
+        });
+      });
+    }).catch(function(err) {
+      report('✗ 失败: ' + err.message);
+      callback(err.message, steps);
+    });
+  }
+
+  /**
    * 推送数据到 Gist（需要 Token）
    */
   function pushToGist() {
@@ -375,56 +434,70 @@ var CloudSync = (function() {
     var originalText = pushBtn ? pushBtn.textContent : '📤 推送';
     if (pushBtn) {
       pushBtn.disabled = true;
-      pushBtn.textContent = '⏳ 推送中...';
+      pushBtn.textContent = '⏳ 诊断中...';
     }
-    showToast('⏳ 正在推送到云端...');
 
-    var data = exportAllData();
-    var payload = {
-      files: {}
-    };
-    payload.files[SYNC_FILE_NAME] = {
-      content: JSON.stringify(data, null, 2)
-    };
-
-    console.log('[云同步] 开始 PATCH 请求...');
-
-    // 带超时的 fetch
-    var controller = new AbortController();
-    var timeoutId = setTimeout(function() { controller.abort(); }, 15000);
-
-    fetch('https://api.github.com/gists/' + syncInfo.gistId, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': 'token ' + syncInfo.gistToken,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    }).then(function(res) {
-      clearTimeout(timeoutId);
-      console.log('[云同步] 响应状态:', res.status);
-      if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' (Token无效)' : res.status === 404 ? ' (Gist不存在)' : ''));
-      return res.json();
-    }).then(function() {
-      var now = new Date().toISOString();
-      syncInfo.lastSync = now;
-      localStorage.setItem(LAST_SYNC_KEY, now);
-      showToast('☁️ 数据已推送到云端');
-      updateSyncIndicator();
-      console.log('[云同步] 推送成功');
-    }).catch(function(err) {
-      clearTimeout(timeoutId);
-      var msg = err.name === 'AbortError' ? '请求超时（15秒），请检查网络连接' : err.message;
-      console.error('[云同步] 推送失败:', msg);
-      alert('推送失败：' + msg);
-    }).finally(function() {
-      // 恢复按钮
-      if (pushBtn) {
-        pushBtn.disabled = false;
-        pushBtn.textContent = originalText;
+    // 先跑诊断
+    diagnoseGistConnection(function(result, steps) {
+      if (result !== 'ok') {
+        // 诊断失败
+        var msg = '❌ 推送失败\n\n诊断报告：\n' + steps.join('\n') +
+                  '\n\n📋 建议排查：\n' +
+                  '1. 检查 Token 是否过期或被撤销\n' +
+                  '2. 确认 Token 勾选了 gist 权限\n' +
+                  '3. 确认 Gist 没有被删除\n' +
+                  '4. 检查防火墙/VPN 是否拦截了 PATCH 请求';
+        alert(msg);
+        if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = originalText; }
+        return;
       }
+
+      // 诊断通过，执行实际推送
+      if (pushBtn) pushBtn.textContent = '⏳ 推送中...';
+      showToast('⏳ 正在推送到云端...');
+
+      var data = exportAllData();
+      var payload = { files: {} };
+      payload.files[SYNC_FILE_NAME] = {
+        content: JSON.stringify(data, null, 2)
+      };
+
+      console.log('[云同步] 开始正式推送...');
+
+      var controller = new AbortController();
+      var timeoutId = setTimeout(function() { controller.abort(); }, 20000);
+
+      fetch('https://api.github.com/gists/' + syncInfo.gistId, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': 'token ' + syncInfo.gistToken,
+          'Accept': 'application/vnd.github+json'
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      }).then(function(res) {
+        clearTimeout(timeoutId);
+        console.log('[云同步] 推送响应:', res.status);
+        if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' (Token无效)' : ''));
+        return res.json();
+      }).then(function() {
+        var now = new Date().toISOString();
+        syncInfo.lastSync = now;
+        localStorage.setItem(LAST_SYNC_KEY, now);
+        showToast('☁️ 数据已推送到云端');
+        updateSyncIndicator();
+        console.log('[云同步] 推送成功');
+      }).catch(function(err) {
+        clearTimeout(timeoutId);
+        var msg = err.name === 'AbortError' ? '请求超时（20秒），请检查网络连接' : err.message;
+        console.error('[云同步] 推送失败:', msg);
+        alert('推送失败：' + msg);
+      }).finally(function() {
+        if (pushBtn) {
+          pushBtn.disabled = false;
+          pushBtn.textContent = originalText;
+        }
+      });
     });
   }
 

@@ -38,7 +38,7 @@ var CloudSync = (function() {
    * 初始化：恢复之前的同步配置
    */
   // 版本标记——用于排查浏览器是否缓存了旧代码
-  var CODE_VERSION = '2026-07-05-fix-loadCacheIndex';
+  var CODE_VERSION = '2026-07-05-fix-dateData-structure';
 
   function init() {
     console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
@@ -170,31 +170,31 @@ var CloudSync = (function() {
    * 导出全部业务数据
    */
   function exportAllData() {
+    // 关键修正：所有日期数据存在 quadrant_task_data 一个大对象里（loadAllData），
+    // 而非每个日期独立键。直接导出整个大对象。
+    var allDateData = {};
+    try {
+      allDateData = (typeof loadAllData === 'function') ? loadAllData() :
+                    JSON.parse(localStorage.getItem('quadrant_task_data') || '{}');
+    } catch(e) { allDateData = {}; }
+
     var exportObj = {
-      _version: 2,
+      _version: 3,  // v3: 修正 dateData 数据结构（从 quadrant_task_data 读取）
       _exportedAt: new Date().toISOString(),
       _source: 'quadrant-task-manager-cloudsync',
       cachedDatesIndex: (function() {
         try { return JSON.parse(localStorage.getItem('quadrant_cached_dates_index') || '[]'); }
         catch(e) { return []; }
       })(),
+      // 全部日期数据（{date: {I:[],II:[],III:[],IV:[]}}）
+      dateData: allDateData,
       bigTasks: loadBigTasks ? loadBigTasks() : [],
       bigTaskCache: (function() {
-        try { return JSON.parse(localStorage.getItem('quadrant_big_task_cache') || '[]'); }
+        try { return JSON.parse(localStorage.getItem('quadrant_big_tasks_cache') || '[]'); }
         catch(e) { return []; }
       })(),
-      principles: loadPrinciples ? loadPrinciples() : {},
-      dateData: {}
+      principles: loadPrinciples ? loadPrinciples() : {}
     };
-
-    // 遍历缓存日期，导出每个日期的象限数据
-    var dates = exportObj.cachedDatesIndex;
-    dates.forEach(function(date) {
-      try {
-        var raw = localStorage.getItem('quadrant_cached_' + date);
-        if (raw) exportObj.dateData[date] = JSON.parse(raw);
-      } catch(e) {}
-    });
 
     // 也加入未来任务池数据
     ['future', 'week', 'month'].forEach(function(pool) {
@@ -205,6 +205,8 @@ var CloudSync = (function() {
       } catch(e) {}
     });
 
+    console.log('[云同步] 导出数据：' + Object.keys(allDateData).length + ' 个日期，' +
+                exportObj.cachedDatesIndex.length + ' 个显式缓存');
     return exportObj;
   }
 
@@ -567,19 +569,40 @@ var CloudSync = (function() {
       return;
     }
 
-    var count = 0;
+    var dateCount = 0;
 
-    // 导入缓存日期索引
+    // 导入缓存日期索引（合并：保留本地独有的日期）
     if (data.cachedDatesIndex && data.cachedDatesIndex.length > 0) {
-      localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(data.cachedDatesIndex));
-      count += data.cachedDatesIndex.length;
+      try {
+        var localIdx = JSON.parse(localStorage.getItem('quadrant_cached_dates_index') || '[]');
+        var merged = localIdx.slice();
+        data.cachedDatesIndex.forEach(function(d) {
+          if (merged.indexOf(d) === -1) merged.push(d);
+        });
+        merged.sort();
+        localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(merged));
+      } catch(e) {}
     }
 
-    // 导入各日期的象限数据
+    // 关键修正：日期数据合并写入 quadrant_task_data 大对象（loadAllData/saveAllData）
+    // 策略：云端有的日期覆盖本地同名日期，本地独有的日期保留
     if (data.dateData) {
+      var existing = {};
+      try {
+        existing = (typeof loadAllData === 'function') ? loadAllData() :
+                   JSON.parse(localStorage.getItem('quadrant_task_data') || '{}');
+      } catch(e) { existing = {}; }
+
       Object.keys(data.dateData).forEach(function(date) {
-        localStorage.setItem('quadrant_cached_' + date, JSON.stringify(data.dateData[date]));
+        existing[date] = data.dateData[date];
+        dateCount++;
       });
+
+      if (typeof saveAllData === 'function') {
+        saveAllData(existing);
+      } else {
+        try { localStorage.setItem('quadrant_task_data', JSON.stringify(existing)); } catch(e) {}
+      }
     }
 
     // 导入未来任务池
@@ -603,7 +626,8 @@ var CloudSync = (function() {
       localStorage.setItem('quadrant_big_task_cache', JSON.stringify(data.bigTaskCache));
     }
 
-    console.log('[云同步] 已导入数据，缓存日期:', count);
+    console.log('[云同步] 已导入数据，合并 ' + dateCount + ' 个日期');
+    return true;
   }
 
   /**

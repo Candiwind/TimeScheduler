@@ -216,11 +216,17 @@
           if (newWorker) {
             newWorker.addEventListener('statechange', function() {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[PWA] 检测到新版本，刷新页面后生效');
+                console.log('[PWA] 检测到新版本，3秒后自动刷新生效');
+                // 新 SW 已就绪，强制刷新页面加载新代码
+                setTimeout(function() { window.location.reload(); }, 3000);
               }
             });
           }
         });
+        // 每次加载主动检查更新（绕过 24h 缓存）
+        if (reg.update) {
+          reg.update().catch(function() {});
+        }
       }).catch(function(err) {
         console.warn('[PWA] Service Worker 注册失败:', err);
       });

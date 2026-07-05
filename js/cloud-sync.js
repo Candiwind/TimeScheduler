@@ -37,7 +37,19 @@ var CloudSync = (function() {
   /**
    * 初始化：恢复之前的同步配置
    */
+  // 版本标记——用于排查浏览器是否缓存了旧代码
+  var CODE_VERSION = '2026-07-05-fix-loadCacheIndex';
+
   function init() {
+    console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
+    console.log('[云同步] 当前配置:', {
+      enabled: localStorage.getItem(SYNC_ENABLED_KEY) === '1',
+      mode: localStorage.getItem('cloudsync_mode'),
+      hasGistId: !!(localStorage.getItem(GIST_ID_KEY)),
+      hasToken: !!(localStorage.getItem(GIST_TOKEN_KEY)),
+      gistId: localStorage.getItem(GIST_ID_KEY) ? localStorage.getItem(GIST_ID_KEY).substring(0, 8) + '...' : null
+    });
+
     // 恢复配置
     syncInfo.enabled = localStorage.getItem(SYNC_ENABLED_KEY) === '1';
     syncInfo.mode = localStorage.getItem('cloudsync_mode') || null;

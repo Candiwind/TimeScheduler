@@ -669,23 +669,8 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 }
 .task-text:hover { color: var(--accent); }
 .task-checkbox { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
-/* 块内小任务 / 阶段 / 大任务子任务：统一分行模式——
-   checkbox+文字独占第一行（文字 pre-wrap 不定多行），操作图标按钮折到第二行 */
-.subtask-item,
-.subtask-stage-item,
-.task-item.is-bigtask-sub {
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-}
-.subtask-item > .task-left,
-.subtask-stage-item > .task-left,
-.task-item.is-bigtask-sub > .task-left {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-.subtask-item .task-text,
-.subtask-stage-item .stage-text,
+/* 大任务子任务桌面端：文字允许换行完整显示（保留换行符+自动断行）。
+   布局仍为紧凑单行，不强制按钮折行——分行模式仅手机端启用（见 @media）*/
 .is-bigtask-sub .task-text {
   white-space: pre-wrap;
   word-break: break-word;

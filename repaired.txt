@@ -316,15 +316,16 @@
    (3) 大任务子任务左侧加 accent 色条，便于识别归属。
    (4) 手机端 .task-text 统一改用 pre-wrap，换行符保留。
    涉及文件：js/render.js / css/style.css
-22. ✅ 大任务/小任务/阶段统一分行模式（图标一行，文字不定多行）：
+22. ✅ 大任务/小任务/阶段分行模式（仅手机端，桌面端保留紧凑原设计）：
    (1) createSubTaskElement / createStageElement / createStageElementForTask 给 checkbox+文字
        包进 <div class="task-left"> 容器，与 createTaskElement 结构统一（拖拽/事件/CSS 均不依赖
-       直接子结构，加容器零影响——已用 3 个时间视图回归测试验证）。
-   (2) 桌面端：.subtask-item / .subtask-stage-item / .task-item.is-bigtask-sub 统一 flex-wrap，
-       task-left 独占第一行（checkbox+文字，文字 pre-wrap 不定多行，保留换行符+自动断行），
-       操作图标按钮折到第二行靠右排列。
-   (3) 窄屏（≤600px）：同规则覆盖到 stage（task-left 虚线分隔 + 按钮均分 + 文字 pre-wrap），
-       三类条目布局完全一致。
+       直接子结构，加容器零影响——已用 3 个时间视图回归测试验证）。桌面端 task-left 默认 flex:1
+       保持紧凑单行；该容器只为手机端分行提供锚点。
+   (2) 手机端（@media ≤600px）：.subtask-item / .subtask-stage-item / .task-item flex-wrap，
+       task-left 独占第一行（checkbox+文字 pre-wrap 不定多行，虚线分隔），操作图标按钮折第二行均分。
+       三类条目（小任务/阶段/大任务子任务）布局完全一致。
+   (3) 桌面端：subtask-item / subtask-stage-item 维持原紧凑单行设计；仅大任务子任务(is-bigtask-sub)
+       的文字 pre-wrap 完整显示 + 左侧色条（便于识别归属），不强制折行。
    涉及文件：js/render.js / css/style.css
    验证：test/test-timeview-columns.js / test-timeview-distribution.js / test-timeview-grouping.js 全通过
 23. ✅ 修复添加新任务时编辑界面跳转到已完成任务的 bug：

@@ -232,47 +232,86 @@ var CloudSync = (function() {
    * - 拉取+推送：需要 Gist ID + Token，两端全自动
    */
   function setupGistSync() {
+    var existingToken = syncInfo.gistToken || '';
+    var tokenHint = existingToken ?
+      '（检测到已保存的 Token，将优先使用）\n\n' :
+      '（公开 Gist 无需 Token 即可拉取）\n\n';
+
     var gistId = prompt(
       '请输入 GitHub Gist ID：\n\n' +
       '如何获取？\n' +
       '1. 打开 gist.github.com\n' +
       '2. 创建一个新 Gist（建议设为 🔓公开，方便手机免 Token 读取）\n' +
       '3. 从浏览器地址栏复制 Gist ID（如 abc123def456）\n\n' +
+      tokenHint +
       '仅需拉取数据 → 输入 Gist ID 即可（Gist 须公开）\n' +
       '需要推送数据 → 还需输入 Token',
       syncInfo.gistId || '');
     if (!gistId) return;
 
-    // 先尝试无 Token 连接（验证 Gist 是否公开可读）
-    fetchGist(gistId, null).then(function(gistData) {
-      // Gist 公开可读，仅拉取模式
-      saveGistConfig(gistId, '', '仅拉取模式（公开Gist）');
-      showToast('✅ Gist 已连接（仅拉取模式）\n' +
-                '手机端无需 Token 即可自动同步\n\n' +
-                '如需在手机端也能推送数据，请再次设置并输入 Token。');
-      // 立即拉取一次
-      pullFromGist(false);
-    }).catch(function() {
-      // 公开读取失败，需要 Token
-      var token = prompt(
-        '该 Gist 为私密或不存在，需要 Token 才能访问。\n\n' +
-        'GitHub Personal Access Token 获取步骤：\n' +
-        '1. 打开 github.com/settings/tokens/new\n' +
-        '2. 勾选 gist 权限\n' +
-        '3. 生成后复制 Token\n\n' +
-        '请输入 Token：',
-        syncInfo.gistToken || '');
-      if (!token) return;
-
-      // 用 Token 重试
-      fetchGist(gistId, token).then(function() {
-        saveGistConfig(gistId, token, '完整模式（私密Gist）');
+    // 已有 Token → 优先用 Token（保留推送能力）
+    if (existingToken) {
+      fetchGist(gistId, existingToken).then(function() {
+        saveGistConfig(gistId, existingToken, '完整模式（已有Token）');
         showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
         pullFromGist(false);
-      }).catch(function(err) {
-        alert('连接失败：' + err.message + '\n请检查 Gist ID 和 Token 是否正确。');
+      }).catch(function() {
+        // Token 失效，提示重新输入
+        var newToken = prompt(
+          '已保存的 Token 失效，请重新输入。\n\n' +
+          'GitHub Personal Access Token 获取步骤：\n' +
+          '1. 打开 github.com/settings/tokens/new\n' +
+          '2. 勾选 gist 权限\n' +
+          '3. 生成后复制 Token\n\n' +
+          '或留空切换到仅拉取模式（需 Gist 为公开）：',
+          '');
+        if (newToken) {
+          fetchGist(gistId, newToken).then(function() {
+            saveGistConfig(gistId, newToken, '完整模式（新Token）');
+            showToast('✅ Gist 已连接（拉取+推送模式）');
+            pullFromGist(false);
+          }).catch(function(err) {
+            alert('连接失败：' + err.message);
+          });
+        } else {
+          // 用户留空，尝试公开模式
+          fetchGist(gistId, null).then(function() {
+            saveGistConfig(gistId, '', '仅拉取模式（公开Gist，Token已失效）');
+            showToast('⚠️ Token 已清除，当前为仅拉取模式\n手机端仍可免 Token 读取');
+            pullFromGist(false);
+          }).catch(function(err) {
+            alert('公开访问也失败：' + err.message + '\n请创建新 Token 后重试。');
+          });
+        }
       });
-    });
+    } else {
+      // 无 Token → 先试公开访问
+      fetchGist(gistId, null).then(function(gistData) {
+        saveGistConfig(gistId, '', '仅拉取模式（公开Gist）');
+        showToast('✅ Gist 已连接（仅拉取模式）\n' +
+                  '手机端无需 Token 即可自动同步\n\n' +
+                  '如需推送数据，请再次设置并输入 Token。');
+        pullFromGist(false);
+      }).catch(function() {
+        var token = prompt(
+          '该 Gist 为私密或不存在，需要 Token 才能访问。\n\n' +
+          'GitHub Personal Access Token 获取步骤：\n' +
+          '1. 打开 github.com/settings/tokens/new\n' +
+          '2. 勾选 gist 权限\n' +
+          '3. 生成后复制 Token\n\n' +
+          '请输入 Token：',
+          '');
+        if (!token) return;
+
+        fetchGist(gistId, token).then(function() {
+          saveGistConfig(gistId, token, '完整模式（私密Gist）');
+          showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
+          pullFromGist(false);
+        }).catch(function(err) {
+          alert('连接失败：' + err.message + '\n请检查 Gist ID 和 Token 是否正确。');
+        });
+      });
+    }
   }
 
   function saveGistConfig(gistId, token, desc) {

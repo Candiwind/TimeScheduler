@@ -38,7 +38,7 @@ var CloudSync = (function() {
    * 初始化：恢复之前的同步配置
    */
   // 版本标记——用于排查浏览器是否缓存了旧代码
-  var CODE_VERSION = '2026-07-05-mobile-layout-sync-direction';
+  var CODE_VERSION = '2026-07-06-sync-icon-indicator';
 
   function init() {
     console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
@@ -145,6 +145,7 @@ var CloudSync = (function() {
   function autoExportToDisk() {
     if (!syncDirHandle) return Promise.resolve();
 
+    setSyncIcon('syncing', '正在写入百度网盘...');
     var data = exportAllData();
 
     return syncDirHandle.getFileHandle(SYNC_FILE_NAME, { create: true }).then(function(fh) {
@@ -158,9 +159,10 @@ var CloudSync = (function() {
       syncInfo.lastSync = now;
       localStorage.setItem(LAST_SYNC_KEY, now);
       console.log('[云同步] 已写入百度网盘:', SYNC_FILE_NAME, now);
-      updateSyncIndicator();
+      setSyncIcon('idle');
     }).catch(function(err) {
       console.warn('[云同步] 写入失败:', err);
+      setSyncIcon('error', '写入网盘失败：' + err.message);
       // 权限可能过期，尝试恢复
       restoreFileHandle();
     });
@@ -454,6 +456,8 @@ var CloudSync = (function() {
       pushBtn.textContent = '⏳ 诊断中...';
     }
 
+    setSyncIcon('syncing', '正在检测连接...');
+
     // 先跑诊断
     diagnoseGistConnection(function(result, steps) {
       if (result !== 'ok') {
@@ -464,14 +468,15 @@ var CloudSync = (function() {
                   '2. 确认 Token 勾选了 gist 权限\n' +
                   '3. 确认 Gist 没有被删除\n' +
                   '4. 检查防火墙/VPN 是否拦截了 PATCH 请求';
+        setSyncIcon('error', '推送失败');
         alert(msg);
         if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = originalText; }
         return;
       }
 
       // 诊断通过，执行实际推送
+      setSyncIcon('syncing', '正在推送到云端...');
       if (pushBtn) pushBtn.textContent = '⏳ 推送中...';
-      showToast('⏳ 正在推送到云端...');
 
       var data = exportAllData();
       var payload = { files: {} };
@@ -501,13 +506,13 @@ var CloudSync = (function() {
         var now = new Date().toISOString();
         syncInfo.lastSync = now;
         localStorage.setItem(LAST_SYNC_KEY, now);
-        showToast('☁️ 数据已推送到云端');
-        updateSyncIndicator();
+        setSyncIcon('idle');
         console.log('[云同步] 推送成功');
       }).catch(function(err) {
         clearTimeout(timeoutId);
         var msg = err.name === 'AbortError' ? '请求超时（20秒），请检查网络连接' : err.message;
         console.error('[云同步] 推送失败:', msg);
+        setSyncIcon('error', '推送失败：' + msg);
         alert('推送失败：' + msg);
       }).finally(function() {
         if (pushBtn) {
@@ -524,6 +529,8 @@ var CloudSync = (function() {
   function pullFromGist(silent) {
     if (!syncInfo.gistId) return Promise.resolve(null);
 
+    if (!silent) setSyncIcon('syncing', '正在从云端拉取...');
+
     var headers = { 'Accept': 'application/vnd.github.v3+json' };
     if (syncInfo.gistToken) headers['Authorization'] = 'token ' + syncInfo.gistToken;
 
@@ -533,7 +540,10 @@ var CloudSync = (function() {
     }).then(function(gist) {
       var file = gist.files && gist.files[SYNC_FILE_NAME];
       if (!file || !file.content) {
-        if (!silent) alert('Gist 中未找到数据文件，请先在电脑端推送一次。');
+        if (!silent) {
+          setSyncIcon('error', 'Gist 中未找到数据文件');
+          alert('Gist 中未找到数据文件，请先在电脑端推送一次。');
+        }
         return null;
       }
 
@@ -543,7 +553,7 @@ var CloudSync = (function() {
       var now = new Date().toISOString();
       syncInfo.lastSync = now;
       localStorage.setItem(LAST_SYNC_KEY, now);
-      updateSyncIndicator();
+      if (!silent) setSyncIcon('idle');
 
       // 触发页面重新渲染
       refreshAllViews();
@@ -551,6 +561,7 @@ var CloudSync = (function() {
       return data;
     }).catch(function(err) {
       if (!silent) {
+        setSyncIcon('error', '拉取失败：' + err.message);
         alert('拉取失败：' + err.message);
       }
       console.error('[云同步] 拉取失败:', err.message);
@@ -756,13 +767,13 @@ var CloudSync = (function() {
   // ============ 同步状态指示器 ============
 
   function updateSyncIndicator() {
-    var el = document.getElementById('cloudSyncIndicator');
-    if (!el) return;
+    var btn = document.getElementById('btnCloudSync');
+    if (!btn) return;
 
     if (!syncInfo.enabled) {
-      el.innerHTML = '☁️ 未配置';
-      el.title = '点击配置云同步';
-      el.style.color = '';
+      btn.innerHTML = '☁️';
+      btn.title = '点击配置云同步';
+      btn.style.color = '';
       return;
     }
 
@@ -771,9 +782,33 @@ var CloudSync = (function() {
 
     var lastSyncStr = syncInfo.lastSync ? formatTimeAgo(syncInfo.lastSync) : '从未';
 
-    el.innerHTML = '☁️ ' + modeLabel + ' · ' + lastSyncStr;
-    el.title = '同步方式：' + modeLabel + '\n上次同步：' + (syncInfo.lastSync || '无');
-    el.style.color = 'var(--accent)';
+    btn.innerHTML = '☁️';
+    btn.title = '同步方式：' + modeLabel + '\n上次同步：' + lastSyncStr;
+    btn.style.color = 'var(--accent)';
+  }
+
+  /**
+   * 设置右上角同步图标状态（替代弹窗通知）
+   * @param {string} state - 'syncing' | 'idle' | 'error'
+   * @param {string} [hint] - 鼠标悬停提示文字
+   */
+  function setSyncIcon(state, hint) {
+    var btn = document.getElementById('btnCloudSync');
+    if (!btn) return;
+    if (state === 'syncing') {
+      btn.innerHTML = '⏳';
+      btn.title = hint || '正在同步...';
+      btn.style.opacity = '0.7';
+    } else if (state === 'error') {
+      btn.innerHTML = '⚠️';
+      btn.title = hint || '同步失败';
+      btn.style.color = '#e53935';
+      btn.style.opacity = '1';
+      setTimeout(function() { updateSyncIndicator(); }, 3000);
+    } else {
+      updateSyncIndicator();
+      btn.style.opacity = '1';
+    }
   }
 
   function formatTimeAgo(isoStr) {

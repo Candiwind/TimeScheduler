@@ -333,6 +333,16 @@
    新任务(未完成)排在中间，DOM 最后一个反而是已完成的旧任务——导致编辑框跳错对象。
    改用 task.id 精确定位新任务的 task-text（data-id 选择器），并 scrollIntoView 滚到可视区。
    涉及文件：js/quadrant-ops.js
+24. ✅ 云同步状态改为图标指示（替代弹窗通知）：
+   (1) 右上角同步按钮(btnCloudSync)兼任状态指示器：空闲时显示 ☁️，同步过程中变成 ⏳ 沙漏，
+       完成后恢复 ☁️ 云；失败时短暂显示 ⚠️（红色，3秒后自动恢复）。
+   (2) pushToGist / pullFromGist / autoExportToDisk 的推送/拉取/写入过程中调用 setSyncIcon('syncing')，
+       完成后调用 setSyncIcon('idle')，失败调用 setSyncIcon('error')——原先的成功 toast/alert 通知全部移除，
+       仅保留错误时的 alert（必须告知用户）。
+   (3) 对话框内推送按钮的独立 loading 状态保留（⏳ 诊断中... / ⏳ 推送中...），
+       与右上角全局图标互不冲突。
+   (4) 自动静默拉取(autoPullFromGist)不改图标，避免页面加载时打扰用户。
+   涉及文件：js/cloud-sync.js / service-worker.js
 
 （暂无）
 

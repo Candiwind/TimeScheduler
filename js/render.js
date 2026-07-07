@@ -1646,6 +1646,22 @@ function renderPlanPoolPanel() {
     });
   });
 
+  // Checkbox 勾选/取消勾选
+  listEl.querySelectorAll('.planpool-checkbox').forEach(function(cb) {
+    cb.addEventListener('change', function(e) {
+      e.stopPropagation();
+      var ftId = this.dataset.ftId;
+      var stId = this.dataset.stId;
+      var checked = this.checked;
+      if (stId) {
+        cfg.editSubFn(ftId, stId, 'completed', checked);
+      } else {
+        cfg.updateFn(ftId, { completed: checked });
+      }
+      renderPlanPoolPanel();
+    });
+  });
+
   listEl.querySelectorAll('.planpool-block-name').forEach(function(el) {
     el.addEventListener('dblclick', function(e) {
       e.stopPropagation();
@@ -1762,8 +1778,11 @@ function _renderPlanTaskHTML(ft) {
   var quadClass = ft.targetQuadrant ? ' set' : '';
   var today = new Date().toISOString().split('T')[0];
   var dateClass = (ft.scheduledDate && ft.scheduledDate === today) ? ' arrived' : '';
+  var isCompleted = ft.completed ? true : false;
+  var completedClass = isCompleted ? ' completed' : '';
 
-  return '<div class="planpool-item planpool-draggable" draggable="true" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '">' +
+  return '<div class="planpool-item planpool-draggable' + completedClass + '" draggable="true" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '">' +
+    '<input type="checkbox" class="planpool-checkbox" data-ft-id="' + ft.id + '"' + (isCompleted ? ' checked' : '') + '>' +
     '<span class="planpool-item-text" data-ft-id="' + ft.id + '" title="双击编辑内容">' + renderTaskText(ft.text || '新任务') + '</span>' +
     '<span class="planpool-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>' +
     '<span class="planpool-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>' +
@@ -1792,7 +1811,10 @@ function _renderPlanBlockHTML(ft) {
     ft.tasks.forEach(function(st) {
       var stDateDisplay = st.scheduledDate || '📅';
       var stQuadDisplay = QUADRANTS[st.targetQuadrant] ? QUADRANTS[st.targetQuadrant].icon : '';
-      h += '<div class="planpool-subtask-item planpool-draggable" draggable="true" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '">';
+      var stCompleted = st.completed ? true : false;
+      var stCompletedClass = stCompleted ? ' completed' : '';
+      h += '<div class="planpool-subtask-item planpool-draggable' + stCompletedClass + '" draggable="true" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '">';
+      h += '<input type="checkbox" class="planpool-checkbox" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '"' + (stCompleted ? ' checked' : '') + '>';
       h += '<span class="planpool-subtask-text" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="双击编辑内容">' + renderTaskText(st.text) + '</span>';
       h += '<span class="planpool-item-date pp-st-date" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.scheduledDate || '') + '" title="点击设定日期">' + stDateDisplay + '</span>';
       h += '<span class="planpool-item-quad pp-st-quad" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.targetQuadrant || '') + '" title="点击选择象限">' + (stQuadDisplay || '选择象限') + '</span>';
@@ -1842,6 +1864,7 @@ function _addPlanSubtask(poolKey, saveFn, ftId, text) {
       tasks[i].tasks.push({
         id: 'fst_' + generateId(),
         text: text,
+        completed: false,
         scheduledDate: '',
         targetQuadrant: ''
       });

@@ -26,6 +26,7 @@ function setupPlanPoolPanel() {
       id: (idPrefix[activePlanPool] || 'pt_') + generateId(),
       type: 'task',
       text: text,
+      completed: false,
       scheduledDate: '',
       targetQuadrant: ''
     };

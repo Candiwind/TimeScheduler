@@ -154,13 +154,13 @@ function buildDailyReportMd(date, data, stats) {
             ft.tasks.forEach(function(st) {
               var targetLabel = st.targetQuadrant ? ' → ' + ((QUADRANTS[st.targetQuadrant] || {}).name || st.targetQuadrant) : '';
               var dateLabel = st.scheduledDate ? ' 📅' + st.scheduledDate : '';
-              lines.push('  - ⬜ ' + (st.text || '') + targetLabel + dateLabel);
+              lines.push('  - ' + (st.completed ? '✅' : '⬜') + ' ' + (st.text || '') + targetLabel + dateLabel);
             });
           }
         } else {
           var targetLabel2 = ft.targetQuadrant ? ' → ' + ((QUADRANTS[ft.targetQuadrant] || {}).name || ft.targetQuadrant) : '';
           var dateLabel2 = ft.scheduledDate ? ' 📅' + ft.scheduledDate : '';
-          lines.push('- ⬜ ' + (ft.text || '') + targetLabel2 + dateLabel2);
+          lines.push('- ' + (ft.completed ? '✅' : '⬜') + ' ' + (ft.text || '') + targetLabel2 + dateLabel2);
         }
       });
     }
@@ -262,14 +262,14 @@ function buildDailyReportHtml(date, data, stats) {
             ft.tasks.forEach(function(st) {
               var targetLabel = st.targetQuadrant ? ' → ' + ((QUADRANTS[st.targetQuadrant] || {}).name || st.targetQuadrant) : '';
               var dateLabel = st.scheduledDate ? ' 📅' + st.scheduledDate : '';
-              h += '<li>⬜ ' + Util.escHtml(st.text || '') + targetLabel + dateLabel + '</li>';
+              h += '<li>' + (st.completed ? '✅' : '⬜') + ' ' + Util.escHtml(st.text || '') + targetLabel + dateLabel + '</li>';
             });
           }
           h += '</ul></li>';
         } else {
           var targetLabel2 = ft.targetQuadrant ? ' → ' + ((QUADRANTS[ft.targetQuadrant] || {}).name || ft.targetQuadrant) : '';
           var dateLabel2 = ft.scheduledDate ? ' 📅' + ft.scheduledDate : '';
-          h += '<li>⬜ ' + Util.escHtml(ft.text || '') + targetLabel2 + dateLabel2 + '</li>';
+          h += '<li>' + (ft.completed ? '✅' : '⬜') + ' ' + Util.escHtml(ft.text || '') + targetLabel2 + dateLabel2 + '</li>';
         }
       });
       h += '</ul>';

@@ -344,6 +344,15 @@
    (4) 自动静默拉取(autoPullFromGist)不改图标，避免页面加载时打扰用户。
    涉及文件：js/cloud-sync.js / service-worker.js
 
+25. ✅ 待办池任务添加勾选完成功能：
+   (1) 数据结构：plan pool 任务和 block 子任务新增 completed: false 字段。
+       新建入口（btnAddPlanTask / _addPlanSubtask）均已初始化，旧数据向后兼容（无 completed 字段默认为 false）。
+   (2) UI：待办池/周计划/月计划三个 tab 的任务行新增 checkbox（planpool-checkbox，15px，accent-color）。
+       勾选后行文字添加删除线 + opacity:0.55（与象限子任务完成态一致）。
+   (3) 事件：checkbox change 通过 cfg.updateFn(ftId, {completed}) / cfg.editSubFn(ftId, stId, 'completed') 保存。
+   (4) 日报：markdown 和 HTML 输出不再硬编码 ⬜，改为根据 completed 字段显示 ✅/⬜。
+   涉及文件：js/render.js / js/future.js / js/daily-report.js / css/style.css / service-worker.js
+
 （暂无）
 
 ────────────────────────────────────────

@@ -1005,6 +1005,18 @@ kbd {
 }
 .planpool-subtask-text:hover { color: var(--accent); }
 
+/* Plan pool checkbox */
+.planpool-checkbox {
+  width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent);
+  flex-shrink: 0;
+}
+/* Plan pool completed items */
+.planpool-item.completed .planpool-item-text,
+.planpool-subtask-item.completed .planpool-subtask-text {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
 .planpool-actions {
   display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;
   border-top: 1px solid var(--border);

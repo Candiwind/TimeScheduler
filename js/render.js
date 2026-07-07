@@ -1538,6 +1538,7 @@ var activePlanPool = 'future';
 var PLAN_POOL_CONFIGS = {
   future: {
     poolKey: FUTURE_TASK_KEY,
+    saveFn: saveFutureTasks,
     emptyText: '暂无待办任务，点击下方按钮添加。设定日期和象限后，到期自动加入日程表。',
     deleteConfirm: '确定删除该待办任务？',
     loadFn: loadFutureTasks,
@@ -1549,6 +1550,7 @@ var PLAN_POOL_CONFIGS = {
   },
   week: {
     poolKey: WEEK_TASK_KEY,
+    saveFn: saveWeekTasks,
     emptyText: '暂无周计划任务，点击下方按钮添加。设定日期和象限后，当周自动加入日程表。',
     deleteConfirm: '确定删除该周计划任务？',
     loadFn: loadWeekTasks,
@@ -1560,6 +1562,7 @@ var PLAN_POOL_CONFIGS = {
   },
   month: {
     poolKey: MONTH_TASK_KEY,
+    saveFn: saveMonthTasks,
     emptyText: '暂无月计划任务，点击下方按钮添加。设定日期和象限后，当月自动加入日程表。',
     deleteConfirm: '确定删除该月计划任务？',
     loadFn: loadMonthTasks,
@@ -1658,6 +1661,58 @@ function renderPlanPoolPanel() {
       } else {
         cfg.updateFn(ftId, { completed: checked });
       }
+      renderPlanPoolPanel();
+    });
+  });
+
+  // 划分阶段按钮
+  listEl.querySelectorAll('.planpool-split-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _splitPlanTaskStages(cfg.poolKey, cfg.saveFn, this.dataset.ftId);
+      renderPlanPoolPanel();
+    });
+  });
+
+  // 阶段 checkbox
+  listEl.querySelectorAll('.planpool-stage-checkbox').forEach(function(cb) {
+    cb.addEventListener('change', function(e) {
+      e.stopPropagation();
+      _togglePlanTaskStageComplete(cfg.poolKey, cfg.saveFn, this.dataset.ftId, this.dataset.stageId, this.checked);
+      renderPlanPoolPanel();
+    });
+  });
+
+  // 阶段文字双击编辑
+  listEl.querySelectorAll('.planpool-stage-text').forEach(function(el) {
+    el.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      var ftId = this.dataset.ftId;
+      var stageId = this.dataset.stageId;
+      startEdit(this, this.textContent, function(newVal) {
+        _updatePlanTaskStageText(cfg.poolKey, cfg.saveFn, ftId, stageId, newVal);
+        renderPlanPoolPanel();
+      });
+    });
+  });
+
+  // 阶段删除按钮
+  listEl.querySelectorAll('.planpool-stage-del-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _deletePlanTaskStage(cfg.poolKey, cfg.saveFn, this.dataset.ftId, this.dataset.stageId);
+      renderPlanPoolPanel();
+    });
+  });
+
+  // 添加阶段按钮
+  listEl.querySelectorAll('.planpool-add-stage-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var ftId = this.dataset.ftId;
+      var text = prompt('阶段名称：');
+      if (!text) return;
+      _addPlanTaskStage(cfg.poolKey, cfg.saveFn, ftId, text);
       renderPlanPoolPanel();
     });
   });
@@ -1779,15 +1834,39 @@ function _renderPlanTaskHTML(ft) {
   var today = new Date().toISOString().split('T')[0];
   var dateClass = (ft.scheduledDate && ft.scheduledDate === today) ? ' arrived' : '';
   var isCompleted = ft.completed ? true : false;
+  var hasStages = ft.stages && ft.stages.length > 0;
   var completedClass = isCompleted ? ' completed' : '';
+  var stagesClass = hasStages ? ' has-stages' : '';
 
-  return '<div class="planpool-item planpool-draggable' + completedClass + '" draggable="true" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '">' +
-    '<input type="checkbox" class="planpool-checkbox" data-ft-id="' + ft.id + '"' + (isCompleted ? ' checked' : '') + '>' +
-    '<span class="planpool-item-text" data-ft-id="' + ft.id + '" title="双击编辑内容">' + renderTaskText(ft.text || '新任务') + '</span>' +
-    '<span class="planpool-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>' +
-    '<span class="planpool-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>' +
-    '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>' +
-    '</div>';
+  var h = '<div class="planpool-item planpool-draggable' + completedClass + stagesClass + '" draggable="true" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '">';
+  // Checkbox：有阶段时禁用（自动派生），无阶段时正常勾选
+  h += '<input type="checkbox" class="planpool-checkbox" data-ft-id="' + ft.id + '"' + (isCompleted ? ' checked' : '') + (hasStages ? ' disabled style="pointer-events:none;opacity:0.5;"' : '') + '>';
+  h += '<span class="planpool-item-text" data-ft-id="' + ft.id + '" title="双击编辑内容">' + renderTaskText(ft.text || '新任务') + '</span>';
+  // 划分阶段按钮（仅无阶段时显示）
+  if (!hasStages) {
+    h += '<button class="split-stages-btn planpool-split-btn" data-ft-id="' + ft.id + '" title="划分阶段" style="width:22px;height:22px;flex-shrink:0;">📋</button>';
+  }
+  h += '<span class="planpool-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>';
+  h += '<span class="planpool-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>';
+  h += '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
+  h += '</div>';
+
+  // 阶段行容器
+  if (hasStages) {
+    h += '<div class="planpool-stages">';
+    ft.stages.forEach(function(stage) {
+      var stageCompleted = stage.completed ? ' completed' : '';
+      h += '<div class="planpool-stage-item' + stageCompleted + '" data-ft-id="' + ft.id + '" data-stage-id="' + stage.id + '">';
+      h += '<input type="checkbox" class="planpool-stage-checkbox" data-ft-id="' + ft.id + '" data-stage-id="' + stage.id + '"' + (stage.completed ? ' checked' : '') + '>';
+      h += '<span class="planpool-stage-text" data-ft-id="' + ft.id + '" data-stage-id="' + stage.id + '" title="双击编辑内容">' + renderTaskText(stage.text) + '</span>';
+      h += '<button class="planpool-stage-del-btn" data-ft-id="' + ft.id + '" data-stage-id="' + stage.id + '" title="删除阶段">&times;</button>';
+      h += '</div>';
+    });
+    h += '<button class="planpool-add-stage-btn" data-ft-id="' + ft.id + '">+ 阶段</button>';
+    h += '</div>';
+  }
+
+  return h;
 }
 
 function _renderPlanBlockHTML(ft) {
@@ -1870,6 +1949,99 @@ function _addPlanSubtask(poolKey, saveFn, ftId, text) {
       });
       saveFn(tasks);
       return;
+    }
+  }
+}
+
+// === Plan pool 阶段操作 ===
+
+function _splitPlanTaskStages(poolKey, saveFn, ftId) {
+  var tasks = loadPlanTasks(poolKey);
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === ftId) {
+      var ft = tasks[i];
+      if (ft.type === 'block') { alert('任务块不支持划分阶段，请对单个任务使用此功能'); return; }
+      if (!ft.text) { alert('请先输入任务内容'); return; }
+      if (ft.stages && ft.stages.length > 0) { alert('该任务已拆分为阶段'); return; }
+      var input = prompt('请输入阶段名称（用逗号分隔，如"设计,编码,测试"）：\n原任务名：' + (ft.text || ''));
+      if (!input) return;
+      var stageNames = input.split(/[,，]/).map(function(s) { return s.trim(); }).filter(Boolean);
+      if (stageNames.length < 2) { alert('请至少输入2个阶段名称'); return; }
+      ft.stages = stageNames.map(function(name) {
+        return { id: generateId(), text: name, completed: false, timeSlot: typeof getDefaultTimeSlot === 'function' ? getDefaultTimeSlot() : '' };
+      });
+      ft.completed = false;
+      saveFn(tasks);
+      return;
+    }
+  }
+}
+
+function _addPlanTaskStage(poolKey, saveFn, ftId, stageText) {
+  var tasks = loadPlanTasks(poolKey);
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === ftId) {
+      var ft = tasks[i];
+      if (!ft.stages) ft.stages = [];
+      ft.stages.push({
+        id: generateId(),
+        text: stageText,
+        completed: false,
+        timeSlot: typeof getDefaultTimeSlot === 'function' ? getDefaultTimeSlot() : ''
+      });
+      ft.completed = false;
+      saveFn(tasks);
+      return;
+    }
+  }
+}
+
+function _deletePlanTaskStage(poolKey, saveFn, ftId, stageId) {
+  if (!confirm('确定删除该阶段？')) return;
+  var tasks = loadPlanTasks(poolKey);
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === ftId) {
+      var ft = tasks[i];
+      ft.stages = (ft.stages || []).filter(function(s) { return s.id !== stageId; });
+      if (ft.stages.length === 0) {
+        delete ft.stages;
+        ft.completed = false;
+      } else {
+        ft.completed = ft.stages.every(function(s) { return s.completed; });
+      }
+      saveFn(tasks);
+      return;
+    }
+  }
+}
+
+function _togglePlanTaskStageComplete(poolKey, saveFn, ftId, stageId, completed) {
+  var tasks = loadPlanTasks(poolKey);
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === ftId && tasks[i].stages) {
+      for (var j = 0; j < tasks[i].stages.length; j++) {
+        if (tasks[i].stages[j].id === stageId) {
+          tasks[i].stages[j].completed = completed;
+          tasks[i].completed = tasks[i].stages.every(function(s) { return s.completed; });
+          saveFn(tasks);
+          return;
+        }
+      }
+    }
+  }
+}
+
+function _updatePlanTaskStageText(poolKey, saveFn, ftId, stageId, newText) {
+  var tasks = loadPlanTasks(poolKey);
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === ftId && tasks[i].stages) {
+      for (var j = 0; j < tasks[i].stages.length; j++) {
+        if (tasks[i].stages[j].id === stageId) {
+          tasks[i].stages[j].text = newText;
+          saveFn(tasks);
+          return;
+        }
+      }
     }
   }
 }

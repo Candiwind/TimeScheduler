@@ -1017,6 +1017,36 @@ kbd {
   opacity: 0.55;
 }
 
+/* Plan pool stages（待办池任务划分阶段） */
+.planpool-item.has-stages { flex-wrap: wrap; }
+.planpool-stages {
+  width: 100%; margin-top: 4px; padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+.planpool-stage-item {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 6px 3px 12px; font-size: 11px;
+  border-radius: 4px; transition: all var(--t);
+}
+.planpool-stage-item:hover { background: var(--accent-light); }
+.planpool-stage-checkbox { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); flex-shrink: 0; }
+.planpool-stage-text { flex: 1; color: var(--text2); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planpool-stage-item.completed .planpool-stage-text { text-decoration: line-through; opacity: 0.55; }
+.planpool-stage-del-btn {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--text3); font-size: 10px; cursor: pointer; border-radius: 3px;
+  padding: 0; display: inline-flex; align-items: center; justify-content: center;
+}
+.planpool-stage-del-btn:hover { color: #e53935; border-color: #e53935; }
+.planpool-add-stage-btn {
+  margin-left: auto; align-self: flex-start;
+  padding: 2px 7px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text3); font-size: 10px; cursor: pointer;
+  border-radius: 4px; transition: all var(--t); flex-shrink: 0;
+}
+.planpool-add-stage-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+
 .planpool-actions {
   display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;
   border-top: 1px solid var(--border);
@@ -1217,6 +1247,11 @@ kbd {
   .quadrant-add-btn, .split-stages-btn, .task-timeslot-btn { width: 48px; height: 48px; font-size: 18px; }
   .btn-icon { width: 48px; height: 48px; font-size: 20px; }
   .planpool-tab { padding: 6px 12px; font-size: 11px; min-height: 36px; }
+  /* 待办池阶段移动端适配 */
+  .planpool-stage-item { padding: 6px 8px 6px 14px; font-size: 12px; min-height: 40px; }
+  .planpool-stage-checkbox { width: 20px; height: 20px; }
+  .planpool-stage-del-btn { width: 32px; height: 32px; font-size: 14px; }
+  .planpool-add-stage-btn { padding: 4px 10px; font-size: 11px; min-height: 36px; }
   /* 源码编辑器移动端适配 */
   .source-editor-header { padding: 8px 10px; gap: 4px; }
   .source-editor-header-actions { gap: 2px; }

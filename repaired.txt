@@ -353,6 +353,21 @@
    (4) 日报：markdown 和 HTML 输出不再硬编码 ⬜，改为根据 completed 字段显示 ✅/⬜。
    涉及文件：js/render.js / js/future.js / js/daily-report.js / css/style.css / service-worker.js
 
+26. ✅ 待办池任务支持划分阶段：
+   (1) 数据函数：新增 _splitPlanTaskStages / _addPlanTaskStage / _deletePlanTaskStage /
+       _togglePlanTaskStageComplete / _updatePlanTaskStageText 五个通用函数，参数化 poolKey+saveFn，
+       与现有 plan pool 子任务函数风格一致。
+   (2) UI：任务行新增 📋 划分阶段按钮（split-stages-btn，无阶段时显示）；点击后弹出逗号分隔的阶段名输入框，
+       至少2个阶段名。阶段渲染为 planpool-stages 容器内的 planpool-stage-item 行（checkbox+文字+删除按钮），
+       底部有 + 阶段 按钮。有阶段时父 checkbox 禁用（自动派生：全阶段完成→父任务完成）。
+   (3) 事件：6 个新 selector 块（split-btn / stage-checkbox / stage-text dblclick / stage-del / add-stage），
+       全部通过 cfg.poolKey+cfg.saveFn 参数化，三个池共享同一套逻辑。
+   (4) PLAN_POOL_CONFIGS 新增 saveFn 字段，方便阶段操作统一引用。
+   (5) 样式：planpool-stages / planpool-stage-item（虚线分隔）/ planpool-stage-checkbox /
+       planpool-stage-text（完成态删除线）/ planpool-add-stage-btn，暗色模式自动适配（CSS变量），
+       移动端触摸目标 ≥36px。
+   涉及文件：js/render.js / css/style.css / service-worker.js
+
 （暂无）
 
 ────────────────────────────────────────

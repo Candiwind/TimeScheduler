@@ -367,6 +367,16 @@
        planpool-stage-text（完成态删除线）/ planpool-add-stage-btn，暗色模式自动适配（CSS变量），
        移动端触摸目标 ≥36px。
    涉及文件：js/render.js / css/style.css / service-worker.js
+27. ✅ 任务池 block 子任务支持划分阶段：
+   (1) 数据函数：新增 _splitPlanBlockSubStages / _addPlanBlockSubStage / _deletePlanBlockSubStage /
+       _togglePlanBlockSubStageComplete / _updatePlanBlockSubStageText 五个函数，导航到
+       tasks[i].tasks[j].stages，与 block 子任务数据结构匹配。
+   (2) UI：每个 block 子任务行新增 📋 划分阶段按钮（无阶段时显示），阶段渲染为 planpool-block-stages
+       容器（18px 额外缩进）。有阶段时父 checkbox 禁用，自动派生（全阶段完成→子任务完成）。
+   (3) 事件：5 个 stage 事件块（split/checkbox/text/del/add）全部通过 data-st-id 分流——存在时
+       调用 block 子任务版本函数，否则调用顶层任务版本。复用现有 CSS 类名、事件选择器。
+   (4) 样式：planpool-block-stages（padding-left:18px）确保阶段行与子任务文本视觉对齐。
+   涉及文件：js/render.js / css/style.css / service-worker.js
 
 （暂无）
 

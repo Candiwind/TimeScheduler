@@ -1046,6 +1046,10 @@ kbd {
   border-radius: 4px; transition: all var(--t); flex-shrink: 0;
 }
 .planpool-add-stage-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+/* Block 子任务阶段：额外缩进，与子任务行对齐 */
+.planpool-block-stages {
+  padding-left: 18px;
+}
 
 .planpool-actions {
   display: flex; gap: 8px; margin-top: 12px; padding-top: 10px;

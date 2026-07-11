@@ -1737,10 +1737,15 @@ function renderPlanPoolPanel() {
       var ftId = this.dataset.ftId;
       var stId = this.dataset.stId;
       var checked = this.checked;
-      if (stId) {
-        cfg.editSubFn(ftId, stId, 'completed', checked);
+      if (checked) {
+        // 完成 → 移入缓存
+        _extractAndCachePlanPoolItem(cfg.poolKey, cfg.saveFn, ftId, stId || null, 'completed');
       } else {
-        cfg.updateFn(ftId, { completed: checked });
+        if (stId) {
+          cfg.editSubFn(ftId, stId, 'completed', checked);
+        } else {
+          cfg.updateFn(ftId, { completed: checked });
+        }
       }
       renderPlanPoolPanel();
     });
@@ -1970,6 +1975,9 @@ function renderPlanPoolPanel() {
       setStageCollapsed(this.dataset.collapseId, nowHidden);
     });
   });
+
+  // 渲染计划池回收站
+  renderPlanPoolDeletedCache();
 }
 
 function switchPlanPoolTab(poolName) {
@@ -2126,14 +2134,7 @@ function _editPlanSubtaskField(poolKey, saveFn, ftId, stId, field, value) {
 }
 
 function _deletePlanSubtask(poolKey, saveFn, ftId, stId) {
-  var tasks = loadPlanTasks(poolKey);
-  for (var i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === ftId && tasks[i].tasks) {
-      tasks[i].tasks = tasks[i].tasks.filter(function(st) { return st.id !== stId; });
-      saveFn(tasks);
-      return;
-    }
-  }
+  _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, stId, 'deleted');
 }
 
 function _addPlanSubtask(poolKey, saveFn, ftId, text) {
@@ -2200,17 +2201,32 @@ function _addPlanTaskStage(poolKey, saveFn, ftId, stageText) {
 function _deletePlanTaskStage(poolKey, saveFn, ftId, stageId) {
   if (!confirm('确定删除该阶段？')) return;
   var tasks = loadPlanTasks(poolKey);
+  var cacheKey = getPlanPoolCacheKey(poolKey);
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].id === ftId) {
       var ft = tasks[i];
-      ft.stages = (ft.stages || []).filter(function(s) { return s.id !== stageId; });
-      if (ft.stages.length === 0) {
-        delete ft.stages;
-        ft.completed = false;
-      } else {
-        ft.completed = ft.stages.every(function(s) { return s.completed; });
+      var entry = null;
+      for (var j = 0; j < (ft.stages || []).length; j++) {
+        if (ft.stages[j].id === stageId) {
+          entry = {
+            id: stageId,
+            type: 'stage',
+            data: JSON.parse(JSON.stringify(ft.stages[j])),
+            parentInfo: { ftId: ftId, ftName: ft.text || ft.blockName || '' },
+            action: 'deleted',
+            timestamp: Date.now(),
+            pinned: false
+          };
+          ft.stages = ft.stages.filter(function(s) { return s.id !== stageId; });
+          break;
+        }
       }
-      saveFn(tasks);
+      if (entry) {
+        if (ft.stages.length === 0) { delete ft.stages; ft.completed = false; }
+        else { ft.completed = ft.stages.every(function(s) { return s.completed; }); }
+        saveFn(tasks);
+        addToCache(cacheKey, entry);
+      }
       return;
     }
   }
@@ -2225,6 +2241,10 @@ function _togglePlanTaskStageComplete(poolKey, saveFn, ftId, stageId, completed)
           tasks[i].stages[j].completed = completed;
           tasks[i].completed = tasks[i].stages.every(function(s) { return s.completed; });
           saveFn(tasks);
+          // 所有阶段完成 → 自动移入缓存
+          if (tasks[i].completed) {
+            _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, null, 'completed');
+          }
           return;
         }
       }
@@ -2297,15 +2317,34 @@ function _addPlanBlockSubStage(poolKey, saveFn, ftId, stId, stageText) {
 function _deletePlanBlockSubStage(poolKey, saveFn, ftId, stId, stageId) {
   if (!confirm('确定删除该阶段？')) return;
   var tasks = loadPlanTasks(poolKey);
+  var cacheKey = getPlanPoolCacheKey(poolKey);
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].id === ftId && tasks[i].tasks) {
       for (var j = 0; j < tasks[i].tasks.length; j++) {
         var st = tasks[i].tasks[j];
         if (st.id === stId && st.stages) {
-          st.stages = st.stages.filter(function(s) { return s.id !== stageId; });
-          if (st.stages.length === 0) { delete st.stages; st.completed = false; }
-          else { st.completed = st.stages.every(function(s) { return s.completed; }); }
-          saveFn(tasks);
+          var entry = null;
+          for (var k = 0; k < st.stages.length; k++) {
+            if (st.stages[k].id === stageId) {
+              entry = {
+                id: stageId,
+                type: 'stage',
+                data: JSON.parse(JSON.stringify(st.stages[k])),
+                parentInfo: { ftId: ftId, ftName: tasks[i].blockName || tasks[i].text || '', stId: stId, stName: st.text || '' },
+                action: 'deleted',
+                timestamp: Date.now(),
+                pinned: false
+              };
+              st.stages = st.stages.filter(function(s) { return s.id !== stageId; });
+              break;
+            }
+          }
+          if (entry) {
+            if (st.stages.length === 0) { delete st.stages; st.completed = false; }
+            else { st.completed = st.stages.every(function(s) { return s.completed; }); }
+            saveFn(tasks);
+            addToCache(cacheKey, entry);
+          }
           return;
         }
       }
@@ -2325,6 +2364,10 @@ function _togglePlanBlockSubStageComplete(poolKey, saveFn, ftId, stId, stageId, 
               st.stages[k].completed = completed;
               st.completed = st.stages.every(function(s) { return s.completed; });
               saveFn(tasks);
+              // 子任务所有阶段完成 → 自动移入缓存
+              if (st.completed) {
+                _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, stId, 'completed');
+              }
               return;
             }
           }
@@ -2478,6 +2521,149 @@ function renderPrinciplesPanel() {
       if (!confirm('删除该优先问题？')) return;
       deletePriorityProblem(this.dataset.ppid);
       renderPrinciplesPanel();
+    });
+  });
+
+  // 渲染依循删除缓存
+  renderPrinciplesDeletedCache();
+}
+
+// ============ Principles Deleted Cache Render ============
+function renderPrinciplesDeletedCache() {
+  var section = document.getElementById('principlesDeletedCache');
+  var listEl = document.getElementById('principlesDeletedCacheList');
+  var countEl = document.getElementById('principlesDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var entries = getCacheEntries(PRINCIPLES_DELETED_KEY);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  section.style.marginTop = '12px';
+
+  var typeLabels = { principle: '💎原则', priorityProblem: '⚠️优先问题' };
+  listEl.innerHTML = '';
+  entries.slice().reverse().forEach(function(e) {
+    var typeLabel = typeLabels[e.type] || e.type;
+    var name = e.data.text || '未命名';
+    var ts = e.deletedAt || e.timestamp;
+    var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+    var div = document.createElement('div');
+    div.className = 'deleted-cache-item';
+    div.innerHTML =
+      '<span class="deleted-type-tag">' + typeLabel + '</span> ' +
+      '<span class="deleted-cache-text">' + Util.escHtml(name) + '</span>' +
+      '<span class="deleted-cache-time">' + Util.escHtml(timeStr) + '</span>' +
+      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:6px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
+      '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复" style="width:22px;height:22px;font-size:11px;padding:0;margin-left:4px;">↩</button>' +
+      '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;margin-left:4px;">&times;</button>';
+    listEl.appendChild(div);
+  });
+
+  listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleCachePin(PRINCIPLES_DELETED_KEY, this.dataset.cacheId);
+      renderPrinciplesPanel();
+    });
+  });
+  listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (restorePrincipleFromDeletedCache(this.dataset.cacheId)) {
+        renderPrinciplesPanel();
+        Toast.show('已恢复删除的条目');
+      }
+    });
+  });
+  listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从回收站永久删除？将无法恢复。')) {
+        removeFromCache(PRINCIPLES_DELETED_KEY, this.dataset.cacheId);
+        renderPrinciplesPanel();
+      }
+    });
+  });
+}
+
+// ============ Plan Pool Deleted Cache Render ============
+function renderPlanPoolDeletedCache() {
+  var section = document.getElementById('planPoolDeletedCache');
+  var listEl = document.getElementById('planPoolDeletedCacheList');
+  var countEl = document.getElementById('planPoolDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var poolKey = (PLAN_POOL_CONFIGS[activePlanPool] || {}).poolKey;
+  if (!poolKey) return;
+  var cacheKey = getPlanPoolCacheKey(poolKey);
+  var entries = getCacheEntries(cacheKey);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  section.style.marginTop = '12px';
+
+  var typeLabels = { task: '📋任务', block: '📦任务块', subtask: '📎子任务', stage: '🔹阶段' };
+  var actionLabels = { completed: '✅已完成', deleted: '🗑️已删除' };
+  listEl.innerHTML = '';
+  entries.slice().reverse().forEach(function(e) {
+    var typeLabel = typeLabels[e.type] || e.type;
+    var actionLabel = actionLabels[e.action] || e.action;
+    var name = '';
+    if (e.type === 'block') name = e.data.blockName || '未命名';
+    else name = e.data.text || '未命名';
+    var parentStr = '';
+    if (e.parentInfo && e.parentInfo.ftName) parentStr = ' ← ' + e.parentInfo.ftName;
+    var ts = e.timestamp;
+    var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+    var div = document.createElement('div');
+    div.className = 'deleted-cache-item';
+    div.innerHTML =
+      '<span class="deleted-type-tag">' + typeLabel + '</span> ' +
+      '<span class="deleted-action-tag" style="font-size:10px;">' + actionLabel + '</span> ' +
+      '<span class="deleted-cache-text">' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></span>' +
+      '<span class="deleted-cache-time">' + Util.escHtml(timeStr) + '</span>' +
+      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:6px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
+      '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复到计划池" style="width:22px;height:22px;font-size:11px;padding:0;margin-left:4px;">↩</button>' +
+      '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;margin-left:4px;">&times;</button>';
+    listEl.appendChild(div);
+  });
+
+  listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleCachePin(cacheKey, this.dataset.cacheId);
+      renderPlanPoolPanel();
+    });
+  });
+  listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (restorePlanPoolFromCacheByKey(poolKey, this.dataset.cacheId)) {
+        renderPlanPoolPanel();
+        Toast.show('已恢复到计划池');
+      }
+    });
+  });
+  listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从回收站永久删除？将无法恢复。')) {
+        removeFromCache(cacheKey, this.dataset.cacheId);
+        renderPlanPoolPanel();
+      }
     });
   });
 }

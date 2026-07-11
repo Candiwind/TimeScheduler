@@ -395,6 +395,7 @@ function renderBigTaskPanel() {
 
   renderBigTaskPool();
   renderBigTaskCache();
+  renderBigTaskDeletedCache();
   flushArchiveToasts();
 }
 
@@ -461,6 +462,84 @@ function renderBigTaskCache() {
       e.stopPropagation();
       if (confirm('确定从缓存库永久删除该已完成大任务？')) {
         deleteBigTaskFromCache(this.dataset.cacheId);
+        renderBigTaskPanel();
+      }
+    });
+  });
+}
+
+// ============ Deleted Big Task Cache (回收站) ============
+function renderBigTaskDeletedCache() {
+  var section = document.getElementById('bigTaskDeletedCache');
+  var listEl = document.getElementById('bigTaskDeletedCacheList');
+  var countEl = document.getElementById('bigTaskDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var entries = getCacheEntries(BIG_TASKS_DELETED_KEY);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+
+  var typeLabels = { bigtask: '🏗️大任务', milestone: '📌里程碑', subtask: '📋子任务', stage: '🔹阶段' };
+  listEl.innerHTML = '';
+  // Newest first
+  entries.slice().reverse().forEach(function(e) {
+    var typeLabel = typeLabels[e.type] || e.type;
+    var name = '';
+    if (e.type === 'bigtask') name = e.data.name || '未命名';
+    else if (e.type === 'milestone') name = e.data.name || '未命名';
+    else if (e.type === 'subtask' || e.type === 'stage') name = e.data.text || '未命名';
+    var parentStr = '';
+    if (e.parentInfo) {
+      parentStr = ' ← ' + (e.parentInfo.bigTaskName || '');
+      if (e.parentInfo.milestoneName) parentStr += ' / ' + e.parentInfo.milestoneName;
+    }
+    var ts = e.deletedAt || e.timestamp;
+    var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+    var div = document.createElement('div');
+    div.className = 'bigtask-cache-item deleted-cache-item';
+    div.innerHTML =
+      '<span class="bigtask-cache-icon">🗑️</span>' +
+      '<div class="bigtask-cache-info">' +
+        '<div class="bigtask-cache-name"><span class="deleted-type-tag">' + typeLabel + '</span> ' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></div>' +
+        '<div class="bigtask-cache-meta">' + Util.escHtml(timeStr) + '</div>' +
+      '</div>' +
+      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-right:4px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
+      '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复到原位置" style="width:22px;height:22px;font-size:11px;padding:0;margin-right:4px;">↩</button>' +
+      '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;">&times;</button>';
+    listEl.appendChild(div);
+  });
+
+  // 置顶切换
+  listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleCachePin(BIG_TASKS_DELETED_KEY, this.dataset.cacheId);
+      renderBigTaskPanel();
+    });
+  });
+  // 恢复
+  listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (restoreBigTaskFromDeletedCache(this.dataset.cacheId)) {
+        renderBigTaskPanel();
+        Toast.show('已恢复删除的条目');
+      }
+    });
+  });
+  // 永久删除
+  listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从回收站永久删除？将无法恢复。')) {
+        removeFromCache(BIG_TASKS_DELETED_KEY, this.dataset.cacheId);
         renderBigTaskPanel();
       }
     });
@@ -1269,31 +1348,11 @@ function editSubtaskField(btId, msId, stId, field, value) {
 }
 
 function deleteMilestone(btId, msId) {
-  var tasks = loadBigTasks();
-  for (var i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === btId && tasks[i].milestones) {
-      tasks[i].milestones = tasks[i].milestones.filter(function(ms) { return ms.id !== msId; });
-      recalcBigTaskProgress(tasks[i]);
-      saveBigTasks(tasks);
-      return;
-    }
-  }
+  _extractAndCacheBigTaskItem(btId, msId, null, null);
 }
 
 function deleteSubtaskFromBigTask(btId, msId, stId) {
-  var tasks = loadBigTasks();
-  for (var i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === btId && tasks[i].milestones) {
-      for (var j = 0; j < tasks[i].milestones.length; j++) {
-        if (tasks[i].milestones[j].id === msId && tasks[i].milestones[j].tasks) {
-          tasks[i].milestones[j].tasks = tasks[i].milestones[j].tasks.filter(function(t) { return t.id !== stId; });
-          recalcBigTaskProgress(tasks[i]);
-          saveBigTasks(tasks);
-          return;
-        }
-      }
-    }
-  }
+  _extractAndCacheBigTaskItem(btId, msId, stId, null);
 }
 
 function addMilestoneToBigTask(btId, name) {

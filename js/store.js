@@ -211,34 +211,59 @@ function importCachedData(sourceDate, targetDate) {
 }
 
 // ============ Explicit Cache Index (only dates user clicked "缓存当前") ============
+// V2: 条目结构 [{date, label}]，label 为空时显示日期；向后兼容旧 string[] 格式
 var CACHE_INDEX_KEY = 'quadrant_cached_dates_index';
 
 function loadCachedDatesIndex() {
   try {
     var raw = localStorage.getItem(CACHE_INDEX_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    var arr = JSON.parse(raw);
+    // 向后兼容：string[] → [{date, label}][]
+    for (var i = 0; i < arr.length; i++) {
+      if (typeof arr[i] === 'string') {
+        arr[i] = { date: arr[i], label: '' };
+      }
+    }
+    return arr;
   } catch (e) {
     return [];
   }
 }
 
-function saveCachedDatesIndex(dates) {
+function saveCachedDatesIndex(entries) {
   try {
-    localStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(dates));
+    localStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(entries));
   } catch (e) { /* silently fail */ }
 }
 
 function markDateAsCached(date) {
   var cached = loadCachedDatesIndex();
-  if (cached.indexOf(date) === -1) {
-    cached.push(date);
-    cached.sort();
+  var exists = false;
+  for (var i = 0; i < cached.length; i++) {
+    if (cached[i].date === date) { exists = true; break; }
+  }
+  if (!exists) {
+    cached.push({ date: date, label: '' });
+    cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
     saveCachedDatesIndex(cached);
   }
 }
 
 function getCachedDates() {
+  return loadCachedDatesIndex().map(function(e) { return e.date; });
+}
+
+function getCachedDateEntries() {
   return loadCachedDatesIndex();
+}
+
+function updateCachedDateLabel(date, label) {
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].date === date) { entries[i].label = (label || '').trim(); break; }
+  }
+  saveCachedDatesIndex(entries);
 }
 
 // One-time migration: seed cache index with all existing dates for backward compat
@@ -246,9 +271,439 @@ function seedCacheIndexIfEmpty() {
   if (loadCachedDatesIndex().length === 0) {
     var allDates = getAllCachedDates();
     if (allDates.length > 0) {
-      saveCachedDatesIndex(allDates);
+      saveCachedDatesIndex(allDates.map(function(d) { return { date: d, label: '' }; }));
     }
   }
+}
+
+// ============ 通用回收站/删除缓存引擎 ============
+// 适用于大任务删除缓存、依循删除缓存、计划池完成/删除缓存
+var BIG_TASKS_DELETED_KEY = 'quadrant_big_tasks_deleted';
+var PRINCIPLES_DELETED_KEY = 'quadrant_principles_deleted';
+var FUTURE_TASKS_CACHE_KEY = 'quadrant_future_tasks_cache';
+var WEEK_TASKS_CACHE_KEY = 'quadrant_week_tasks_cache';
+var MONTH_TASKS_CACHE_KEY = 'quadrant_month_tasks_cache';
+var MAX_CACHE_ENTRIES = 10;
+
+function _loadGenericCache(cacheKey) {
+  try {
+    var raw = localStorage.getItem(cacheKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function _saveGenericCache(cacheKey, entries) {
+  try { localStorage.setItem(cacheKey, JSON.stringify(entries)); }
+  catch (e) { alert('存储空间不足'); }
+  if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+    CloudSync.onDataChanged();
+  }
+}
+
+// 向缓存添加条目。达到上限时：优先驱逐最旧的 unpinned 条目；全置顶则拒绝并返回 false
+function addToCache(cacheKey, entry, maxSize) {
+  var limit = maxSize || MAX_CACHE_ENTRIES;
+  var entries = _loadGenericCache(cacheKey);
+  entry.timestamp = entry.timestamp || Date.now();
+  entry.pinned = entry.pinned || false;
+  if (entries.length >= limit) {
+    var victimIdx = -1;
+    for (var i = 0; i < entries.length; i++) {
+      if (!entries[i].pinned) { victimIdx = i; break; }
+    }
+    if (victimIdx < 0) {
+      alert('缓存已满（' + limit + ' 条）且全部已置顶。请先取消置顶再操作。');
+      return false;
+    }
+    entries.splice(victimIdx, 1);
+  }
+  entries.push(entry);
+  _saveGenericCache(cacheKey, entries);
+  return true;
+}
+
+// 从缓存中永久删除条目
+function removeFromCache(cacheKey, id) {
+  var entries = _loadGenericCache(cacheKey);
+  var filtered = entries.filter(function(e) { return e.id !== id; });
+  if (filtered.length < entries.length) {
+    _saveGenericCache(cacheKey, filtered);
+    return true;
+  }
+  return false;
+}
+
+// 切换缓存条目的置顶状态
+function toggleCachePin(cacheKey, id) {
+  var entries = _loadGenericCache(cacheKey);
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) { entries[i].pinned = !entries[i].pinned; break; }
+  }
+  _saveGenericCache(cacheKey, entries);
+}
+
+// 获取缓存条目列表
+function getCacheEntries(cacheKey) {
+  return _loadGenericCache(cacheKey);
+}
+
+// ============ 计划池完成/删除 → 移入缓存 ============
+// 从计划池中查找并移出条目（任务/块/子任务），写入对应缓存
+// poolKey: FUTURE/WEEK/MONTH_TASK_KEY。返回被移除的条目副本，未找到返回 null
+function _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, stId, action) {
+  var tasks = loadPlanTasks(poolKey);
+  var cacheKey = _planPoolToCacheKey(poolKey);
+  var entry = null;
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === ftId) {
+      if (stId && tasks[i].tasks) {
+        // block 子任务
+        for (var j = 0; j < tasks[i].tasks.length; j++) {
+          if (tasks[i].tasks[j].id === stId) {
+            var removed = tasks[i].tasks.splice(j, 1)[0];
+            entry = {
+              id: stId,
+              type: 'subtask',
+              data: JSON.parse(JSON.stringify(removed)),
+              parentInfo: { ftId: ftId, ftName: tasks[i].blockName || tasks[i].text || '' },
+              action: action,
+              timestamp: Date.now(),
+              pinned: false
+            };
+            break;
+          }
+        }
+      } else if (!stId) {
+        // 任务/块本身
+        var removed2 = tasks.splice(i, 1)[0];
+        entry = {
+          id: ftId,
+          type: removed2.type || 'task',
+          data: JSON.parse(JSON.stringify(removed2)),
+          parentInfo: null,
+          action: action,
+          timestamp: Date.now(),
+          pinned: false
+        };
+      }
+      break;
+    }
+  }
+  if (entry) {
+    saveFn(tasks);
+    addToCache(cacheKey, entry);
+  }
+  return entry;
+}
+
+// 从计划池中提取已完成的条目（当 stage→all 完成 或 直接勾选完成 时）
+// 检查 entry.data 中所有 stages 是否完成，若完成则移入缓存
+function _maybeCompleteAndCachePlanPoolItem(poolKey, saveFn, ftId, stId) {
+  var tasks = loadPlanTasks(poolKey);
+  var cacheKey = _planPoolToCacheKey(poolKey);
+  var entry = null;
+  var shouldCache = false;
+
+  for (var i = 0; i < tasks.length; i++) {
+    var ft = tasks[i];
+    if (ft.id === ftId) {
+      if (stId && ft.tasks) {
+        // block 子任务完成检查
+        for (var j = 0; j < ft.tasks.length; j++) {
+          var st = ft.tasks[j];
+          if (st.id === stId) {
+            if (st.completed) {
+              // 子任务有阶段：所有阶段完成才算完成
+              if (st.stages && st.stages.length > 0) {
+                shouldCache = st.stages.every(function(s) { return s.completed; });
+              } else {
+                shouldCache = true; // 无阶段，直接完成
+              }
+              if (shouldCache) {
+                var removed = ft.tasks.splice(j, 1)[0];
+                entry = {
+                  id: stId,
+                  type: 'subtask',
+                  data: JSON.parse(JSON.stringify(removed)),
+                  parentInfo: { ftId: ftId, ftName: ft.blockName || ft.text || '' },
+                  action: 'completed',
+                  timestamp: Date.now(),
+                  pinned: false
+                };
+              }
+            }
+            break;
+          }
+        }
+      } else if (!stId) {
+        // 任务/块完成检查
+        if (ft.completed) {
+          if (ft.stages && ft.stages.length > 0) {
+            shouldCache = ft.stages.every(function(s) { return s.completed; });
+          } else {
+            shouldCache = true;
+          }
+          if (shouldCache) {
+            var removed2 = tasks.splice(i, 1)[0];
+            entry = {
+              id: ftId,
+              type: ft.type || 'task',
+              data: JSON.parse(JSON.stringify(removed2)),
+              parentInfo: null,
+              action: 'completed',
+              timestamp: Date.now(),
+              pinned: false
+            };
+          }
+        }
+      }
+      break;
+    }
+  }
+  if (entry) {
+    saveFn(tasks);
+    addToCache(cacheKey, entry);
+  }
+  return entry;
+}
+
+function _planPoolToCacheKey(poolKey) {
+  if (poolKey === FUTURE_TASK_KEY) return FUTURE_TASKS_CACHE_KEY;
+  if (poolKey === WEEK_TASK_KEY) return WEEK_TASKS_CACHE_KEY;
+  return MONTH_TASKS_CACHE_KEY;
+}
+
+// 从计划池缓存中恢复条目到池中
+function restorePlanPoolFromCache(poolKey, saveFn, cacheId) {
+  var cacheKey = _planPoolToCacheKey(poolKey);
+  var entries = _loadGenericCache(cacheKey);
+  var idx = -1;
+  for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { idx = i; break; } }
+  if (idx < 0) return false;
+  var entry = entries.splice(idx, 1)[0];
+  _saveGenericCache(cacheKey, entries);
+  // 恢复时清除 completed 状态（如果是因为完成而缓存的）
+  if (entry.data) {
+    entry.data.completed = false;
+    if (entry.data.stages) {
+      entry.data.stages.forEach(function(s) { s.completed = false; });
+    }
+  }
+  var tasks = loadPlanTasks(poolKey);
+  if (entry.type === 'subtask' && entry.parentInfo) {
+    // 恢复到对应 block 中
+    for (var j = 0; j < tasks.length; j++) {
+      if (tasks[j].id === entry.parentInfo.ftId && tasks[j].tasks) {
+        tasks[j].tasks.push(entry.data);
+        break;
+      }
+    }
+  } else {
+    tasks.push(entry.data);
+  }
+  saveFn(tasks);
+  return true;
+}
+
+// ============ 大任务删除缓存 ============
+function _extractAndCacheBigTaskItem(btId, msId, stId, stageId) {
+  var tasks = loadBigTasks();
+  var entry = null;
+  for (var i = 0; i < tasks.length; i++) {
+    if (tasks[i].id === btId) {
+      if (!msId && !stId && !stageId) {
+        // 删除整卡
+        var removed = tasks.splice(i, 1)[0];
+        entry = {
+          id: btId,
+          type: 'bigtask',
+          data: JSON.parse(JSON.stringify(removed)),
+          parentInfo: null,
+          deletedAt: Date.now(),
+          pinned: false
+        };
+      } else if (msId && !stId && !stageId && tasks[i].milestones) {
+        // 删除里程碑
+        for (var j = 0; j < tasks[i].milestones.length; j++) {
+          if (tasks[i].milestones[j].id === msId) {
+            var removedMs = tasks[i].milestones.splice(j, 1)[0];
+            entry = {
+              id: msId,
+              type: 'milestone',
+              data: JSON.parse(JSON.stringify(removedMs)),
+              parentInfo: { bigTaskId: btId, bigTaskName: tasks[i].name || '' },
+              deletedAt: Date.now(),
+              pinned: false
+            };
+            break;
+          }
+        }
+      } else if (msId && stId && !stageId && tasks[i].milestones) {
+        // 删除子任务
+        for (var k = 0; k < tasks[i].milestones.length; k++) {
+          if (tasks[i].milestones[k].id === msId && tasks[i].milestones[k].tasks) {
+            for (var l = 0; l < tasks[i].milestones[k].tasks.length; l++) {
+              if (tasks[i].milestones[k].tasks[l].id === stId) {
+                var removedSt = tasks[i].milestones[k].tasks.splice(l, 1)[0];
+                entry = {
+                  id: stId,
+                  type: 'subtask',
+                  data: JSON.parse(JSON.stringify(removedSt)),
+                  parentInfo: { bigTaskId: btId, bigTaskName: tasks[i].name || '', milestoneId: msId, milestoneName: tasks[i].milestones[k].name || '' },
+                  deletedAt: Date.now(),
+                  pinned: false
+                };
+                break;
+              }
+            }
+            break;
+          }
+        }
+      } else if (msId && stId && stageId && tasks[i].milestones) {
+        // 删除阶段
+        for (var m = 0; m < tasks[i].milestones.length; m++) {
+          if (tasks[i].milestones[m].id === msId && tasks[i].milestones[m].tasks) {
+            for (var n = 0; n < tasks[i].milestones[m].tasks.length; n++) {
+              var t = tasks[i].milestones[m].tasks[n];
+              if (t.id === stId && t.stages) {
+                for (var p = 0; p < t.stages.length; p++) {
+                  if (t.stages[p].id === stageId) {
+                    var removedStage = t.stages.splice(p, 1)[0];
+                    entry = {
+                      id: stageId,
+                      type: 'stage',
+                      data: JSON.parse(JSON.stringify(removedStage)),
+                      parentInfo: { bigTaskId: btId, bigTaskName: tasks[i].name || '', milestoneId: msId, milestoneName: tasks[i].milestones[m].name || '', subtaskId: stId, subtaskName: t.text || '' },
+                      deletedAt: Date.now(),
+                      pinned: false
+                    };
+                    if (t.stages.length === 0) { delete t.stages; t.completed = false; }
+                    else { t.completed = t.stages.every(function(s) { return s.completed; }); }
+                    break;
+                  }
+                }
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+      break;
+    }
+  }
+  if (entry) {
+    // 整卡删除时 tasks[i] 已指向下一个元素，不 recalc
+    if (msId) {
+      // 里程碑/子任务/阶段删除：重新计算所属大任务的进度
+      for (var bi = 0; bi < tasks.length; bi++) {
+        if (tasks[bi].id === btId) { recalcBigTaskProgress(tasks[bi]); break; }
+      }
+    }
+    saveBigTasks(tasks);
+    addToCache(BIG_TASKS_DELETED_KEY, entry);
+  }
+  return entry;
+}
+
+// 从大任务删除缓存恢复条目
+function restoreBigTaskFromDeletedCache(cacheId) {
+  var entries = _loadGenericCache(BIG_TASKS_DELETED_KEY);
+  var idx = -1;
+  for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { idx = i; break; } }
+  if (idx < 0) return false;
+  var entry = entries.splice(idx, 1)[0];
+  _saveGenericCache(BIG_TASKS_DELETED_KEY, entries);
+  var tasks = loadBigTasks();
+  if (entry.type === 'bigtask') {
+    tasks.push(entry.data);
+    saveBigTasks(tasks);
+  } else if (entry.parentInfo && entry.parentInfo.bigTaskId) {
+    // 里程碑/子任务/阶段：恢复到原大任务中
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === entry.parentInfo.bigTaskId) {
+        if (entry.type === 'milestone') {
+          if (!tasks[i].milestones) tasks[i].milestones = [];
+          tasks[i].milestones.push(entry.data);
+        } else if (entry.type === 'subtask') {
+          for (var j = 0; j < (tasks[i].milestones || []).length; j++) {
+            if (tasks[i].milestones[j].id === entry.parentInfo.milestoneId) {
+              if (!tasks[i].milestones[j].tasks) tasks[i].milestones[j].tasks = [];
+              tasks[i].milestones[j].tasks.push(entry.data);
+              break;
+            }
+          }
+        } else if (entry.type === 'stage') {
+          for (var k = 0; k < (tasks[i].milestones || []).length; k++) {
+            if (tasks[i].milestones[k].id === entry.parentInfo.milestoneId && tasks[i].milestones[k].tasks) {
+              for (var l = 0; l < tasks[i].milestones[k].tasks.length; l++) {
+                if (tasks[i].milestones[k].tasks[l].id === entry.parentInfo.subtaskId) {
+                  if (!tasks[i].milestones[k].tasks[l].stages) tasks[i].milestones[k].tasks[l].stages = [];
+                  tasks[i].milestones[k].tasks[l].stages.push(entry.data);
+                  break;
+                }
+              }
+              break;
+            }
+          }
+        }
+        recalcBigTaskProgress(tasks[i]);
+        break;
+      }
+    }
+    saveBigTasks(tasks);
+  } else {
+    return false; // 无法恢复（parentInfo 缺失）
+  }
+  return true;
+}
+
+// ============ 依循删除缓存 ============
+function _extractAndCachePrinciple(id, type) {
+  var data = loadPrinciples();
+  var entry = null;
+  if (type === 'principle') {
+    for (var i = 0; i < data.principles.length; i++) {
+      if (data.principles[i].id === id) {
+        var removed = data.principles.splice(i, 1)[0];
+        entry = { id: id, type: 'principle', data: JSON.parse(JSON.stringify(removed)), deletedAt: Date.now(), pinned: false };
+        break;
+      }
+    }
+  } else if (type === 'priorityProblem') {
+    if (!data.priorityProblems) data.priorityProblems = [];
+    for (var j = 0; j < data.priorityProblems.length; j++) {
+      if (data.priorityProblems[j].id === id) {
+        var removed2 = data.priorityProblems.splice(j, 1)[0];
+        entry = { id: id, type: 'priorityProblem', data: JSON.parse(JSON.stringify(removed2)), deletedAt: Date.now(), pinned: false };
+        break;
+      }
+    }
+  }
+  if (entry) {
+    savePrinciples(data);
+    addToCache(PRINCIPLES_DELETED_KEY, entry);
+  }
+  return entry;
+}
+
+// 从依循删除缓存恢复条目
+function restorePrincipleFromDeletedCache(cacheId) {
+  var entries = _loadGenericCache(PRINCIPLES_DELETED_KEY);
+  var idx = -1;
+  for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { idx = i; break; } }
+  if (idx < 0) return false;
+  var entry = entries.splice(idx, 1)[0];
+  _saveGenericCache(PRINCIPLES_DELETED_KEY, entries);
+  var data = loadPrinciples();
+  if (entry.type === 'principle') {
+    data.principles.push(entry.data);
+  } else if (entry.type === 'priorityProblem') {
+    if (!data.priorityProblems) data.priorityProblems = [];
+    data.priorityProblems.push(entry.data);
+  }
+  savePrinciples(data);
+  return true;
 }
 
 function generateId() {
@@ -572,13 +1027,7 @@ function updateBigTask(id, updates) {
 }
 
 function deleteBigTask(id) {
-  var tasks = loadBigTasks();
-  var filtered = tasks.filter(function(t) { return t.id !== id; });
-  if (filtered.length < tasks.length) {
-    saveBigTasks(filtered);
-    return true;
-  }
-  return false;
+  return !!_extractAndCacheBigTaskItem(id, null, null, null);
 }
 
 // Recalculate overall progress: equal-weight per subtask (or per stage if staged)
@@ -756,23 +1205,27 @@ function updateBigSubtaskStageText(bigTaskId, subtaskId, stageId, newText) {
 
 function deleteBigSubtaskStage(bigTaskId, subtaskId, stageId) {
   if (!confirm('确定删除该阶段？')) return;
+  // 查找子任务所在的里程碑ID
   var tasks = loadBigTasks();
+  var msId = null;
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].id === bigTaskId && tasks[i].milestones) {
-      tasks[i].milestones.forEach(function(ms) {
-        if (ms.tasks) {
-          ms.tasks.forEach(function(t) {
-            if (t.id === subtaskId && t.stages) {
-              t.stages = t.stages.filter(function(s) { return s.id !== stageId; });
-              if (t.stages.length === 0) { delete t.stages; t.completed = false; }
-              else { t.completed = t.stages.every(function(s) { return s.completed; }); }
+      for (var j = 0; j < tasks[i].milestones.length; j++) {
+        if (tasks[i].milestones[j].tasks) {
+          for (var k = 0; k < tasks[i].milestones[j].tasks.length; k++) {
+            if (tasks[i].milestones[j].tasks[k].id === subtaskId) {
+              msId = tasks[i].milestones[j].id;
+              break;
             }
-          });
+          }
+          if (msId) break;
         }
-      });
+      }
+      break;
     }
   }
-  saveBigTasks(tasks);
+  if (!msId) return;
+  _extractAndCacheBigTaskItem(bigTaskId, msId, subtaskId, stageId);
   renderBigTaskPanel();
 }
 
@@ -903,13 +1356,17 @@ function updatePlanTask(poolKey, id, updates) {
 }
 
 function deletePlanTask(poolKey, id) {
-  var tasks = loadPlanTasks(poolKey);
-  var filtered = tasks.filter(function(t) { return t.id !== id; });
-  if (filtered.length < tasks.length) {
-    savePlanTasks(poolKey, filtered);
-    return true;
-  }
-  return false;
+  return !!_extractAndCachePlanPoolItem(poolKey, savePlanTasks.bind(null, poolKey), id, null, 'deleted');
+}
+
+// Convenience aliases for plan pool cache key lookup
+function getPlanPoolCacheKey(poolKey) { return _planPoolToCacheKey(poolKey); }
+function restorePlanPoolFromCacheByKey(poolKey, cacheId) {
+  var saveFn;
+  if (poolKey === FUTURE_TASK_KEY) saveFn = saveFutureTasks;
+  else if (poolKey === WEEK_TASK_KEY) saveFn = saveWeekTasks;
+  else saveFn = saveMonthTasks;
+  return restorePlanPoolFromCache(poolKey, saveFn, cacheId);
 }
 
 // Convenience aliases for future tasks (backward compat)
@@ -1240,9 +1697,7 @@ function updatePrinciple(id, text) {
 }
 
 function deletePrinciple(id) {
-  var data = loadPrinciples();
-  data.principles = data.principles.filter(function(p) { return p.id !== id; });
-  savePrinciples(data);
+  return !!_extractAndCachePrinciple(id, 'principle');
 }
 
 function updatePrinciplesDateRange(startDate, endDate) {
@@ -1273,10 +1728,7 @@ function updatePriorityProblem(id, text) {
 }
 
 function deletePriorityProblem(id) {
-  var data = loadPrinciples();
-  if (!data.priorityProblems) return;
-  data.priorityProblems = data.priorityProblems.filter(function(p) { return p.id !== id; });
-  savePrinciples(data);
+  return !!_extractAndCachePrinciple(id, 'priorityProblem');
 }
 
 // ============ Stages Collapse State Module ============

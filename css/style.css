@@ -1549,3 +1549,205 @@ kbd {
     margin-right: 4px;
   }
 }
+
+/* ===== 缓存回收站面板（大任务/依循/计划池通用） ===== */
+.deleted-cache-section {
+  border-top: 1px solid var(--border, #e0e0e0);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.deleted-cache-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2, #666);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.deleted-cache-header:hover {
+  color: var(--text, #333);
+}
+
+.deleted-cache-toggle-icon {
+  font-size: 11px;
+  transition: transform 0.2s;
+}
+
+.deleted-cache-body {
+  margin-top: 6px;
+}
+
+.deleted-cache-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin: 2px 0;
+  border-radius: 4px;
+  background: var(--bg-secondary, #f5f5f5);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.deleted-cache-item:hover {
+  background: var(--bg-hover, #e8e8e8);
+}
+
+.deleted-type-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-tertiary, #e0e0e0);
+  color: var(--text2, #666);
+  flex-shrink: 0;
+}
+
+.deleted-action-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  background: #27ae60;
+  color: #fff;
+}
+
+.deleted-action-tag[style*="deleted"],
+.deleted-cache-item .deleted-action-tag {
+  /* 删除操作标签 */
+}
+
+.deleted-cache-item .deleted-action-tag:empty {
+  display: none;
+}
+
+.deleted-cache-text {
+  flex: 1;
+  min-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleted-cache-time {
+  color: var(--text-muted, #999);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.dc-pin-btn, .dc-restore-btn {
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 3px;
+  background: var(--bg, #fff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dc-pin-btn:hover, .dc-restore-btn:hover {
+  background: var(--bg-hover, #e8e8e8);
+  border-color: var(--primary, #4a90d9);
+}
+
+/* 导入缓存 UI：可编辑名称标签 */
+.cache-entry-label {
+  cursor: text;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+
+.cache-entry-label:hover {
+  border-bottom-color: var(--primary, #4a90d9);
+}
+
+.cache-entry-btns {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.cache-entry-btns .btn {
+  flex-shrink: 0;
+}
+
+/* ===== 暗色模式 ===== */
+[data-theme="dark"] .deleted-cache-section {
+  border-top-color: var(--border, #444);
+}
+
+[data-theme="dark"] .deleted-cache-item {
+  background: var(--bg-secondary, #2a2a2a);
+}
+
+[data-theme="dark"] .deleted-cache-item:hover {
+  background: var(--bg-hover, #333);
+}
+
+[data-theme="dark"] .deleted-type-tag {
+  background: var(--bg-tertiary, #3a3a3a);
+  color: var(--text2, #aaa);
+}
+
+[data-theme="dark"] .deleted-cache-header {
+  color: var(--text2, #aaa);
+}
+
+[data-theme="dark"] .deleted-cache-header:hover {
+  color: var(--text, #eee);
+}
+
+[data-theme="dark"] .dc-pin-btn,
+[data-theme="dark"] .dc-restore-btn {
+  background: var(--bg-secondary, #2a2a2a);
+  border-color: var(--border, #444);
+  color: var(--text2, #aaa);
+}
+
+[data-theme="dark"] .dc-pin-btn:hover,
+[data-theme="dark"] .dc-restore-btn:hover {
+  background: var(--bg-hover, #333);
+  border-color: var(--primary, #5b9bd5);
+}
+
+/* ===== 移动端适配 ===== */
+@media (max-width: 600px) {
+  .deleted-cache-item {
+    font-size: 11px;
+    gap: 4px;
+    padding: 6px 4px;
+  }
+
+  .deleted-cache-text {
+    min-width: 40px;
+    font-size: 11px;
+  }
+
+  .dc-pin-btn, .dc-restore-btn {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 13px !important;
+  }
+
+  .deleted-cache-item .task-delete-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 16px !important;
+  }
+
+  .cache-entry-btns .btn {
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+
+  .cache-entry-label {
+    font-size: 13px;
+  }
+}

@@ -533,6 +533,43 @@
     js/app.js / js/source-editor.js / service-worker.js / index.html /
     test/test-cloudsync-merge.js（新增）/ test/test-cloudsync-store-keys.js（新增）
 
+63. ✅ 缓存系统增强——回收站机制：大任务/依循/计划池的删除和完成操作
+    不再永久删除，而是移入回收站缓存，支持置顶保护和恢复。
+
+    【导入缓存UI升级】
+    - 缓存日期索引从 string[] 升级为 [{date, label}][]，向后兼容自动迁移
+    - 导入缓存界面支持重命名：双击名称或点击 ✏️ 按钮自定义标签（如"工作日常用"）
+    - 每条缓存增加 📤 导出JSON 按钮，可将单日数据导出为 tasks-xxx.json
+    - 新增 getCachedDateEntries() / updateCachedDateLabel() 函数
+
+    【大任务回收站】
+    - 删除大任务/里程碑/子任务/阶段 → 移入 `quadrant_big_tasks_deleted`（上限10条）
+    - 新增 `_extractAndCacheBigTaskItem()` 通用提取函数，自动处理父信息记录
+    - 大任务面板底部新增"🗑️ 大任务回收站"可折叠区域
+    - 每条缓存支持：📌 置顶保护 / ↩ 恢复到原位置 / 🗑 永久删除
+    - 删除大任务整卡时正确跳过 recalcBigTaskProgress（修复 splice 后索引错位bug）
+
+    【依循回收站】
+    - 删除原则/优先问题 → 移入 `quadrant_principles_deleted`（上限10条）
+    - 依循面板底部新增"🗑️ 依循回收站"可折叠区域
+    - 同样支持 📌 置顶 / ↩ 恢复 / 🗑 永久删除
+
+    【计划池回收站】
+    - 待办/周/月三个池各自独立的缓存键：`quadrant_future_tasks_cache` 等（各上限10条）
+    - 完成时自动移入：勾选checkbox → 从池中移除 → 缓存区出现（action: "completed"）
+    - 阶段全部完成也自动触发父任务移入缓存
+    - 删除时自动移入：所有 delete 函数改造为 move-to-cache（action: "deleted"）
+    - 计划池面板底部新增"🗑️ 计划池回收站"可折叠区域（按Tab切换显示对应池缓存）
+    - 同样支持 📌 置顶保护 / ↩ 恢复到池中（清除completed状态）/ 🗑 永久删除
+
+    【通用缓存引擎】
+    - 新增通用函数：addToCache / removeFromCache / toggleCachePin / getCacheEntries
+    - 缓存满（10条）自动驱逐最旧的 unpinned 条目；全置顶时拒绝添加并提示
+    - 所有缓存条目带 timestamp 和 pinned 字段
+
+    涉及文件：js/store.js（核心重构） / js/bigtask.js / js/render.js / js/cache-ui.js /
+        css/style.css / index.html / service-worker.js
+
 ────────────────────────────────────────
 
 【未来计划】

@@ -24,8 +24,8 @@ function setupCacheButtons() {
 }
 
 function showCacheModal() {
-  var dates = getCachedDates();
-  if (dates.length === 0) {
+  var entries = getCachedDateEntries();
+  if (entries.length === 0) {
     alert('没有已缓存的日期，请先在某个日期下添加任务后点击"缓存当前"');
     return;
   }
@@ -39,8 +39,8 @@ function showCacheModal() {
 
   var content = document.createElement('div');
   content.className = 'modal-content';
-  content.style.maxWidth = '500px';
-  content.style.maxHeight = '70vh';
+  content.style.maxWidth = '560px';
+  content.style.maxHeight = '75vh';
   content.style.overflowY = 'auto';
 
   var title = document.createElement('h2');
@@ -48,28 +48,92 @@ function showCacheModal() {
   content.appendChild(title);
 
   var desc = document.createElement('p');
-  desc.textContent = '选择日期导入，将合并到当前日期（' + currentDate + '），已有任务不会被修改或删除：';
+  desc.textContent = '选择日期导入，将合并到当前日期（' + currentDate + '）。双击名称可重命名，已有任务不会被修改或删除：';
   desc.style.color = 'var(--text2)';
   content.appendChild(desc);
 
   var list = document.createElement('div');
   list.className = 'cache-date-list';
 
-  dates.forEach(function(cacheDate) {
+  entries.forEach(function(entry) {
+    var cacheDate = entry.date;
+    var label = entry.label || '';
+
     var item = document.createElement('div');
     item.className = 'cache-date-item';
-    item.style.cursor = 'pointer';
-    item.title = '点击合并 ' + cacheDate + ' 的数据到 ' + currentDate + '，已有任务不变';
+    item.title = '点击合并数据到 ' + currentDate + '，已有任务不变';
 
     var info = document.createElement('div');
     info.className = 'cache-date-info';
     var cacheData = getCachedDateData(cacheDate);
     var summary = getTaskSummary(cacheData);
-    info.innerHTML = '<strong>' + cacheDate + '</strong><br><small>' + summary + '</small>';
 
-    var btn = document.createElement('button');
-    btn.className = 'btn btn-sm btn-primary';
-    btn.textContent = '导入';
+    // 可编辑名称标签
+    var nameEl = document.createElement('strong');
+    nameEl.className = 'cache-entry-label';
+    nameEl.textContent = label || cacheDate;
+    nameEl.title = '双击编辑名称';
+    nameEl.style.cursor = 'text';
+    nameEl.addEventListener('dblclick', function(e) {
+      e.stopPropagation();
+      var newLabel = prompt('输入新名称（留空则显示日期）：', label || '');
+      if (newLabel !== null) {
+        updateCachedDateLabel(cacheDate, newLabel);
+        showCacheModal(); // 刷新模态框
+      }
+    });
+
+    var dateLine = document.createElement('small');
+    dateLine.textContent = (label ? '📅 ' + cacheDate + ' · ' : '') + summary;
+
+    info.appendChild(nameEl);
+    info.appendChild(document.createElement('br'));
+    info.appendChild(dateLine);
+
+    // 按钮行
+    var btns = document.createElement('div');
+    btns.className = 'cache-entry-btns';
+    btns.style.marginTop = '4px';
+
+    // 重命名按钮
+    var renameBtn = document.createElement('button');
+    renameBtn.className = 'btn btn-sm';
+    renameBtn.textContent = '✏️';
+    renameBtn.title = '重命名';
+    renameBtn.style.marginRight = '4px';
+    renameBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var newLabel = prompt('输入新名称（留空则显示日期）：', label || '');
+      if (newLabel !== null) {
+        updateCachedDateLabel(cacheDate, newLabel);
+        showCacheModal();
+      }
+    });
+
+    // 导出JSON按钮
+    var exportBtn = document.createElement('button');
+    exportBtn.className = 'btn btn-sm btn-info';
+    exportBtn.textContent = '📤';
+    exportBtn.title = '导出该日期数据为 JSON';
+    exportBtn.style.marginRight = '4px';
+    exportBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var data = getCachedDateData(cacheDate);
+      var json = JSON.stringify(data, null, 2);
+      var fileName = 'tasks-' + (label || cacheDate) + '.json';
+      var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // 导入按钮
+    var importBtn = document.createElement('button');
+    importBtn.className = 'btn btn-sm btn-primary';
+    importBtn.textContent = '导入';
 
     function doImport(e) {
       e.stopPropagation();
@@ -83,18 +147,21 @@ function showCacheModal() {
       modal.remove();
       try {
         renderAll(currentDate);
-      } catch (e) {
-        alert('数据已导入但渲染失败：' + e.message + '\n请刷新页面查看。');
+      } catch (e2) {
+        alert('数据已导入但渲染失败：' + e2.message + '\n请刷新页面查看。');
         return;
       }
-      alert('已从 ' + cacheDate + ' 合并数据到 ' + currentDate + '（' + summary + '），已有任务保持不变');
+      alert('已从 ' + (label || cacheDate) + ' 合并数据到 ' + currentDate + '（' + summary + '），已有任务保持不变');
     }
 
-    btn.addEventListener('click', doImport);
+    importBtn.addEventListener('click', doImport);
     item.addEventListener('click', doImport);
 
+    btns.appendChild(renameBtn);
+    btns.appendChild(exportBtn);
+    btns.appendChild(importBtn);
     item.appendChild(info);
-    item.appendChild(btn);
+    item.appendChild(btns);
     list.appendChild(item);
   });
 

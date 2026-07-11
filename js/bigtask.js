@@ -128,6 +128,14 @@ function renderBigTaskPanel() {
     });
   });
 
+  // Bind card-level "import today's pool" button (📥 on the card header)
+  listEl.querySelectorAll('.bt-import-today-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importBigTaskTodayPoolToToday(this.dataset.btId);
+    });
+  });
+
   // Bind delete
   listEl.querySelectorAll('.bigtask-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
@@ -454,6 +462,15 @@ function renderBigTaskCardHTML(bt, idx) {
   var countdownClass = daysLeft <= 14 ? ' urgent' : '';
 
   var completedClass = (bt.progress >= 100) ? ' completed' : '';
+  // 该大任务"今日任务池"子任务数（plannedDate=当前查看日期 且未完成）—— 用于卡片级一键导入按钮
+  var todayPoolCount = 0;
+  if (bt.milestones) {
+    bt.milestones.forEach(function(ms) {
+      if (ms.tasks) ms.tasks.forEach(function(t) {
+        if (t.plannedDate === currentDate && !t.completed) todayPoolCount++;
+      });
+    });
+  }
   var h = '<div class="bigtask-card' + completedClass + '">';
   h += '<div class="bigtask-card-header">';
   h += '<span class="bigtask-card-icon">📌</span>';
@@ -474,6 +491,9 @@ function renderBigTaskCardHTML(bt, idx) {
     }
   } else {
     h += '<span class="bigtask-card-countdown' + countdownClass + '">' + (daysLeft >= 0 ? '倒计时 ' + daysLeft + ' 天' : '已逾期') + '</span>';
+  }
+  if (todayPoolCount > 0) {
+    h += '<button class="task-defer-btn bt-import-today-btn" data-bt-id="' + bt.id + '" title="一键导入今日任务池（' + todayPoolCount + ' 条）到今日象限" style="width:22px;height:22px;font-size:12px;padding:0;flex-shrink:0;">📥</button>';
   }
   h += '<button class="bigtask-complete-btn' + (bt.progress >= 100 ? ' completed' : '') + '" data-bt-id="' + bt.id + '" title="' + (bt.progress >= 100 ? '标记为未完成' : '标记为完成') + '" style="font-size:14px;padding:0;width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">' + (bt.progress >= 100 ? '✅' : '⬜') + '</button>';
   h += '<span class="bigtask-card-toggle" style="font-size:10px;color:var(--text3);transition:transform var(--t);">▼</span>';

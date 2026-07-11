@@ -430,6 +430,19 @@
    功能看起来"不存在"。改为空状态仅隐藏分隔线，保留添加按钮可见。
    SW 缓存版本升至 v18。
    涉及文件：js/render.js / service-worker.js
+34. ✅ 大任务卡片新增"一键导入今日任务池"按钮（📥，卡片标题栏可见，无需展开）：
+   (1) 痛点：原大任务导入入口埋在 卡片→里程碑→子任务 三层折叠里，极难发现；
+        且与计划池（平铺、显眼）体验不一致。
+   (2) 新增 future.js planBigTaskTodayImport（纯函数，去重逻辑同 migrateBigTaskSubtasks，
+        但限定单个大任务）+ importBigTaskTodayPoolToToday：把该大任务"今日任务池"
+        （plannedDate=当前查看日期 且未完成）的全部子任务一键导入今日 Q-II，
+        已导入的自动跳过（跨 I/II/III/IV 象限及块内子任务均去重），含阶段一并深拷贝。
+   (3) bigtask.js renderBigTaskCardHTML 头部按 todayPoolCount>0 条件渲染 📥 按钮
+        （标题"一键导入今日任务池（N 条）"）；renderBigTaskPanel 绑定 .bt-import-today-btn。
+   (4) 新增回归测试 test/test-bigtask-import-today.js（6 组用例：空数据/去重/跨象限/
+        块子任务/跨大任务不误删/空池），全部通过。
+   (5) SW 缓存版本升至 v19。
+   涉及文件：js/future.js / js/bigtask.js / service-worker.js / test/test-bigtask-import-today.js
 
 （暂无）
 

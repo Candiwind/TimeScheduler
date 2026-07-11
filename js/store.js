@@ -1151,9 +1151,11 @@ var PRINCIPLES_KEY = 'quadrant_principles';
 function loadPrinciples() {
   try {
     var raw = localStorage.getItem(PRINCIPLES_KEY);
-    return raw ? JSON.parse(raw) : { id: '', startDate: '', endDate: '', principles: [] };
+    var data = raw ? JSON.parse(raw) : { id: '', startDate: '', endDate: '', principles: [] };
+    data.priorityProblems = data.priorityProblems || [];
+    return data;
   } catch (e) {
-    return { id: '', startDate: '', endDate: '', principles: [] };
+    return { id: '', startDate: '', endDate: '', principles: [], priorityProblems: [] };
   }
 }
 
@@ -1190,5 +1192,59 @@ function updatePrinciplesDateRange(startDate, endDate) {
   data.startDate = startDate;
   data.endDate = endDate;
   savePrinciples(data);
+}
+
+// ============ Priority Problems Module ============
+function addPriorityProblem(text) {
+  var data = loadPrinciples();
+  if (!data.priorityProblems) data.priorityProblems = [];
+  if (data.priorityProblems.length >= 2) { alert('优先问题最多2条，建议1条'); return null; }
+  var p = { id: generateId(), text: text };
+  data.priorityProblems.push(p);
+  savePrinciples(data);
+  return p;
+}
+
+function updatePriorityProblem(id, text) {
+  var data = loadPrinciples();
+  if (!data.priorityProblems) return;
+  for (var i = 0; i < data.priorityProblems.length; i++) {
+    if (data.priorityProblems[i].id === id) { data.priorityProblems[i].text = text; break; }
+  }
+  savePrinciples(data);
+}
+
+function deletePriorityProblem(id) {
+  var data = loadPrinciples();
+  if (!data.priorityProblems) return;
+  data.priorityProblems = data.priorityProblems.filter(function(p) { return p.id !== id; });
+  savePrinciples(data);
+}
+
+// ============ Stages Collapse State Module ============
+var STAGES_COLLAPSE_KEY = 'quadrant_stages_collapsed';
+
+function loadStagesCollapseState() {
+  try {
+    var raw = localStorage.getItem(STAGES_COLLAPSE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveStagesCollapseState(state) {
+  try { localStorage.setItem(STAGES_COLLAPSE_KEY, JSON.stringify(state)); }
+  catch (e) { /* silent */ }
+}
+
+function setStageCollapsed(id, collapsed) {
+  var state = loadStagesCollapseState();
+  if (collapsed) {
+    state[id] = true;
+  } else {
+    delete state[id];
+  }
+  saveStagesCollapseState(state);
 }
 

@@ -98,3 +98,109 @@ function importBigSubtaskToToday(btId, msId, stId) {
   saveDateData(today, data);
   renderAll(currentDate);
 }
+
+// ---- Import Plan Pool Item to Today ----
+
+// 导入计划池任务（无阶段）到今日 Q-II
+function importPlanPoolItemToToday(ftId, stId, text) {
+  var today = currentDate;
+  var data = loadDateData(today);
+  if (!data['II']) data['II'] = [];
+
+  if (stId) {
+    // 块内子任务
+    var cfg = PLAN_POOL_CONFIGS[activePlanPool];
+    var tasks = cfg.loadFn();
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
+        for (var j = 0; j < tasks[i].tasks.length; j++) {
+          if (tasks[i].tasks[j].id === stId) {
+            var st = tasks[i].tasks[j];
+            data['II'].push({
+              id: generateId(),
+              text: st.text,
+              completed: false,
+              progress: '100%',
+              dueDate: '',
+              timeSlot: st.timeSlot || getDefaultTimeSlot(),
+              planPoolRef: { pool: activePlanPool, ftId: ftId, stId: stId }
+            });
+            break;
+          }
+        }
+        break;
+      }
+    }
+  } else {
+    // 顶层任务
+    data['II'].push({
+      id: generateId(),
+      text: text,
+      completed: false,
+      progress: '100%',
+      dueDate: '',
+      timeSlot: getDefaultTimeSlot(),
+      planPoolRef: { pool: activePlanPool, ftId: ftId }
+    });
+  }
+
+  saveDateData(today, data);
+  renderAll(today);
+}
+
+// 导入计划池任务（含全部阶段）到今日 Q-II
+function importPlanPoolItemWithStagesToToday(ftId, stId, text) {
+  var today = currentDate;
+  var data = loadDateData(today);
+  if (!data['II']) data['II'] = [];
+
+  var cfg = PLAN_POOL_CONFIGS[activePlanPool];
+  var tasks = cfg.loadFn();
+  var sourceTask = null;
+
+  if (stId) {
+    // 块内子任务
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
+        for (var j = 0; j < tasks[i].tasks.length; j++) {
+          if (tasks[i].tasks[j].id === stId) { sourceTask = tasks[i].tasks[j]; break; }
+        }
+        break;
+      }
+    }
+  } else {
+    // 顶层任务
+    for (var k = 0; k < tasks.length; k++) {
+      if (tasks[k].id === ftId) { sourceTask = tasks[k]; break; }
+    }
+  }
+
+  if (!sourceTask) return;
+
+  var newTask = {
+    id: generateId(),
+    text: sourceTask.text,
+    completed: false,
+    progress: '100%',
+    dueDate: '',
+    timeSlot: sourceTask.timeSlot || getDefaultTimeSlot(),
+    planPoolRef: { pool: activePlanPool, ftId: ftId, stId: stId || undefined }
+  };
+
+  if (sourceTask.stages && sourceTask.stages.length > 0) {
+    newTask.stages = sourceTask.stages.map(function(s) {
+      return {
+        id: generateId(),
+        text: s.text,
+        completed: s.completed || false,
+        timeSlot: s.timeSlot || getDefaultTimeSlot(),
+        highlights: s.highlights ? s.highlights.slice() : undefined,
+        extraCompleted: s.extraCompleted || false
+      };
+    });
+  }
+
+  data['II'].push(newTask);
+  saveDateData(today, data);
+  renderAll(today);
+}

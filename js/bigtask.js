@@ -222,6 +222,12 @@ function renderBigTaskPanel() {
     });
   });
 
+  listEl.querySelectorAll('.st-import-all-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation();
+      importBigSubtaskToToday(this.dataset.btId, this.dataset.msId, this.dataset.stId);
+    });
+  });
+
   listEl.querySelectorAll('.st-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) { e.stopPropagation();
       if (!confirm('删除该子任务？')) return;
@@ -527,6 +533,8 @@ function renderBigTaskCardHTML(bt, idx) {
             h += '<span class="bigtask-subtask-date st-editable-date" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;">' + (t.plannedDate || '📅') + '</span>';
             h += '<span class="bigtask-subtask-weight st-editable-weight" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.weight || 5) + '" title="点击修改参考权重" style="cursor:pointer;">' + (t.weight || 5) + '%</span>';
             h += '<button class="task-defer-btn st-import-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务" style="width:18px;height:18px;font-size:11px;">📥</button>';
+          } else {
+            h += '<button class="task-defer-btn st-import-all-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务（含全部阶段）" style="width:18px;height:18px;font-size:11px;">📥</button>';
           }
           h += '<button class="task-extra-btn bt-st-hl-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" title="高亮/取消高亮" style="width:18px;height:18px;font-size:11px;padding:0;">' + hlIcon + '</button>';
           h += '<button class="task-delete-btn st-delete-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="删除子任务" style="width:16px;height:16px;font-size:12px;">&times;</button>';

@@ -421,6 +421,43 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
 .principle-text:hover { color: var(--accent); }
 .principles-actions { display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 
+/* ============ Priority Problems (below principles) ============ */
+.priority-problems-separator {
+  display: flex; align-items: center; gap: 8px;
+  margin: 10px 0 6px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.priority-separator-line { flex: 1; height: 1px; background: var(--border2); }
+.priority-separator-label {
+  font-size: 11px; font-weight: 700; color: #d9534f;
+  white-space: nowrap;
+}
+[data-theme="dark"] .priority-separator-label { color: #f08080; }
+
+.priority-problems-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.priority-problem-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  border: 1px solid #f5c6cb; border-radius: 6px;
+  font-size: 13px; transition: all var(--t);
+  background: #fff8f8;
+}
+[data-theme="dark"] .priority-problem-item {
+  border-color: #5a3030; background: #2d1a1a;
+}
+.priority-problem-item:hover { border-color: #d9534f; background: #fff0f0; }
+[data-theme="dark"] .priority-problem-item:hover { background: #3d2020; }
+.priority-problem-index { font-weight: 700; color: #d9534f; font-size: 12px; }
+[data-theme="dark"] .priority-problem-index { color: #f08080; }
+.priority-problem-text { flex: 1; cursor: pointer; color: #8b0000; }
+[data-theme="dark"] .priority-problem-text { color: #f5c6cb; }
+.priority-problem-text:hover { color: #d9534f; }
+.priority-problems-actions { padding-top: 4px; }
+
+@media (max-width: 600px) {
+  .priority-problem-item { padding: 8px 10px; min-height: 44px; }
+  .priority-problem-del-btn { width: 30px; height: 30px; }
+}
+
 /* ============ Quadrant Grid ============ */
 .quadrant-grid {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -788,6 +825,20 @@ input[type="date"]:focus, input[type="text"].search-input:focus {
   border-radius: 4px; transition: all var(--t); flex-shrink: 0;
 }
 .add-stage-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+
+/* ============ Stages Toggle Button ============ */
+.stages-toggle-btn {
+  width: 22px; height: 22px; flex-shrink: 0;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--text3); font-size: 10px; cursor: pointer; border-radius: 4px;
+  padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--t); margin-left: 2px;
+}
+.stages-toggle-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+@media (max-width: 600px) {
+  .stages-toggle-btn { width: 30px; height: 30px; font-size: 12px; }
+}
+
 .add-subtask-btn {
   width: 100%; padding: 6px; border: 1px dashed var(--border2); background: transparent;
   color: var(--text3); font-size: 11px; cursor: pointer; border-radius: 0 0 9px 9px;
@@ -1046,6 +1097,8 @@ kbd {
   border-radius: 4px; transition: all var(--t); flex-shrink: 0;
 }
 .planpool-add-stage-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+/* 计划池导入按钮 */
+.planpool-import-all-btn:hover { background: var(--accent-light); color: var(--accent); }
 /* Block 子任务阶段：额外缩进，与子任务行对齐 */
 .planpool-block-stages {
   padding-left: 18px;

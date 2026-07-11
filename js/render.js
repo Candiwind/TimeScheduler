@@ -793,6 +793,29 @@ function createTaskElement(item, quadrantKey, index) {
     // Insert before delBtn so both appear at top-right
     el.insertBefore(addStageBtn, delBtn);
     el.appendChild(stagesContainer);
+
+    // 折叠切换按钮
+    var toggleBtn = document.createElement('button');
+    toggleBtn.className = 'stages-toggle-btn';
+    var isCollapsed = loadStagesCollapseState()[item.id];
+    toggleBtn.innerHTML = isCollapsed ? '▶' : '▼';
+    toggleBtn.title = isCollapsed ? '展开阶段' : '折叠阶段';
+    if (isCollapsed) {
+      stagesContainer.style.display = 'none';
+      addStageBtn.style.display = 'none';
+    }
+    toggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var nowCollapsed = stagesContainer.style.display !== 'none';
+      stagesContainer.style.display = nowCollapsed ? 'none' : '';
+      toggleBtn.innerHTML = nowCollapsed ? '▶' : '▼';
+      toggleBtn.title = nowCollapsed ? '展开阶段' : '折叠阶段';
+      var addBtn = el.querySelector('.add-stage-btn');
+      if (addBtn) addBtn.style.display = nowCollapsed ? 'none' : '';
+      setStageCollapsed(item.id, nowCollapsed);
+    });
+    toggleBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    el.insertBefore(toggleBtn, delBtn);
   }
 
   // Bind drag handlers directly
@@ -1092,6 +1115,30 @@ function createSubTaskElement(task, quadrantKey, blockId, opts) {
     // Insert before delBtn so both appear at top-right
     el.insertBefore(addStageBtn, delBtn);
     el.appendChild(stagesContainer);
+
+    // 折叠切换按钮
+    var stCollapseId = blockId + '_' + task.id;
+    var stToggleBtn = document.createElement('button');
+    stToggleBtn.className = 'stages-toggle-btn';
+    var stIsCollapsed = loadStagesCollapseState()[stCollapseId];
+    stToggleBtn.innerHTML = stIsCollapsed ? '▶' : '▼';
+    stToggleBtn.title = stIsCollapsed ? '展开阶段' : '折叠阶段';
+    if (stIsCollapsed) {
+      stagesContainer.style.display = 'none';
+      addStageBtn.style.display = 'none';
+    }
+    stToggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var nowCollapsed = stagesContainer.style.display !== 'none';
+      stagesContainer.style.display = nowCollapsed ? 'none' : '';
+      stToggleBtn.innerHTML = nowCollapsed ? '▶' : '▼';
+      stToggleBtn.title = nowCollapsed ? '展开阶段' : '折叠阶段';
+      var addBtn = el.querySelector('.add-stage-btn');
+      if (addBtn) addBtn.style.display = nowCollapsed ? 'none' : '';
+      setStageCollapsed(stCollapseId, nowCollapsed);
+    });
+    stToggleBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    el.insertBefore(stToggleBtn, delBtn);
   }
 
   return el;
@@ -1832,6 +1879,29 @@ function renderPlanPoolPanel() {
     });
   });
 
+  // 计划池导入按钮
+  listEl.querySelectorAll('.planpool-import-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importPlanPoolItemToToday(
+        this.dataset.ftId,
+        this.dataset.stId || null,
+        this.dataset.ftText
+      );
+    });
+  });
+
+  listEl.querySelectorAll('.planpool-import-all-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importPlanPoolItemWithStagesToToday(
+        this.dataset.ftId,
+        this.dataset.stId || null,
+        this.dataset.ftText
+      );
+    });
+  });
+
   listEl.querySelectorAll('.planpool-draggable').forEach(function(el) {
     el.addEventListener('dragstart', handleFutureDragStart);
     el.addEventListener('dragend', handleFutureDragEnd);
@@ -1873,6 +1943,7 @@ function _renderPlanTaskHTML(ft) {
   }
   h += '<span class="planpool-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>';
   h += '<span class="planpool-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>';
+  h += '<button class="task-defer-btn planpool-import-btn" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '" title="导入今日Q-II" style="width:18px;height:18px;font-size:11px;">📥</button>';
   h += '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
   h += '</div>';
 
@@ -1888,6 +1959,7 @@ function _renderPlanTaskHTML(ft) {
       h += '</div>';
     });
     h += '<button class="planpool-add-stage-btn" data-ft-id="' + ft.id + '">+ 阶段</button>';
+    h += '<button class="planpool-import-all-btn" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '" title="导入全部阶段到今日" style="width:100%;padding:3px 6px;border:1px dashed var(--border2);background:transparent;color:var(--accent);font-size:11px;cursor:pointer;border-radius:4px;margin-top:4px;">📥 导入全部阶段到今日</button>';
     h += '</div>';
   }
 
@@ -1929,6 +2001,7 @@ function _renderPlanBlockHTML(ft) {
       }
       h += '<span class="planpool-item-date pp-st-date" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.scheduledDate || '') + '" title="点击设定日期">' + stDateDisplay + '</span>';
       h += '<span class="planpool-item-quad pp-st-quad" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.targetQuadrant || '') + '" title="点击选择象限">' + (stQuadDisplay || '选择象限') + '</span>';
+      h += '<button class="task-defer-btn planpool-import-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '" title="导入今日Q-II" style="width:16px;height:16px;font-size:10px;">📥</button>';
       h += '<button class="task-delete-btn pp-st-delete-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="删除子任务" style="width:18px;height:18px;font-size:12px;">&times;</button>';
       h += '</div>';
       // 子任务阶段容器
@@ -1943,6 +2016,7 @@ function _renderPlanBlockHTML(ft) {
           h += '</div>';
         });
         h += '<button class="planpool-add-stage-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '">+ 阶段</button>';
+        h += '<button class="planpool-import-all-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '" title="导入全部阶段到今日" style="width:100%;padding:3px 6px;border:1px dashed var(--border2);background:transparent;color:var(--accent);font-size:11px;cursor:pointer;border-radius:4px;margin-top:4px;">📥 导入全部阶段到今日</button>';
         h += '</div>';
       }
     });
@@ -2265,6 +2339,61 @@ function renderPrinciplesPanel() {
       e.stopPropagation();
       if (!confirm('删除该原则？')) return;
       deletePrinciple(this.dataset.pid);
+      renderPrinciplesPanel();
+    });
+  });
+
+  // ===== 优先问题渲染 =====
+  var ppListEl = document.getElementById('priorityProblemsList');
+  var ppSeparator = document.getElementById('priorityProblemsSeparator');
+  var ppActions = document.getElementById('priorityProblemsActions');
+  var ppAddBtn = document.getElementById('btnAddPriorityProblem');
+
+  if (!ppListEl) return;
+
+  // 清空旧优先问题项
+  ppListEl.querySelectorAll('.priority-problem-item').forEach(function(el) { el.remove(); });
+
+  var problems = data.priorityProblems || [];
+
+  if (problems.length === 0) {
+    if (ppSeparator) ppSeparator.style.display = 'none';
+    if (ppActions) ppActions.style.display = 'none';
+    return;
+  }
+
+  if (ppSeparator) ppSeparator.style.display = '';
+  if (ppActions) {
+    if (ppAddBtn) ppAddBtn.style.display = problems.length >= 2 ? 'none' : '';
+    ppActions.style.display = '';
+  }
+
+  problems.forEach(function(p, idx) {
+    var el = document.createElement('div');
+    el.className = 'priority-problem-item';
+    el.innerHTML = '<span class="priority-problem-index">' + (idx + 1) + '.</span>' +
+      '<span class="priority-problem-text">' + Util.escHtml(p.text) + '</span>' +
+      '<button class="task-delete-btn priority-problem-del-btn" data-ppid="' + p.id + '">&times;</button>';
+    ppListEl.appendChild(el);
+  });
+
+  // 绑定双击编辑
+  ppListEl.querySelectorAll('.priority-problem-text').forEach(function(el) {
+    el.addEventListener('dblclick', function() {
+      var ppid = this.parentElement.querySelector('.priority-problem-del-btn').dataset.ppid;
+      startEdit(this, this.textContent, function(newVal) {
+        updatePriorityProblem(ppid, newVal);
+        renderPrinciplesPanel();
+      });
+    });
+  });
+
+  // 绑定删除
+  ppListEl.querySelectorAll('.priority-problem-del-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!confirm('删除该优先问题？')) return;
+      deletePriorityProblem(this.dataset.ppid);
       renderPrinciplesPanel();
     });
   });

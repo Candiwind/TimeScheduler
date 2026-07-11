@@ -326,6 +326,13 @@ function setupPrinciplesPanel() {
     addPrinciple(text);
     renderPrinciplesPanel();
   });
+
+  document.getElementById('btnAddPriorityProblem').addEventListener('click', function() {
+    var text = prompt('请输入优先解决的问题（如"修复登录页面Bug"）：');
+    if (!text) return;
+    addPriorityProblem(text);
+    renderPrinciplesPanel();
+  });
 }
 
 // ============ Start ============

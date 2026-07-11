@@ -390,6 +390,28 @@
    (5) updateSyncIndicator / disableSync 适配双模式，同步图标 title 显示具体平台名称。
    (6) SW 缓存版本升至 v15。
    涉及文件：js/cloud-sync.js / service-worker.js
+29. ✅ 依循项下新增"最近优先解决的问题"模块：
+   (1) 数据模型：principles 对象新增 priorityProblems 数组（{id, text}），最多2条（建议1条）。
+       向后兼容旧数据（自动初始化空数组）。
+   (2) 存储：新增 addPriorityProblem / updatePriorityProblem / deletePriorityProblem。
+   (3) UI：在原则列表和"+ 添加原则"按钮之间渲染红色主题分隔线和优先问题列表。
+       双击编辑文字、×删除，满2条自动隐藏添加按钮。
+   涉及文件：js/store.js / js/render.js / js/app.js / index.html / css/style.css
+30. ✅ 大任务和小任务划分阶段支持可折叠功能：
+   (1) 象限视图的任务/子任务有阶段时，右侧新增 ▼/▶ 折叠切换按钮。
+   (2) 折叠状态持久化到 localStorage（quadrant_stages_collapsed），刷新页面保持。
+   (3) 折叠时隐藏 .subtask-stages 容器和"+ 阶段"按钮。
+   (4) 默认不折叠（▼ 展开态），仅象限视图生效（时间视图阶段分散分布，无需折叠）。
+   涉及文件：js/store.js / js/render.js / css/style.css
+31. ✅ 计划池任务和大任务加"立刻导入"选项：
+   (1) 计划池任务（待办/周/月）：无阶段任务行新增 📥 导入按钮，含阶段任务在阶段容器底部
+       新增"📥 导入全部阶段到今日"按钮；块内子任务同理。
+   (2) 大任务含阶段子任务：原来有阶段时隐藏 📥 导入按钮（仅显示逐阶段导入），
+       现在新增 📥"导入全部"按钮（复用 importBigSubtaskToToday，已支持 copyBigSubtaskStages）。
+   (3) 导入语义：复制到今日 Q-II，不删除源数据。导入任务附带 planPoolRef 追溯字段。
+       新增 importPlanPoolItemToToday / importPlanPoolItemWithStagesToToday。
+   (4) SW 缓存版本升至 v16。
+   涉及文件：js/render.js / js/future.js / js/bigtask.js / css/style.css / service-worker.js
 
 （暂无）
 

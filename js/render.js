@@ -9,6 +9,11 @@ function getCurrentDate() { return currentDate; }
 
 function renderAll(date) {
   currentDate = date;
+  // 自动导入：检查是否有置顶缓存条目设置了当天星期自动导入
+  var autoLabels = runAutoImportsForDate(date);
+  if (autoLabels.length > 0) {
+    console.log('[AutoImport] 已自动导入 ' + autoLabels.length + ' 条缓存：' + autoLabels.join(', '));
+  }
   var data = loadDateData(date);
   if (viewMode === 'time') {
     renderTimeView(date, data);

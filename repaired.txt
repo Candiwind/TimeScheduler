@@ -598,10 +598,6 @@
 
     涉及文件：js/store.js / js/bigtask.js / js/render.js / css/style.css / index.html
 
-────────────────────────────────────────
-
-【未来计划】
-1. 代码重构：模块化拆分，提升可维护性和运行性能
 65. ✅ 导入缓存增强——支持删除缓存条目和置顶保护
 
     【导入缓存删除+置顶】
@@ -626,4 +622,34 @@
 
     涉及文件：js/store.js / js/cache-ui.js
 
+
+────────────────────────────────────────
+
+67. ✅ 置顶缓存支持按星期自动导入——工作日/周六/周日三个独立开关
+
+    【自动导入机制】
+    - `quadrant_cached_dates_index` 条目新增 `autoWorkday`/`autoSaturday`/`autoSunday` 字段（V4）
+    - 向后兼容自动迁移，旧条目缺失字段默认 false
+    - 新增 `setCachedDateAutoImport(id, field, value)` — 设置单条目的自动导入选项
+    - 新增 `getAutoImportEntriesForDate(dateStr)` — 按星期筛选匹配的置顶条目
+    - 新增 `silentImportCachedData(sourceDate, targetDate)` — 静默合并（无alert/confirm）
+    - 新增 `runAutoImportsForDate(dateStr)` — 对指定日期执行全部匹配的自动导入
+    - `renderAll()` 开头调用 `runAutoImportsForDate()`，数据变更后重新加载渲染
+
+    【导入缓存UI】
+    - 置顶条目下方新增"⏰ 自动导入"行，含三个切换按钮：工作日 / 周六 / 周日
+    - 激活的按钮高亮显示（btn-primary样式），点击即切换开关状态
+    - 仅置顶条目显示自动导入选项（非置顶不显示）
+
+    【星期映射】
+    - 工作日：周一至周五（getDay 1-5）
+    - 周六：getDay 6
+    - 周日：getDay 0
+
+    涉及文件：js/store.js / js/cache-ui.js / js/render.js / service-worker.js
+
+────────────────────────────────────────
+
+【未来计划】
+1. 代码重构：模块化拆分，提升可维护性和运行性能
 2. APP与网页版数据互通

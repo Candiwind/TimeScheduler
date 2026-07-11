@@ -197,6 +197,47 @@ function showCacheModal() {
     btns.appendChild(exportBtn);
     btns.appendChild(delBtn);
     btns.appendChild(importBtn);
+
+    // 置顶后才显示自动导入选项（按星期自动合并）
+    if (pinned) {
+      var autoRow = document.createElement('div');
+      autoRow.className = 'cache-entry-btns';
+      autoRow.style.marginTop = '4px';
+      autoRow.style.fontSize = '11px';
+
+      var autoLabel = document.createElement('span');
+      autoLabel.textContent = '⏰ 自动导入：';
+      autoLabel.style.marginRight = '4px';
+      autoLabel.style.color = 'var(--text2)';
+      autoRow.appendChild(autoLabel);
+
+      var autoWorkday = entry.autoWorkday || false;
+      var autoSaturday = entry.autoSaturday || false;
+      var autoSunday = entry.autoSunday || false;
+
+      function makeAutoBtn(label, field, current) {
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-sm' + (current ? ' btn-primary' : '');
+        btn.textContent = label;
+        btn.title = current ? '点击取消' + label + '自动导入' : '点击开启' + label + '自动导入';
+        btn.style.marginRight = '4px';
+        btn.style.fontSize = '11px';
+        btn.style.padding = '2px 6px';
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          setCachedDateAutoImport(entryId, field, !current);
+          showCacheModal();
+        });
+        return btn;
+      }
+
+      autoRow.appendChild(makeAutoBtn('工作日', 'autoWorkday', autoWorkday));
+      autoRow.appendChild(makeAutoBtn('周六', 'autoSaturday', autoSaturday));
+      autoRow.appendChild(makeAutoBtn('周日', 'autoSunday', autoSunday));
+
+      item.appendChild(autoRow);
+    }
+
     item.appendChild(info);
     item.appendChild(btns);
     list.appendChild(item);

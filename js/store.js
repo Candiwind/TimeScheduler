@@ -211,7 +211,8 @@ function importCachedData(sourceDate, targetDate) {
 }
 
 // ============ Explicit Cache Index (only dates user clicked "缓存当前") ============
-// V3: 条目结构 [{id, date, label, pinned, cachedAt}]，同一日期可多次缓存为独立快照
+// V4: 条目结构 [{id, date, label, pinned, cachedAt, autoWorkday, autoSaturday, autoSunday}]
+// 同一日期可多次缓存为独立快照，置顶后支持按星期自动导入
 var CACHE_INDEX_KEY = 'quadrant_cached_dates_index';
 
 function loadCachedDatesIndex() {
@@ -219,14 +220,17 @@ function loadCachedDatesIndex() {
     var raw = localStorage.getItem(CACHE_INDEX_KEY);
     if (!raw) return [];
     var arr = JSON.parse(raw);
-    // 向后兼容：string[] → [{date, label}] → [{id, date, label, pinned, cachedAt}]
+    // 向后兼容：string[] → [{date, label}] → [{id, date, label, pinned, cachedAt, auto*}]
     for (var i = 0; i < arr.length; i++) {
       if (typeof arr[i] === 'string') {
-        arr[i] = { id: 'cache_' + generateId(), date: arr[i], label: '', pinned: false, cachedAt: Date.now() };
+        arr[i] = { id: 'cache_' + generateId(), date: arr[i], label: '', pinned: false, cachedAt: Date.now(), autoWorkday: false, autoSaturday: false, autoSunday: false };
       } else {
         if (!arr[i].id) arr[i].id = 'cache_' + generateId();
         if (arr[i].pinned === undefined) arr[i].pinned = false;
         if (!arr[i].cachedAt) arr[i].cachedAt = Date.now();
+        if (arr[i].autoWorkday === undefined) arr[i].autoWorkday = false;
+        if (arr[i].autoSaturday === undefined) arr[i].autoSaturday = false;
+        if (arr[i].autoSunday === undefined) arr[i].autoSunday = false;
       }
     }
     return arr;
@@ -244,7 +248,7 @@ function saveCachedDatesIndex(entries) {
 function markDateAsCached(date) {
   var cached = loadCachedDatesIndex();
   // 同日期允许多次缓存，每次生成独立 ID
-  cached.push({ id: 'cache_' + generateId(), date: date, label: '', pinned: false, cachedAt: Date.now() });
+  cached.push({ id: 'cache_' + generateId(), date: date, label: '', pinned: false, cachedAt: Date.now(), autoWorkday: false, autoSaturday: false, autoSunday: false });
   cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
   saveCachedDatesIndex(cached);
 }
@@ -292,6 +296,71 @@ function toggleCachedDatePin(id) {
   saveCachedDatesIndex(entries);
 }
 
+// 设置缓存条目的自动导入选项（field: 'autoWorkday' | 'autoSaturday' | 'autoSunday'）
+function setCachedDateAutoImport(id, field, value) {
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) { entries[i][field] = !!value; break; }
+  }
+  saveCachedDatesIndex(entries);
+}
+
+// 获取某日期应自动导入的缓存条目（置顶 + 星期匹配）
+function getAutoImportEntriesForDate(dateStr) {
+  var day = new Date(dateStr + 'T00:00:00').getDay(); // 0=周日 1-5=周一至周五 6=周六
+  var entries = loadCachedDatesIndex();
+  return entries.filter(function(e) {
+    if (!e.pinned) return false;
+    if (day >= 1 && day <= 5 && e.autoWorkday) return true;
+    if (day === 6 && e.autoSaturday) return true;
+    if (day === 0 && e.autoSunday) return true;
+    return false;
+  });
+}
+
+// 静默版导入（无 alert/confirm），供自动导入使用
+function silentImportCachedData(sourceDate, targetDate) {
+  var all = loadAllData();
+  if (!all[sourceDate]) return false;
+  var sourceData = JSON.parse(JSON.stringify(all[sourceDate]));
+  if (sourceDate === targetDate) {
+    all[targetDate] = sourceData;
+  } else {
+    var targetData = all[targetDate] || { I: [], II: [], III: [], IV: [] };
+    QUADRANT_KEYS.forEach(function(key) {
+      var existingIds = {};
+      (targetData[key] || []).forEach(function(item) {
+        existingIds[item.id] = true;
+        if (item.tasks) {
+          item.tasks.forEach(function(st) { existingIds[st.id] = true; });
+        }
+      });
+      (sourceData[key] || []).forEach(function(item) {
+        if (!existingIds[item.id]) {
+          if (!targetData[key]) targetData[key] = [];
+          targetData[key].push(item);
+        }
+      });
+    });
+    all[targetDate] = targetData;
+  }
+  saveAllData(all);
+  return true;
+}
+
+// 对指定日期执行所有匹配的自动导入，返回导入的条目标签列表
+function runAutoImportsForDate(dateStr) {
+  var entries = getAutoImportEntriesForDate(dateStr);
+  if (entries.length === 0) return [];
+  var labels = [];
+  entries.forEach(function(e) {
+    if (silentImportCachedData(e.date, dateStr)) {
+      labels.push(e.label || e.date);
+    }
+  });
+  return labels;
+}
+
 // One-time migration: seed cache index with all existing dates for backward compat
 function seedCacheIndexIfEmpty() {
   if (loadCachedDatesIndex().length === 0) {
@@ -299,7 +368,7 @@ function seedCacheIndexIfEmpty() {
     if (allDates.length > 0) {
       var now = Date.now();
       saveCachedDatesIndex(allDates.map(function(d) {
-        return { id: 'cache_' + generateId(), date: d, label: '', pinned: false, cachedAt: now };
+        return { id: 'cache_' + generateId(), date: d, label: '', pinned: false, cachedAt: now, autoWorkday: false, autoSaturday: false, autoSunday: false };
       }));
     }
   }

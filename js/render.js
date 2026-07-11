@@ -11,7 +11,7 @@ function renderAll(date) {
   currentDate = date;
   var data = loadDateData(date);
   if (viewMode === 'time') {
-    renderTimeView(date);
+    renderTimeView(date, data);
   } else {
     resetGridLayout();
     QUADRANT_KEYS.forEach(function(key) {
@@ -147,8 +147,8 @@ var QUADRANT_BG = {
   IV: 'rgba(195,240,195,0.18)'
 };
 
-function renderTimeView(date) {
-  var data = loadDateData(date);
+function renderTimeView(date, preloadedData) {
+  var data = preloadedData || loadDateData(date);
   var grid = document.querySelector('.quadrant-grid');
   if (!grid) return;
 
@@ -1408,7 +1408,7 @@ function calcTimeSlotCompletion(data) {
 }
 
 function updateStatsBar(data) {
-  var stats = calcWeightedCompletion(data);
+  var stats = calcAllStats(data);
   var hcDone = document.getElementById('hcDone');
   var hcTotal = document.getElementById('hcTotal');
   var hcRate = document.getElementById('hcRate');
@@ -1422,13 +1422,12 @@ function updateStatsBar(data) {
   }
 
   // Time slot breakdown in header — each group in a pill badge
-  var slotStats = calcTimeSlotCompletion(data);
   var slotEl = document.getElementById('headerSlotBreakdown');
   if (!slotEl) return;
   var slotGroupKeys = ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'];
   var parts = [];
   slotGroupKeys.forEach(function(gk) {
-    var gd = slotStats[gk];
+    var gd = stats.slotGroups[gk];
     var rate = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
     parts.push('<span class="header-slot-badge" title="' + gk + '">' + gd.icons + ' <span>' + gd.done + '/' + gd.total + ' ' + rate + '%</span></span>');
   });
@@ -1437,6 +1436,40 @@ function updateStatsBar(data) {
   }
   slotEl.style.display = '';
   slotEl.innerHTML = parts.join('');
+}
+
+// 合并统计计算：一次遍历叶子项，同时算出象限/加权/时段三组指标
+function calcAllStats(data) {
+  var quadCounts = { I: {total:0, done:0}, II: {total:0, done:0}, III: {total:0, done:0}, IV: {total:0, done:0} };
+  var totalAll = 0, doneAll = 0;
+  var slotGroups = {
+    '早晨 + 上午': { total: 0, done: 0, icons: '🌄🕘' },
+    '中午 + 下午': { total: 0, done: 0, icons: '☀️🕒' },
+    '傍晚 + 晚上': { total: 0, done: 0, icons: '🌇🌙' }
+  };
+  var slotToGroup = {
+    'early_morn': '早晨 + 上午', 'forenoon': '早晨 + 上午',
+    'noon': '中午 + 下午', 'afternoon': '中午 + 下午',
+    'dusk': '傍晚 + 晚上', 'night': '傍晚 + 晚上'
+  };
+
+  QUADRANT_KEYS.forEach(function(key) {
+    walkLeafItems(data[key] || [], function(leaf, info) {
+      quadCounts[key].total++;
+      totalAll++;
+      if (leaf.completed) { quadCounts[key].done++; doneAll++; }
+      var g = slotToGroup[info.timeSlot];
+      if (g) { slotGroups[g].total++; if (leaf.completed) slotGroups[g].done++; }
+    });
+  });
+
+  var weightedRate = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
+
+  return {
+    quadCounts: quadCounts,
+    total: totalAll, done: doneAll, weightedRate: weightedRate,
+    slotGroups: slotGroups
+  };
 }
 
 function setSearchTerm(term) {

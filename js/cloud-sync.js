@@ -108,9 +108,9 @@ var CloudSync = (function() {
       principles: loadPrinciples ? loadPrinciples() : {}
     };
 
-    // 也加入未来任务池数据
+    // 也加入计划池数据（future/week/month）
     ['future', 'week', 'month'].forEach(function(pool) {
-      var key = 'quadrant_pool_' + pool;
+      var key = 'quadrant_' + pool + '_tasks';
       try {
         var poolRaw = localStorage.getItem(key);
         if (poolRaw) exportObj['pool_' + pool] = JSON.parse(poolRaw);
@@ -160,8 +160,7 @@ var CloudSync = (function() {
     if (existingToken) {
       fetchGist(gistId, existingToken).then(function() {
         saveGistConfig(gistId, existingToken, '完整模式（已有Token）');
-        showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
-        pullFromGist(false);
+        showToast('✅ Gist 已连接（拉取+推送模式）\n点击 📥 拉取可合并云端数据');
         if (fromForm) openSyncSettings();
       }).catch(function() {
         if (fromForm) {
@@ -176,8 +175,7 @@ var CloudSync = (function() {
           if (newToken) {
             fetchGist(gistId, newToken).then(function() {
               saveGistConfig(gistId, newToken, '完整模式（新Token）');
-              showToast('✅ Gist 已连接（拉取+推送模式）');
-              pullFromGist(false);
+              showToast('✅ Gist 已连接（拉取+推送模式）\n点击 📥 拉取可合并云端数据');
             }).catch(function(err) {
               alert('连接失败：' + err.message);
             });
@@ -185,7 +183,6 @@ var CloudSync = (function() {
             fetchGist(gistId, null).then(function() {
               saveGistConfig(gistId, '', '仅拉取模式（公开Gist，Token已失效）');
               showToast('⚠️ Token 已清除，当前为仅拉取模式');
-              pullFromGist(false);
             }).catch(function(err) {
               alert('公开访问也失败：' + err.message);
             });
@@ -197,13 +194,13 @@ var CloudSync = (function() {
       fetchGist(gistId, null).then(function(gistData) {
         saveGistConfig(gistId, '', '仅拉取模式（公开Gist）');
         if (fromForm) {
-          showToast('✅ Gist 已连接（仅拉取模式）\n手机端无需 Token 即可自动同步');
+          showToast('✅ Gist 已连接（仅拉取模式）\n点击 📥 拉取可合并云端数据');
         } else {
           showToast('✅ Gist 已连接（仅拉取模式）\n' +
                     '手机端无需 Token 即可自动同步\n\n' +
+                    '点击 📥 拉取可合并云端数据。\n' +
                     '如需推送数据，请再次设置并输入 Token。');
         }
-        pullFromGist(false);
         if (fromForm) openSyncSettings();
       }).catch(function() {
         if (fromForm) {
@@ -216,8 +213,7 @@ var CloudSync = (function() {
           if (!newToken) return;
           fetchGist(gistId, newToken).then(function() {
             saveGistConfig(gistId, newToken, '完整模式（私密Gist）');
-            showToast('✅ Gist 已连接（拉取+推送模式）');
-            pullFromGist(false);
+            showToast('✅ Gist 已连接（拉取+推送模式）\n点击 📥 拉取可合并云端数据');
           }).catch(function(err) {
             alert('连接失败：' + err.message);
           });
@@ -249,7 +245,7 @@ var CloudSync = (function() {
   }
 
   /**
-   * 诊断 Gist 连接：逐步检测问题出在哪一环
+   * 诊断 Gist 连接：逐步检测问题出在哪一环（仅 GET，不写入）
    * 返回 "ok" 或错误描述
    */
   function diagnoseGistConnection(callback) {
@@ -261,48 +257,41 @@ var CloudSync = (function() {
     // 检查 1：配置
     if (!syncInfo.gistId) { callback('未配置 Gist ID', steps); return; }
     report('✓ Gist ID: ' + syncInfo.gistId);
-    if (!syncInfo.gistToken) { callback('未配置 Token（仅拉取模式无法推送）', steps); return; }
-    report('✓ Token: ' + syncInfo.gistToken.substring(0, 7) + '...');
 
-    // 检查 2：基本网络（GET api.github.com）
+    // 检查 2：基本网络（HEAD api.github.com）
     report('正在检测 api.github.com 连通性...');
     fetch('https://api.github.com', { method: 'HEAD' }).then(function(res) {
       report('✓ api.github.com 可达 (HTTP ' + res.status + ')');
 
-      // 检查 3：Gist 读取权限
+      // 检查 3：Gist 读取权限（GET，不写入）
       report('正在检测 Gist 读取权限...');
-      return fetchGist(syncInfo.gistId, syncInfo.gistToken);
-    }).then(function(gist) {
-      report('✓ Gist 可读取 (' + (gist.description || '无描述') + ')');
-
-      // 检查 4：写入权限（最小测试）
-      report('正在检测 Gist 写入权限（发送空更新）...');
-      var testPayload = {
-        files: {}
-      };
-      testPayload.files[SYNC_FILE_NAME] = {
-        content: JSON.stringify({ _test: true, _timestamp: new Date().toISOString() }, null, 2)
-      };
-
-      return fetch('https://api.github.com/gists/' + syncInfo.gistId, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': 'token ' + syncInfo.gistToken,
-          'Accept': 'application/vnd.github+json'
-        },
-        body: JSON.stringify(testPayload)
-      }).then(function(res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' → Token 无效或权限不足' : res.status === 404 ? ' → Gist 不存在' : ''));
-        report('✓ Gist 写入成功 — 一切正常');
-
-        // 写入成功，回写原来的数据
-        report('诊断完成：所有检查通过，现在执行完整推送...');
-        return res.json().then(function() {
-          callback('ok', steps);
-        });
+      var headers = { 'Accept': 'application/vnd.github.v3+json' };
+      if (syncInfo.gistToken) headers['Authorization'] = 'token ' + syncInfo.gistToken;
+      return fetch('https://api.github.com/gists/' + syncInfo.gistId, { headers: headers });
+    }).then(function(res) {
+      if (!res.ok) {
+        if (res.status === 401) {
+          report('✗ Gist 不可访问 (HTTP 401) → Token 无效或 Gist 为私密且缺少 Token');
+        } else if (res.status === 404) {
+          report('✗ Gist 不存在 (HTTP 404) → Gist ID 错误或已被删除');
+        } else {
+          report('✗ Gist 读取失败 (HTTP ' + res.status + ')');
+        }
+        callback('Gist 读取失败: HTTP ' + res.status, steps);
+        return;
+      }
+      return res.json().then(function(gist) {
+        report('✓ Gist 可读取 (' + (gist.description || '无描述') + ')');
+        if (syncInfo.gistToken) {
+          report('✓ Token 有效，具备读写权限');
+        } else {
+          report('⚠ 未配置 Token，仅可读取公开 Gist');
+        }
+        report('诊断完成：连接正常，推送时若失败请检查 Token 是否勾选 gist 权限');
+        callback('ok', steps);
       });
     }).catch(function(err) {
-      report('✗ 失败: ' + err.message);
+      report('✗ 网络错误: ' + err.message);
       callback(err.message, steps);
     });
   }
@@ -322,48 +311,58 @@ var CloudSync = (function() {
       return;
     }
 
+    // 检查 in-flight 锁
+    if (_syncInFlight) {
+      showToast('⏳ 同步进行中，请稍候...');
+      _pendingPush = true;
+      return;
+    }
+    _syncInFlight = true;
+
     // 显示加载状态
     var pushBtn = document.getElementById('btnGistPush');
     var originalText = pushBtn ? pushBtn.textContent : '📤 推送';
     if (pushBtn) {
       pushBtn.disabled = true;
-      pushBtn.textContent = '⏳ 诊断中...';
+      pushBtn.textContent = '⏳ 推送中...';
     }
 
-    setSyncIcon('syncing', '正在检测连接...');
+    setSyncIcon('syncing', '正在同步到云端...');
 
-    // 先跑诊断
-    diagnoseGistConnection(function(result, steps) {
-      if (result !== 'ok') {
-        // 诊断失败
-        var msg = '❌ 推送失败\n\n诊断报告：\n' + steps.join('\n') +
-                  '\n\n📋 建议排查：\n' +
-                  '1. 检查 Token 是否过期或被撤销\n' +
-                  '2. 确认 Token 勾选了 gist 权限\n' +
-                  '3. 确认 Gist 没有被删除\n' +
-                  '4. 检查防火墙/VPN 是否拦截了 PATCH 请求';
-        setSyncIcon('error', '推送失败');
-        alert(msg);
-        if (pushBtn) { pushBtn.disabled = false; pushBtn.textContent = originalText; }
-        return;
+    // 拉取远程数据并合并到本地（推前合并不覆盖远程改动）
+    var headers = { 'Accept': 'application/vnd.github.v3+json' };
+    headers['Authorization'] = 'token ' + syncInfo.gistToken;
+
+    fetch('https://api.github.com/gists/' + syncInfo.gistId, { headers: headers })
+    .then(function(res) {
+      if (res.ok) return res.json();
+      // 远程不可达时也用本地数据推送（首次推送 Gist 可能为空）
+      return null;
+    }).then(function(gist) {
+      // 如果远程有数据，先合并到本地
+      if (gist && gist.files && gist.files[SYNC_FILE_NAME] && gist.files[SYNC_FILE_NAME].content) {
+        try {
+          var remoteData = JSON.parse(gist.files[SYNC_FILE_NAME].content);
+          if (remoteData && remoteData._version) {
+            var mergeStats = mergeImportData(remoteData);
+            console.log('[云同步] 推前合并完成：' + mergeStats.dateCount + ' 天');
+          }
+        } catch(e) { console.warn('[云同步] 推前合并失败:', e); }
       }
-
-      // 诊断通过，执行实际推送
-      setSyncIcon('syncing', '正在推送到云端...');
-      if (pushBtn) pushBtn.textContent = '⏳ 推送中...';
-
-      var data = exportAllData();
+      // 导出合并后的本地数据推送
+      return exportAllData();
+    }).then(function(data) {
       var payload = { files: {} };
       payload.files[SYNC_FILE_NAME] = {
         content: JSON.stringify(data, null, 2)
       };
 
-      console.log('[云同步] 开始正式推送...');
+      console.log('[云同步] 开始推送...');
 
       var controller = new AbortController();
       var timeoutId = setTimeout(function() { controller.abort(); }, 20000);
 
-      fetch('https://api.github.com/gists/' + syncInfo.gistId, {
+      return fetch('https://api.github.com/gists/' + syncInfo.gistId, {
         method: 'PATCH',
         headers: {
           'Authorization': 'token ' + syncInfo.gistToken,
@@ -374,26 +373,43 @@ var CloudSync = (function() {
       }).then(function(res) {
         clearTimeout(timeoutId);
         console.log('[云同步] 推送响应:', res.status);
-        if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' (Token无效)' : ''));
-        return res.json();
-      }).then(function() {
-        var now = new Date().toISOString();
-        syncInfo.lastSync = now;
-        localStorage.setItem(LAST_SYNC_KEY, now);
-        setSyncIcon('idle');
-        console.log('[云同步] 推送成功');
-      }).catch(function(err) {
-        clearTimeout(timeoutId);
-        var msg = err.name === 'AbortError' ? '请求超时（20秒），请检查网络连接' : err.message;
-        console.error('[云同步] 推送失败:', msg);
-        setSyncIcon('error', '推送失败：' + msg);
-        alert('推送失败：' + msg);
-      }).finally(function() {
-        if (pushBtn) {
-          pushBtn.disabled = false;
-          pushBtn.textContent = originalText;
+        if (!res.ok) {
+          var hint = '';
+          if (res.status === 401) hint = ' — Token 无效或权限不足，请在 github.com/settings/tokens 检查 Token 是否勾选 gist 权限';
+          if (res.status === 404) hint = ' — Gist 不存在，请检查 Gist ID';
+          if (res.status === 403) hint = ' — API 限流或 Token 无权限';
+          throw new Error('HTTP ' + res.status + hint);
         }
+        return res.json();
       });
+    }).then(function() {
+      var now = new Date().toISOString();
+      syncInfo.lastSync = now;
+      localStorage.setItem(LAST_SYNC_KEY, now);
+      // 清除本地编辑标记
+      localStorage.removeItem('quadrant_last_local_edit');
+      setSyncIcon('idle');
+      console.log('[云同步] 推送成功');
+    }).catch(function(err) {
+      var msg = err.name === 'AbortError' ? '请求超时（20秒），请检查网络连接' : err.message;
+      console.error('[云同步] 推送失败:', msg);
+      setSyncIcon('error', '推送失败：' + msg);
+      alert('推送失败：' + msg + '\n\n📋 建议排查：\n' +
+            '1. 检查 Token 是否过期或被撤销\n' +
+            '2. 确认 Token 勾选了 gist 权限\n' +
+            '3. 确认 Gist 没有被删除\n' +
+            '4. 检查防火墙/VPN 是否拦截了 PATCH 请求');
+    }).finally(function() {
+      _syncInFlight = false;
+      if (_pendingPush) {
+        _pendingPush = false;
+        // 有待推送的变更，稍后再推
+        setTimeout(function() { pushToGist(); }, 1000);
+      }
+      if (pushBtn) {
+        pushBtn.disabled = false;
+        pushBtn.textContent = originalText;
+      }
     });
   }
 
@@ -422,7 +438,7 @@ var CloudSync = (function() {
       }
 
       var data = JSON.parse(file.content);
-      importAllData(data);
+      var stats = mergeImportData(data);
 
       var now = new Date().toISOString();
       syncInfo.lastSync = now;
@@ -432,6 +448,9 @@ var CloudSync = (function() {
       // 触发页面重新渲染
       refreshAllViews();
 
+      if (!silent) {
+        showToast('✅ 已合并云端数据：' + stats.dateCount + ' 天记录');
+      }
       return data;
     }).catch(function(err) {
       if (!silent) {
@@ -443,76 +462,129 @@ var CloudSync = (function() {
     });
   }
 
-  // ============ 数据导入逻辑 ============
+  // ============ 数据导入逻辑（基于 SyncMerge 非破坏性合并）============
 
   /**
-   * 导入全部数据到当前浏览器
+   * 导入/合并云端数据到本地（使用 SyncMerge 逐条目 LWW 合并）。
+   * @returns {{ merged: boolean, dateCount: number, poolCount: number, bigTaskCount: number }}
    */
-  function importAllData(data) {
+  function mergeImportData(data) {
     if (!data || !data._version) {
-      alert('无效的同步数据文件。');
-      return;
+      if (!data || Object.keys(data).length === 0) return { merged: false, dateCount: 0 };
+      // 向后兼容：无 _version 的旧数据也尝试合并
     }
 
-    var dateCount = 0;
+    var stats = { merged: false, dateCount: 0, poolCount: 0, bigTaskCount: 0, cacheCount: 0, principleCount: 0 };
 
-    // 导入缓存日期索引（合并：保留本地独有的日期）
-    if (data.cachedDatesIndex && data.cachedDatesIndex.length > 0) {
+    // 1. 合并每日象限数据（逐条目 LWW，非整日覆盖）
+    if (data.dateData && typeof SyncMerge !== 'undefined') {
+      var localAllDateData = {};
+      try {
+        localAllDateData = (typeof loadAllData === 'function') ? loadAllData() :
+                           JSON.parse(localStorage.getItem('quadrant_task_data') || '{}');
+      } catch(e) { localAllDateData = {}; }
+      var mergedDateData = SyncMerge.mergeAllDateData(localAllDateData, data.dateData);
+      stats.dateCount = Object.keys(mergedDateData).length;
+      if (typeof saveAllData === 'function') {
+        saveAllData(mergedDateData);
+      }
+      stats.merged = true;
+    } else if (data.dateData) {
+      // SyncMerge 未加载时的降级：保持旧逻辑
+      var fallback = {};
+      try { fallback = (typeof loadAllData === 'function') ? loadAllData() :
+             JSON.parse(localStorage.getItem('quadrant_task_data') || '{}'); } catch(e) {}
+      Object.keys(data.dateData).forEach(function(date) {
+        fallback[date] = data.dateData[date];
+        stats.dateCount++;
+      });
+      if (typeof saveAllData === 'function') saveAllData(fallback);
+      stats.merged = true;
+    }
+
+    // 2. 合并缓存日期索引
+    if (data.cachedDatesIndex && data.cachedDatesIndex.length > 0 && typeof SyncMerge !== 'undefined') {
       try {
         var localIdx = JSON.parse(localStorage.getItem('quadrant_cached_dates_index') || '[]');
-        var merged = localIdx.slice();
-        data.cachedDatesIndex.forEach(function(d) {
-          if (merged.indexOf(d) === -1) merged.push(d);
-        });
-        merged.sort();
-        localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(merged));
+        var mergedIdx = SyncMerge.mergeCachedDatesIndex(localIdx, data.cachedDatesIndex);
+        localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(mergedIdx));
+      } catch(e) {}
+    } else if (data.cachedDatesIndex && data.cachedDatesIndex.length > 0) {
+      try {
+        var li = JSON.parse(localStorage.getItem('quadrant_cached_dates_index') || '[]');
+        var m = li.slice();
+        data.cachedDatesIndex.forEach(function(d) { if (m.indexOf(d) === -1) m.push(d); });
+        m.sort();
+        localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(m));
       } catch(e) {}
     }
 
-    // 关键修正：日期数据合并写入 quadrant_task_data 大对象（loadAllData/saveAllData）
-    // 策略：云端有的日期覆盖本地同名日期，本地独有的日期保留
-    if (data.dateData) {
-      var existing = {};
-      try {
-        existing = (typeof loadAllData === 'function') ? loadAllData() :
-                   JSON.parse(localStorage.getItem('quadrant_task_data') || '{}');
-      } catch(e) { existing = {}; }
-
-      Object.keys(data.dateData).forEach(function(date) {
-        existing[date] = data.dateData[date];
-        dateCount++;
-      });
-
-      if (typeof saveAllData === 'function') {
-        saveAllData(existing);
-      } else {
-        try { localStorage.setItem('quadrant_task_data', JSON.stringify(existing)); } catch(e) {}
-      }
-    }
-
-    // 导入未来任务池
+    // 3. 合并计划池（逐条目 LWW）
     ['future', 'week', 'month'].forEach(function(pool) {
-      var key = 'pool_' + pool;
-      if (data[key]) {
-        localStorage.setItem('quadrant_pool_' + pool, JSON.stringify(data[key]));
+      var remoteKey = 'pool_' + pool;
+      if (data[remoteKey] && typeof SyncMerge !== 'undefined') {
+        try {
+          var localPool = JSON.parse(localStorage.getItem('quadrant_' + pool + '_tasks') || '[]');
+          var mergedPool = SyncMerge.mergeFlatArray(localPool, data[remoteKey]);
+          localStorage.setItem('quadrant_' + pool + '_tasks', JSON.stringify(mergedPool));
+          stats.poolCount += mergedPool.length;
+        } catch(e) {}
+      } else if (data[remoteKey]) {
+        localStorage.setItem('quadrant_' + pool + '_tasks', JSON.stringify(data[remoteKey]));
+        stats.poolCount += (data[remoteKey] && data[remoteKey].length) || 0;
       }
     });
 
-    // 导入原则
-    if (data.principles && data.principles.principles) {
+    // 4. 合并原则（含 priorityProblems）
+    if (data.principles && typeof SyncMerge !== 'undefined') {
+      try {
+        var localPr = typeof loadPrinciples === 'function' ? loadPrinciples() :
+                      JSON.parse(localStorage.getItem('quadrant_principles') || '{"principles":[],"priorityProblems":[]}');
+        var mergedPr = SyncMerge.mergePrinciples(localPr, data.principles);
+        if (typeof savePrinciples === 'function') {
+          savePrinciples(mergedPr);
+        } else {
+          localStorage.setItem('quadrant_principles', JSON.stringify(mergedPr));
+        }
+        stats.principleCount = (mergedPr.principles && mergedPr.principles.length || 0) +
+                               (mergedPr.priorityProblems && mergedPr.priorityProblems.length || 0);
+      } catch(e) {}
+    } else if (data.principles && data.principles.principles) {
       localStorage.setItem('quadrant_principles', JSON.stringify(data.principles));
     }
 
-    // 导入大任务
-    if (data.bigTasks) {
+    // 5. 合并活跃大任务（逐条目 LWW）
+    if (data.bigTasks && typeof SyncMerge !== 'undefined') {
+      try {
+        var localBT = typeof loadBigTasks === 'function' ? loadBigTasks() :
+                      JSON.parse(localStorage.getItem('quadrant_big_tasks') || '[]');
+        var mergedBT = SyncMerge.mergeFlatArray(localBT, data.bigTasks);
+        localStorage.setItem('quadrant_big_tasks', JSON.stringify(mergedBT));
+        stats.bigTaskCount = mergedBT.length;
+      } catch(e) {}
+    } else if (data.bigTasks) {
       localStorage.setItem('quadrant_big_tasks', JSON.stringify(data.bigTasks));
-    }
-    if (data.bigTaskCache) {
-      localStorage.setItem('quadrant_big_task_cache', JSON.stringify(data.bigTaskCache));
+      stats.bigTaskCount = data.bigTasks.length || 0;
     }
 
-    console.log('[云同步] 已导入数据，合并 ' + dateCount + ' 个日期');
-    return true;
+    // 6. 合并大任务缓存库
+    if (data.bigTaskCache && typeof SyncMerge !== 'undefined') {
+      try {
+        var localCache = typeof loadBigTaskCache === 'function' ? loadBigTaskCache() :
+                         JSON.parse(localStorage.getItem('quadrant_big_tasks_cache') || '[]');
+        var mergedCache = SyncMerge.mergeFlatArray(localCache, data.bigTaskCache);
+        localStorage.setItem('quadrant_big_tasks_cache', JSON.stringify(mergedCache));
+        stats.cacheCount = mergedCache.length;
+      } catch(e) {}
+    } else if (data.bigTaskCache) {
+      localStorage.setItem('quadrant_big_tasks_cache', JSON.stringify(data.bigTaskCache));
+      stats.cacheCount = data.bigTaskCache.length || 0;
+    }
+
+    console.log('[云同步] 已合并数据：' + stats.dateCount + ' 日期, ' +
+                stats.poolCount + ' 计划池条目, ' + stats.bigTaskCount + ' 大任务, ' +
+                stats.cacheCount + ' 归档, ' + stats.principleCount + ' 原则');
+    return stats;
   }
 
   /**
@@ -546,6 +618,9 @@ var CloudSync = (function() {
 
   // 防抖推送定时器
   var pushTimer = null;
+  // 同步飞行锁（防止并发推/拉）
+  var _syncInFlight = false;
+  var _pendingPush = false;
   function debouncePushToGist() {
     if (pushTimer) clearTimeout(pushTimer);
     pushTimer = setTimeout(function() {

@@ -448,6 +448,73 @@
 
 ────────────────────────────────────────
 
+【同步可靠性深度重构 + 性能优化 — 2026-07-11】
+
+── 同步数据丢失缺陷修复 ──
+35. ✅ 计划池 localStorage key 错配修复：cloud-sync.js 导出/导入计划池键从错误的
+    "quadrant_pool_*" 改为正确的 "quadrant_future_tasks"/"quadrant_week_tasks"/"quadrant_month_tasks"
+36. ✅ 大任务缓存库 key 单复数错配修复：cloud-sync.js 导入大任务缓存从单数 "quadrant_big_task_cache"
+    改为复数 "quadrant_big_tasks_cache"
+37. ✅ 移除诊断测试 PATCH 毒化云端：diagnoseGistConnection 不再用测试 payload 覆盖 Gist，
+    改为直接真实推送
+38. ✅ 修复启动时静默 autoPull 覆盖本地未推送修改：setupGistSync 初始化不再自动拉取，
+    改为 toast 提示手动拉取
+39. ✅ onDataChanged 遗漏修复：saveBigTasks/saveBigTaskCache/savePlanTasks/savePrinciples
+    末尾统一调用 CloudSync.onDataChanged()
+
+── 可靠合并同步引擎 ──
+40. ✅ 新建 js/sync-merge.js：逐条目 LWW（最后写赢）合并引擎，纯函数、node 可测
+    - lwwWinner：按 updatedAt 比较，墓碑优先，旧数据向后兼容
+    - mergeArrayById：按 ID 合并两个数组，支持递归子条目
+    - mergeDateData / mergeAllDateData：象限/多日数据合并
+    - mergeFlatArray / mergePrinciples / mergeCachedDatesIndex
+    - countRemoteChanges：远端变更统计
+    - 验证：test/test-cloudsync-merge.js（25 测试全通过）
+41. ✅ 拉取流程改为非破坏性合并：pullFromGist 使用 mergeImportData 逐集合合并
+    （替代原 importAllData 全量覆盖），显示合并统计 toast
+42. ✅ 推送流程改为推前合并：pushToGist 先 GET 远程、mergeImportData 合并到本地、
+    再 PATCH 合并后数据（推前合并不覆盖远程改动）
+43. ✅ 竞态控制：_syncInFlight 锁 + _pendingPush 排队，推送完成后自动 flush 排队请求
+44. ✅ 推送成功清除 lastLocalEdit 标记
+
+── 性能优化（渲染与存储）──
+45. ✅ store.js 内存缓存层：_allDataCache + _fastDeepClone，loadAllData 命中缓存时
+    零 JSON.parse 开销；saveAllData 自动更新缓存
+46. ✅ 备份轮转限频：_rotateRollingBackups 限频 30s，高频小操作跳过备份轮转
+47. ✅ 统计合并遍历：新增 calcAllStats 函数，一次 walkLeafItems 同时算出象限/加权/时段
+    三组指标，updateStatsBar 从 2 次遍历减为 1 次
+48. ✅ renderTimeView 去重数据加载：renderAll 将已加载 data 传给 renderTimeView，
+    避免重复 loadDateData（减少一次完整 JSON.parse）
+49. ✅ migrate 短路：_migratedToday 按日期缓存，同一天多次 renderAll 只执行一次迁移
+50. ✅ renderAll debounce：renderAllDebounced 50ms 防抖，连续操作合并为一次渲染
+51. ✅ SourceEditor 延迟初始化：init 改为首次 open 时调用，避免启动时捕获完整 DOM
+52. ✅ 启动任务延迟：migrateFutureTasks/WeekTasks/MonthTasks 改为 setTimeout(0) 延迟执行，
+    seedCacheIndexIfEmpty 同步延迟；大任务自动归档改为 one-time migration
+    （quadrant_bigtask_autoarchive_v1 标记）
+53. ✅ 消除启动时双重面板渲染：renderAll 已内调 renderBigTaskPanel/renderPlanPoolPanel/
+    renderPrinciplesPanel，移除 initApp 中的冗余调用
+
+── Service Worker 与缓存策略 ──
+54. ✅ SW 缓存版本升级至 v20
+55. ✅ 新增 js/sync-merge.js 到 PRECACHE_ASSETS（原遗漏）
+56. ✅ fetchAndCache 修复：cache.put 前 clone 响应，避免 body stream 被消费两次
+57. ✅ 后台更新扩展至 JS/CSS：SW 对 HTML/JS/CSS 资源都执行 Stale-While-Revalidate
+58. ✅ index.html 所有 <script> 加 defer 属性 + ?v=20 缓存刷新参数；
+    <link> CSS 同样加 ?v=20
+
+── 回归测试 ──
+59. ✅ 全部 8 个测试套件（100+ 测试）通过：
+    test-cloudsync-merge.js / test-cloudsync-store-keys.js /
+    test-timeview-columns.js / test-timeview-distribution.js /
+    test-timeview-grouping.js / test-bigtask-completion.js /
+    test-bigtask-import-today.js / test-bigtask-cache.js
+
+涉及文件：js/cloud-sync.js / js/sync-merge.js（新增）/ js/store.js / js/render.js /
+    js/app.js / js/source-editor.js / service-worker.js / index.html /
+    test/test-cloudsync-merge.js（新增）/ test/test-cloudsync-store-keys.js（新增）
+
+────────────────────────────────────────
+
 【未来计划】
 1. 代码重构：模块化拆分，提升可维护性和运行性能
 2. APP与网页版数据互通

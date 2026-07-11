@@ -1,6 +1,6 @@
 // service-worker.js — PWA Service Worker
 // 版本号：修改此值可触发缓存更新（新旧缓存并存，激活后清理旧版）
-const CACHE_VERSION = 'v19';
+const CACHE_VERSION = 'v20';
 const CACHE_NAME = 'quadrant-tasks-' + CACHE_VERSION;
 
 // 需要预缓存的核心资源（首次安装时缓存）
@@ -27,6 +27,7 @@ const PRECACHE_ASSETS = [
   'js/bigtask.js',
   'js/daily-report.js',
   'js/source-editor.js',
+  'js/sync-merge.js',
   'js/cloud-sync.js',
   'js/app.js',
   'manifest.json',
@@ -91,8 +92,14 @@ self.addEventListener('fetch', function(event) {
     caches.match(event.request).then(function(cachedResponse) {
       if (cachedResponse) {
         // 缓存命中：返回缓存，同时在后台更新缓存（Stale-While-Revalidate）
-        // 对 HTML 页面始终尝试网络更新
-        if (event.request.headers.get('accept') && event.request.headers.get('accept').indexOf('text/html') !== -1) {
+        // 对 HTML / JS / CSS 资源尝试后台网络更新
+        var acceptHeader = event.request.headers.get('accept') || '';
+        var url = event.request.url;
+        var isAsset = acceptHeader.indexOf('text/html') !== -1
+          || /\.(js|css)(\?|$)/.test(url)
+          || url.indexOf('/js/') !== -1
+          || url.indexOf('/css/') !== -1;
+        if (isAsset) {
           fetchAndCache(event.request);
         }
         return cachedResponse;
@@ -141,7 +148,7 @@ function fetchAndCache(request) {
   fetch(request).then(function(networkResponse) {
     if (networkResponse && networkResponse.status === 200) {
       caches.open(CACHE_NAME).then(function(cache) {
-        cache.put(request, networkResponse);
+        cache.put(request, networkResponse.clone());
       });
     }
   }).catch(function() {

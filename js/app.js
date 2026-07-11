@@ -3,8 +3,8 @@ function initApp() {
   var today = new Date().toISOString().split('T')[0];
   currentDate = today;
 
-  // 初始化源码编辑器（捕获原始页面源码）
-  SourceEditor.init();
+  // 初始化源码编辑器 — 延迟到首次点击时（避免启动时捕获完整 DOM）
+  SourceEditor._initLazy = true;
 
   // 初始化云同步模块
   CloudSync.init();
@@ -31,17 +31,23 @@ function initApp() {
   setupPlanPoolPanel();
   setupPrinciplesPanel();
   setupHintBar();
-  migrateFutureTasks(today);
-  migrateWeekTasks(today);
-  migrateMonthTasks(today);
-  seedCacheIndexIfEmpty(); // Backward compat: seed cache index with existing dates (one-time)
-  // Silent migration: archive any legacy completed big tasks into the cache library.
-  saveBigTasks(loadBigTasks());
-  _pendingArchiveToasts = []; // don't toast for migrations on load
+
+  // 延迟执行非关键启动任务，让四象限视图先渲染
+  setTimeout(function() {
+    migrateFutureTasks(today);
+    migrateWeekTasks(today);
+    migrateMonthTasks(today);
+    seedCacheIndexIfEmpty();
+
+    // 大任务自动归档：仅在版本标记不存在时执行一次（ONE-TIME migration）
+    if (!localStorage.getItem('quadrant_bigtask_autoarchive_v1')) {
+      saveBigTasks(loadBigTasks());
+      localStorage.setItem('quadrant_bigtask_autoarchive_v1', '1');
+    }
+  }, 0);
+
   renderAll(today);
-  renderBigTaskPanel();
-  renderPlanPoolPanel();
-  renderPrinciplesPanel();
+  // renderBigTaskPanel / renderPlanPoolPanel / renderPrinciplesPanel 已在 renderAll 内调用
 
   // View mode toggle button
   var btnViewMode = document.getElementById('btnViewMode');
@@ -292,16 +298,32 @@ function updateSearchResult() {
 
 // Override renderAll (drag handlers are bound in create*Element functions)
 var _originalRenderAll = renderAll;
+var _renderTimer = null;
+var _migratedToday = {};
+
 renderAll = function(date) {
-  migrateFutureTasks(date);
-  migrateWeekTasks(date);
-  migrateMonthTasks(date);
-  migrateBigTaskSubtasks(date);
+  // migrate 短路：同一天只执行一次各迁移
+  if (!_migratedToday[date]) {
+    _migratedToday[date] = true;
+    migrateFutureTasks(date);
+    migrateWeekTasks(date);
+    migrateMonthTasks(date);
+    migrateBigTaskSubtasks(date);
+  }
   _originalRenderAll(date);
   renderBigTaskPanel();
   renderPlanPoolPanel();
   renderPrinciplesPanel();
 };
+
+// 防抖版 renderAll：50ms 内多次调用只执行最后一次
+function renderAllDebounced(date) {
+  if (_renderTimer) clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(function() {
+    _renderTimer = null;
+    renderAll(date || currentDate);
+  }, 50);
+}
 
 // ============ Principles Panel ============
 function setupPrinciplesPanel() {

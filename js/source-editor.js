@@ -37,6 +37,15 @@ var SourceEditor = (function() {
   function init() {
     captureOriginalSource();
     loadFromStorage();
+    _initialized = true;
+  }
+
+  var _initialized = false;
+
+  function ensureInit() {
+    if (!_initialized) {
+      init();
+    }
   }
 
   /**
@@ -115,6 +124,8 @@ var SourceEditor = (function() {
    * 打开源码编辑器
    */
   function open() {
+    // 延迟初始化：首次打开时才捕获 DOM 源码
+    ensureInit();
     // 确保源码是最新的
     if (!currentSource.html) loadFromStorage();
 

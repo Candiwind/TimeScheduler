@@ -12,10 +12,40 @@ function isCapacitorNative() {
 var STORAGE_BACKUP_KEY = 'quadrant_task_data_backup';
 var MAX_ROLLING_BACKUPS = 3;  // Keep last 3 snapshots (rotating)
 
+// --- 内存缓存层（避免重复 JSON.parse 整个历史大对象）---
+var _allDataCache = null;
+var _allDataCacheDirty = true;
+
+function _fastDeepClone(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    var arr = [];
+    for (var i = 0; i < obj.length; i++) arr[i] = _fastDeepClone(obj[i]);
+    return arr;
+  }
+  var clone = {};
+  var keys = Object.keys(obj);
+  for (var j = 0; j < keys.length; j++) {
+    clone[keys[j]] = _fastDeepClone(obj[keys[j]]);
+  }
+  return clone;
+}
+
+function invalidateDataCache() {
+  _allDataCacheDirty = true;
+}
+
 function loadAllData() {
+  if (!_allDataCacheDirty && _allDataCache !== null) {
+    return _fastDeepClone(_allDataCache);
+  }
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      _allDataCache = JSON.parse(raw);
+      _allDataCacheDirty = false;
+      return _fastDeepClone(_allDataCache);
+    }
   } catch (e) { /* fall through to backups */ }
   // Try recovery from rolling backups: _backup → _backup_1 → _backup_2 → ...
   var tryKeys = [STORAGE_BACKUP_KEY];
@@ -29,18 +59,28 @@ function loadAllData() {
         console.warn('Primary data corrupted, recovering from backup: ' + tryKeys[k]);
         var recovered = JSON.parse(backup);
         localStorage.setItem(STORAGE_KEY, backup);
-        return recovered;
+        _allDataCache = recovered;
+        _allDataCacheDirty = false;
+        return _fastDeepClone(_allDataCache);
       }
     } catch (e2) { /* continue to next backup */ }
   }
+  _allDataCache = {};
+  _allDataCacheDirty = false;
   return {};
 }
+
+var _lastBackupRotate = 0;
 
 // Rotate backups: shift existing snapshots +1, then store newest as _backup.
 // This prevents a single malformed save from destroying both primary and backup
 // simultaneously — older snapshots survive if the bug is detected in time.
+// Throttled: only rotates if >30s since last rotation (high-frequency saves skip rotation).
 function _rotateRollingBackups(json) {
   try {
+    var now = Date.now();
+    if (now - _lastBackupRotate < 30000) return; // 限频：30秒内不重复轮转
+    _lastBackupRotate = now;
     // Shift: _backup_2 → _backup_3, _backup_1 → _backup_2, _backup → _backup_1
     for (var i = MAX_ROLLING_BACKUPS - 1; i >= 1; i--) {
       var older = localStorage.getItem(STORAGE_BACKUP_KEY + '_' + i);
@@ -60,6 +100,9 @@ function saveAllData(data) {
   try {
     var json = JSON.stringify(data);
     localStorage.setItem(STORAGE_KEY, json);
+    // 更新内存缓存
+    _allDataCache = _fastDeepClone(data);
+    _allDataCacheDirty = false;
     // Rolling backup: keeps up to 3 prior snapshots so old versions survive
     // even if a logic bug corrupts data for several consecutive saves
     _rotateRollingBackups(json);
@@ -402,6 +445,9 @@ function saveBigTaskCache(arr) {
   } catch (e) {
     alert('存储空间不足');
   }
+  if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+    CloudSync.onDataChanged();
+  }
 }
 
 // Persist active big tasks. As a side effect, any task that has reached 100%
@@ -439,6 +485,10 @@ function saveBigTasks(tasks) {
     localStorage.setItem(BIG_TASK_KEY, JSON.stringify(active));
   } catch (e) {
     alert('存储空间不足');
+  }
+  // 通知云同步（大任务变更也需要自动推送）
+  if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+    CloudSync.onDataChanged();
   }
 }
 
@@ -827,6 +877,10 @@ function savePlanTasks(poolKey, tasks) {
   } catch (e) {
     alert('存储空间不足');
   }
+  // 通知云同步（计划池变更也需要自动推送）
+  if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+    CloudSync.onDataChanged();
+  }
 }
 
 function addPlanTask(poolKey, task) {
@@ -1162,6 +1216,10 @@ function loadPrinciples() {
 function savePrinciples(data) {
   try { localStorage.setItem(PRINCIPLES_KEY, JSON.stringify(data)); }
   catch (e) { alert('存储空间不足'); }
+  // 通知云同步（原则/优先问题变更也需要自动推送）
+  if (typeof CloudSync !== 'undefined' && CloudSync.onDataChanged) {
+    CloudSync.onDataChanged();
+  }
 }
 
 function addPrinciple(text) {

@@ -2358,7 +2358,9 @@ function renderPrinciplesPanel() {
 
   if (problems.length === 0) {
     if (ppSeparator) ppSeparator.style.display = 'none';
-    if (ppActions) ppActions.style.display = 'none';
+    // 仍显示"+ 添加优先问题"按钮，否则空状态下无法添加第一条
+    if (ppActions) ppActions.style.display = '';
+    if (ppAddBtn) ppAddBtn.style.display = '';
     return;
   }
 

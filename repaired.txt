@@ -424,6 +424,12 @@
        cloudsync_gitee_gist_id / cloudsync_gitee_gist_token），降级为未启用状态。
    (5) CODE_VERSION 更新为 '2026-07-11-remove-gitee'，SW 缓存版本升至 v17。
    涉及文件：js/cloud-sync.js / service-worker.js
+33. ✅ 修复优先问题模块空状态下无法添加的 bug：
+   renderPrinciplesPanel 中，当 priorityProblems 为空时把 ppActions
+   （含"+ 添加优先问题"按钮）一并隐藏，导致用户永远无法添加第一条——
+   功能看起来"不存在"。改为空状态仅隐藏分隔线，保留添加按钮可见。
+   SW 缓存版本升至 v18。
+   涉及文件：js/render.js / service-worker.js
 
 （暂无）
 

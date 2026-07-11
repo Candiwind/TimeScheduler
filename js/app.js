@@ -58,6 +58,7 @@ function initApp() {
       btnViewMode.title = '切换到象限视图';
     }
     btnViewMode.addEventListener('click', function() {
+      if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
       if (viewMode === 'quadrant') {
         viewMode = 'time';
         localStorage.setItem('quadrant_view_mode', 'time');
@@ -208,6 +209,14 @@ function setupButtons() {
     document.getElementById('btnAddBlock-' + key).addEventListener('click', function() {
       addTaskBlock(key);
     });
+    var batchBtn = document.getElementById('btnBatchDel-' + key);
+    if (batchBtn) {
+      batchBtn.addEventListener('click', function() {
+        if (typeof enterQuadrantBatchMode === 'function') {
+          enterQuadrantBatchMode(key);
+        }
+      });
+    }
   });
 }
 

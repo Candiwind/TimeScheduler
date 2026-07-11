@@ -51,6 +51,15 @@ function setupPlanPoolPanel() {
     (addFn[activePlanPool] || addFutureTask)(block);
     renderPlanPoolPanel();
   });
+
+  var planPoolBatchBtn = document.getElementById('btnBatchDelPlanPool');
+  if (planPoolBatchBtn) {
+    planPoolBatchBtn.addEventListener('click', function() {
+      if (typeof enterPlanPoolBatchMode === 'function') {
+        enterPlanPoolBatchMode();
+      }
+    });
+  }
 }
 
 // Backward compat stubs

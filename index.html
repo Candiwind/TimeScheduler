@@ -21,7 +21,7 @@
 <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>四象限任务管理器 v4</title>
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=22">
 </head>
 <body>
 <div id="app">
@@ -83,6 +83,7 @@
       <div class="bigtask-actions">
         <button class="btn btn-sm btn-primary" id="btnAddBigTask">+ 新建大任务</button>
         <button class="btn btn-sm btn-info" id="btnClaudePlan" data-tooltip="用 AI 调研规划大任务">🤖 AI 规划</button>
+        <button class="btn btn-sm batch-mode-trigger" id="btnBatchDelBigTask" title="批量删除">📋 批删</button>
       </div>
       <!-- Completed Big Task Cache (auto-populated when a big task finishes) -->
       <div class="bigtask-cache collapsed" id="bigTaskCache" style="display:none;">
@@ -137,6 +138,7 @@
         <span class="quadrant-label">立即处理</span>
         <button class="quadrant-add-btn" id="btnAddTask-I" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-I" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-I" title="批量删除">📋</button>
         <span class="task-count" id="count-I">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -150,6 +152,7 @@
         <span class="quadrant-label">计划安排</span>
         <button class="quadrant-add-btn" id="btnAddTask-II" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-II" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-II" title="批量删除">📋</button>
         <span class="task-count" id="count-II">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -163,6 +166,7 @@
         <span class="quadrant-label">委派处理</span>
         <button class="quadrant-add-btn" id="btnAddTask-III" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-III" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-III" title="批量删除">📋</button>
         <span class="task-count" id="count-III">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -176,6 +180,7 @@
         <span class="quadrant-label">尽量减少</span>
         <button class="quadrant-add-btn" id="btnAddTask-IV" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-IV" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-IV" title="批量删除">📋</button>
         <span class="task-count" id="count-IV">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -204,6 +209,7 @@
       <div class="planpool-actions">
         <button class="btn btn-sm btn-primary" id="btnAddPlanTask">+ 添加任务</button>
         <button class="btn btn-sm btn-info" id="btnAddPlanBlock">+ 添加任务块</button>
+        <button class="btn btn-sm batch-mode-trigger" id="btnBatchDelPlanPool" title="批量删除">📋 批删</button>
       </div>
     </div>
   </div>
@@ -242,28 +248,29 @@
     });
   }
 </script>
-<script defer src="js/util.js?v=20"></script>
-<script defer src="js/config.js?v=20"></script>
-<script defer src="js/store.js?v=20"></script>
-<script defer src="js/edit.js?v=20"></script>
-<script defer src="js/toast.js?v=20"></script>
-<script defer src="js/highlight.js?v=20"></script>
-<script defer src="js/timeslot.js?v=20"></script>
-<script defer src="js/render.js?v=20"></script>
-<script defer src="js/drag.js?v=20"></script>
-<script defer src="js/markdown.js?v=20"></script>
-<script defer src="js/json-io.js?v=20"></script>
-<script defer src="js/cache-ui.js?v=20"></script>
-<script defer src="js/stats-ui.js?v=20"></script>
-<script defer src="js/shortcuts.js?v=20"></script>
-<script defer src="js/quadrant-ops.js?v=20"></script>
-<script defer src="js/defer.js?v=20"></script>
-<script defer src="js/future.js?v=20"></script>
-<script defer src="js/bigtask.js?v=20"></script>
-<script defer src="js/daily-report.js?v=20"></script>
-<script defer src="js/source-editor.js?v=20"></script>
-<script defer src="js/sync-merge.js?v=20"></script>
-<script defer src="js/cloud-sync.js?v=20"></script>
-<script defer src="js/app.js?v=20"></script>
+<script defer src="js/util.js?v=22"></script>
+<script defer src="js/config.js?v=22"></script>
+<script defer src="js/store.js?v=22"></script>
+<script defer src="js/edit.js?v=22"></script>
+<script defer src="js/toast.js?v=22"></script>
+<script defer src="js/highlight.js?v=22"></script>
+<script defer src="js/timeslot.js?v=22"></script>
+<script defer src="js/render.js?v=22"></script>
+<script defer src="js/drag.js?v=22"></script>
+<script defer src="js/markdown.js?v=22"></script>
+<script defer src="js/json-io.js?v=22"></script>
+<script defer src="js/cache-ui.js?v=22"></script>
+<script defer src="js/stats-ui.js?v=22"></script>
+<script defer src="js/shortcuts.js?v=22"></script>
+<script defer src="js/quadrant-ops.js?v=22"></script>
+<script defer src="js/defer.js?v=22"></script>
+<script defer src="js/future.js?v=22"></script>
+<script defer src="js/bigtask.js?v=22"></script>
+<script defer src="js/daily-report.js?v=22"></script>
+<script defer src="js/source-editor.js?v=22"></script>
+<script defer src="js/sync-merge.js?v=22"></script>
+<script defer src="js/cloud-sync.js?v=22"></script>
+<script defer src="js/batch-delete.js?v=22"></script>
+<script defer src="js/app.js?v=22"></script>
 </body>
 </html>

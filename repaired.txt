@@ -455,6 +455,16 @@
     去重依据 planPoolRef（跨象限 + 块内子任务），含阶段的子任务一并深拷贝阶段。
     SW 缓存版本升至 v21。
     涉及文件：js/render.js / js/future.js / service-worker.js
+62. ✅ 批量删除功能：新增 js/batch-delete.js，支持在象限/计划池/大任务三大区域
+    进入批次模式（📋批删按钮），多选条目后一键批量删除。
+    - 进入批次模式后每行左侧出现选择复选框，底部出现操作栏（全选/反选/删除/取消）
+    - 象限视图：支持批量删除任务、任务块、块内子任务、阶段（含 bigTaskRef 解绑）
+    - 计划池：支持批量删除待办/周/月池的任务、任务块、块内子任务、阶段
+    - 大任务面板：支持批量删除卡片、里程碑、子任务、阶段
+    - 切换视图/面板/日期自动退出批次模式
+    SW 缓存版本升至 v22。
+    涉及文件：js/batch-delete.js / js/render.js / js/bigtask.js / js/future.js
+              / js/app.js / index.html / css/style.css / service-worker.js
 
 ────────────────────────────────────────
 

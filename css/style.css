@@ -1373,3 +1373,179 @@ kbd {
     min-width: 0;
   }
 }
+
+/* ============ 批量删除 ============ */
+
+/* 批次选择复选框 */
+.batch-select-checkbox {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-right: 6px;
+  accent-color: var(--danger, #e74c3c);
+  cursor: pointer;
+}
+
+/* 批次模式下的象限高亮 */
+.quadrant.batch-mode {
+  outline: 2px dashed var(--danger, #e74c3c);
+  outline-offset: -2px;
+}
+
+/* 批次模式容器 */
+.batch-mode .task-item,
+.batch-mode .subtask-item,
+.batch-mode .task-block,
+.batch-mode .planpool-item,
+.batch-mode .planpool-block,
+.batch-mode .bigtask-card,
+.batch-mode .bigtask-milestone {
+  cursor: default;
+}
+
+/* 底部批次工具栏 */
+.batch-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--surface, #fff);
+  border-top: 2px solid var(--danger, #e74c3c);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.12);
+  font-size: 13px;
+}
+
+.batch-toolbar-count {
+  font-weight: 600;
+  color: var(--danger, #e74c3c);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.batch-toolbar-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  background: var(--surface2, #f5f5f5);
+  color: var(--text, #333);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  min-height: 32px;
+}
+
+.batch-toolbar-btn:hover {
+  background: var(--accent-light, #e8f0fe);
+  border-color: var(--accent, #4285f4);
+}
+
+.batch-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.batch-toolbar-danger {
+  background: var(--danger, #e74c3c);
+  color: #fff;
+  border-color: var(--danger, #e74c3c);
+  font-weight: 600;
+}
+
+.batch-toolbar-danger:hover {
+  background: #c0392b;
+  border-color: #c0392b;
+}
+
+/* 批删模式触发按钮 */
+.batch-mode-trigger {
+  background: transparent;
+  border: 1px dashed var(--border, #ddd);
+  color: var(--text2, #666);
+}
+
+.batch-mode-trigger:hover {
+  border-color: var(--danger, #e74c3c);
+  color: var(--danger, #e74c3c);
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.quadrant-batch-btn {
+  background: transparent;
+  border: 1px dashed var(--border, #ddd);
+  color: var(--text2, #666);
+  font-size: 14px;
+}
+
+.quadrant-batch-btn:hover {
+  border-color: var(--danger, #e74c3c);
+  color: var(--danger, #e74c3c);
+  background: rgba(231, 76, 60, 0.05);
+}
+
+/* 暗色模式 */
+[data-theme="dark"] .batch-toolbar {
+  background: var(--surface, #1e1e1e);
+  border-top-color: var(--danger, #e74c3c);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.4);
+}
+
+[data-theme="dark"] .batch-toolbar-btn {
+  background: var(--surface2, #2a2a2a);
+  border-color: var(--border, #444);
+  color: var(--text, #ddd);
+}
+
+[data-theme="dark"] .batch-toolbar-btn:hover {
+  background: rgba(66, 133, 244, 0.15);
+}
+
+[data-theme="dark"] .batch-toolbar-danger {
+  background: var(--danger, #e74c3c);
+  color: #fff;
+}
+
+[data-theme="dark"] .batch-mode-trigger,
+[data-theme="dark"] .quadrant-batch-btn {
+  border-color: var(--border, #444);
+  color: var(--text2, #999);
+}
+
+[data-theme="dark"] .batch-mode-trigger:hover,
+[data-theme="dark"] .quadrant-batch-btn:hover {
+  border-color: var(--danger, #e74c3c);
+  color: var(--danger, #e74c3c);
+}
+
+/* 移动端适配 */
+@media (max-width: 600px) {
+  .batch-toolbar {
+    padding: 8px 10px;
+    gap: 6px;
+    font-size: 12px;
+  }
+
+  .batch-toolbar-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+    min-height: 40px;
+    min-width: 44px;
+  }
+
+  .batch-toolbar-count {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .batch-select-checkbox {
+    width: 22px;
+    height: 22px;
+    margin-right: 4px;
+  }
+}

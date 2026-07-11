@@ -14,6 +14,15 @@ function setupBigTaskPanel() {
   document.getElementById('btnAddBigTask').addEventListener('click', showAddBigTaskModal);
   document.getElementById('btnClaudePlan').addEventListener('click', showAIPlanModal);
 
+  var bigTaskBatchBtn = document.getElementById('btnBatchDelBigTask');
+  if (bigTaskBatchBtn) {
+    bigTaskBatchBtn.addEventListener('click', function() {
+      if (typeof enterBigTaskBatchMode === 'function') {
+        enterBigTaskBatchMode();
+      }
+    });
+  }
+
   var cacheToggle = document.getElementById('bigTaskCacheToggle');
   if (cacheToggle) {
     cacheToggle.addEventListener('click', function() {
@@ -25,6 +34,7 @@ function setupBigTaskPanel() {
 // ============ Render ============
 
 function renderBigTaskPanel() {
+  if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
   var bigTasks = loadBigTasks();
   var listEl = document.getElementById('bigTaskList');
 

@@ -1,6 +1,6 @@
 // service-worker.js — PWA Service Worker
 // 版本号：修改此值可触发缓存更新（新旧缓存并存，激活后清理旧版）
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = 'quadrant-tasks-' + CACHE_VERSION;
 
 // 需要预缓存的核心资源（首次安装时缓存）
@@ -29,6 +29,7 @@ const PRECACHE_ASSETS = [
   'js/source-editor.js',
   'js/sync-merge.js',
   'js/cloud-sync.js',
+  'js/batch-delete.js',
   'js/app.js',
   'manifest.json',
   'icon-192.png',

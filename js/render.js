@@ -1655,6 +1655,7 @@ var PLAN_POOL_CONFIGS = {
 };
 
 function renderPlanPoolPanel() {
+  if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
   var cfg = PLAN_POOL_CONFIGS[activePlanPool];
   if (!cfg) return;
   var ptasks = cfg.loadFn();
@@ -1973,6 +1974,7 @@ function renderPlanPoolPanel() {
 
 function switchPlanPoolTab(poolName) {
   if (activePlanPool === poolName) return;
+  if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
   activePlanPool = poolName;
   var tabs = document.querySelectorAll('.planpool-tab');
   tabs.forEach(function(t) {

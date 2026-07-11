@@ -446,6 +446,16 @@
 
 （暂无）
 
+60. ✅ 计划池阶段可折叠：为计划池任务（_renderPlanTaskHTML）和块内子任务（_renderPlanBlockHTML）
+    的阶段容器新增 ▼/▶ 折叠切换按钮，复用 store.js 的 setStageCollapsed 持久化到
+    localStorage（quadrant_stages_collapsed，用 pp-stages- 前缀避免与象限视图冲突）。
+    默认展开（▼），点击折叠后刷新页面保持状态。
+61. ✅ 计划池任务块批量导入：新增 importPlanBlockAllToToday（js/future.js），
+    在块头部新增 📥 一键导入全部子任务按钮（仅当有未完成子任务时显示），
+    去重依据 planPoolRef（跨象限 + 块内子任务），含阶段的子任务一并深拷贝阶段。
+    SW 缓存版本升至 v21。
+    涉及文件：js/render.js / js/future.js / service-worker.js
+
 ────────────────────────────────────────
 
 【同步可靠性深度重构 + 性能优化 — 2026-07-11】

@@ -211,7 +211,7 @@ function importCachedData(sourceDate, targetDate) {
 }
 
 // ============ Explicit Cache Index (only dates user clicked "缓存当前") ============
-// V2: 条目结构 [{date, label}]，label 为空时显示日期；向后兼容旧 string[] 格式
+// V3: 条目结构 [{id, date, label, pinned, cachedAt}]，同一日期可多次缓存为独立快照
 var CACHE_INDEX_KEY = 'quadrant_cached_dates_index';
 
 function loadCachedDatesIndex() {
@@ -219,12 +219,14 @@ function loadCachedDatesIndex() {
     var raw = localStorage.getItem(CACHE_INDEX_KEY);
     if (!raw) return [];
     var arr = JSON.parse(raw);
-    // 向后兼容：string[] → [{date, label, pinned}][]
+    // 向后兼容：string[] → [{date, label}] → [{id, date, label, pinned, cachedAt}]
     for (var i = 0; i < arr.length; i++) {
       if (typeof arr[i] === 'string') {
-        arr[i] = { date: arr[i], label: '', pinned: false };
-      } else if (arr[i].pinned === undefined) {
-        arr[i].pinned = false;
+        arr[i] = { id: 'cache_' + generateId(), date: arr[i], label: '', pinned: false, cachedAt: Date.now() };
+      } else {
+        if (!arr[i].id) arr[i].id = 'cache_' + generateId();
+        if (arr[i].pinned === undefined) arr[i].pinned = false;
+        if (!arr[i].cachedAt) arr[i].cachedAt = Date.now();
       }
     }
     return arr;
@@ -241,37 +243,39 @@ function saveCachedDatesIndex(entries) {
 
 function markDateAsCached(date) {
   var cached = loadCachedDatesIndex();
-  var exists = false;
-  for (var i = 0; i < cached.length; i++) {
-    if (cached[i].date === date) { exists = true; break; }
-  }
-  if (!exists) {
-    cached.push({ date: date, label: '', pinned: false });
-    cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
-    saveCachedDatesIndex(cached);
-  }
+  // 同日期允许多次缓存，每次生成独立 ID
+  cached.push({ id: 'cache_' + generateId(), date: date, label: '', pinned: false, cachedAt: Date.now() });
+  cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
+  saveCachedDatesIndex(cached);
 }
 
+// 返回去重后的唯一日期列表（供导入逻辑使用）
 function getCachedDates() {
-  return loadCachedDatesIndex().map(function(e) { return e.date; });
+  var seen = {};
+  var dates = [];
+  loadCachedDatesIndex().forEach(function(e) {
+    if (!seen[e.date]) { seen[e.date] = true; dates.push(e.date); }
+  });
+  return dates;
 }
 
 function getCachedDateEntries() {
   return loadCachedDatesIndex();
 }
 
-function updateCachedDateLabel(date, label) {
+// 通过条目ID更新标签
+function updateCachedDateLabel(id, label) {
   var entries = loadCachedDatesIndex();
   for (var i = 0; i < entries.length; i++) {
-    if (entries[i].date === date) { entries[i].label = (label || '').trim(); break; }
+    if (entries[i].id === id) { entries[i].label = (label || '').trim(); break; }
   }
   saveCachedDatesIndex(entries);
 }
 
-// 从导入缓存索引中删除指定日期（不删除实际数据，仅移除索引条目）
-function removeCachedDate(date) {
+// 通过条目ID从导入缓存索引中删除
+function removeCachedDate(id) {
   var entries = loadCachedDatesIndex();
-  var filtered = entries.filter(function(e) { return e.date !== date; });
+  var filtered = entries.filter(function(e) { return e.id !== id; });
   if (filtered.length < entries.length) {
     saveCachedDatesIndex(filtered);
     return true;
@@ -279,11 +283,11 @@ function removeCachedDate(date) {
   return false;
 }
 
-// 切换导入缓存条目的置顶状态
-function toggleCachedDatePin(date) {
+// 通过条目ID切换置顶状态
+function toggleCachedDatePin(id) {
   var entries = loadCachedDatesIndex();
   for (var i = 0; i < entries.length; i++) {
-    if (entries[i].date === date) { entries[i].pinned = !entries[i].pinned; break; }
+    if (entries[i].id === id) { entries[i].pinned = !entries[i].pinned; break; }
   }
   saveCachedDatesIndex(entries);
 }
@@ -293,7 +297,10 @@ function seedCacheIndexIfEmpty() {
   if (loadCachedDatesIndex().length === 0) {
     var allDates = getAllCachedDates();
     if (allDates.length > 0) {
-      saveCachedDatesIndex(allDates.map(function(d) { return { date: d, label: '', pinned: false }; }));
+      var now = Date.now();
+      saveCachedDatesIndex(allDates.map(function(d) {
+        return { id: 'cache_' + generateId(), date: d, label: '', pinned: false, cachedAt: now };
+      }));
     }
   }
 }

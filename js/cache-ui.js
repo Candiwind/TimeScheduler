@@ -64,6 +64,7 @@ function showCacheModal() {
 
   entries.forEach(function(entry) {
     var cacheDate = entry.date;
+    var entryId = entry.id;
     var label = entry.label || '';
     var pinned = entry.pinned || false;
 
@@ -86,7 +87,7 @@ function showCacheModal() {
       e.stopPropagation();
       var newLabel = prompt('输入新名称（留空则显示日期）：', label || '');
       if (newLabel !== null) {
-        updateCachedDateLabel(cacheDate, newLabel);
+        updateCachedDateLabel(entryId, newLabel);
         showCacheModal();
       }
     });
@@ -111,7 +112,7 @@ function showCacheModal() {
     pinBtn.style.marginRight = '4px';
     pinBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      toggleCachedDatePin(cacheDate);
+      toggleCachedDatePin(entryId);
       showCacheModal();
     });
 
@@ -125,7 +126,7 @@ function showCacheModal() {
       e.stopPropagation();
       var newLabel = prompt('输入新名称（留空则显示日期）：', label || '');
       if (newLabel !== null) {
-        updateCachedDateLabel(cacheDate, newLabel);
+        updateCachedDateLabel(entryId, newLabel);
         showCacheModal();
       }
     });
@@ -159,7 +160,7 @@ function showCacheModal() {
     delBtn.addEventListener('click', function(e) {
       e.stopPropagation();
       if (confirm('确定从导入缓存列表中删除 ' + (label || cacheDate) + '？\n（不会删除该日期的实际任务数据，仅移除缓存索引）')) {
-        removeCachedDate(cacheDate);
+        removeCachedDate(entryId);
         showCacheModal();
       }
     });

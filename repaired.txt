@@ -614,4 +614,16 @@
 
     涉及文件：js/store.js / js/cache-ui.js
 
+66. ✅ 同日期支持多条缓存快照——每次缓存生成独立条目
+
+    【同日期多次缓存】
+    - `quadrant_cached_dates_index` 条目新增 `id` 和 `cachedAt` 字段（V3），向后兼容自动迁移
+    - `markDateAsCached(date)` 不再检查重复，每次调用都创建新条目并分配唯一ID
+    - `getCachedDates()` 返回去重后的唯一日期列表，保证导入等逻辑不受影响
+    - `updateCachedDateLabel(id)` / `removeCachedDate(id)` / `toggleCachedDatePin(id)` 改用ID操作
+    - `seedCacheIndexIfEmpty()` 也生成 `id` + `cachedAt` 字段
+    - `cache-ui.js` 中所有操作（置顶/删除/重命名）使用 `entry.id` 而非 `entry.date`
+
+    涉及文件：js/store.js / js/cache-ui.js
+
 2. APP与网页版数据互通

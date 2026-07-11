@@ -412,6 +412,18 @@
        新增 importPlanPoolItemToToday / importPlanPoolItemWithStagesToToday。
    (4) SW 缓存版本升至 v16。
    涉及文件：js/render.js / js/future.js / js/bigtask.js / css/style.css / service-worker.js
+32. ✅ 移除 Gitee Gist 云同步（仅保留 GitHub Gist）：
+   (1) 删除 Gitee 全部同步代码：常量（GITEE_GIST_ID_KEY / GITEE_GIST_TOKEN_KEY）、
+       syncInfo 的 giteeGistId / giteeGistToken 字段、init 中的 Gitee 自动拉取、
+       onDataChanged 的 Gitee 分支、8 个 Gitee 函数（setupGiteeGist / saveGiteeGistConfig /
+       fetchGiteeGist / diagnoseGiteeGistConnection / pushToGiteeGist / pullFromGiteeGist /
+       autoPullFromGiteeGist / debouncePushToGiteeGist）、公开 API 的 Gitee 导出。
+   (2) openSyncSettings 对话框移除 Gitee Gist 配置区，仅保留 GitHub Gist。
+   (3) updateSyncIndicator / disableSync 移除 Gitee 分支。
+   (4) 向后兼容：init 检测旧 'gitee-gist' 模式自动清空配置（含 localStorage 残留的
+       cloudsync_gitee_gist_id / cloudsync_gitee_gist_token），降级为未启用状态。
+   (5) CODE_VERSION 更新为 '2026-07-11-remove-gitee'，SW 缓存版本升至 v17。
+   涉及文件：js/cloud-sync.js / service-worker.js
 
 （暂无）
 

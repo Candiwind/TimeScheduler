@@ -30,6 +30,13 @@ function showCacheModal() {
     return;
   }
 
+  // 置顶的排在最前面，然后按日期排序
+  entries.sort(function(a, b) {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return a.date.localeCompare(b.date);
+  });
+
   var existing = document.getElementById('cacheModal');
   if (existing) existing.remove();
 
@@ -58,6 +65,7 @@ function showCacheModal() {
   entries.forEach(function(entry) {
     var cacheDate = entry.date;
     var label = entry.label || '';
+    var pinned = entry.pinned || false;
 
     var item = document.createElement('div');
     item.className = 'cache-date-item';
@@ -71,7 +79,7 @@ function showCacheModal() {
     // 可编辑名称标签
     var nameEl = document.createElement('strong');
     nameEl.className = 'cache-entry-label';
-    nameEl.textContent = label || cacheDate;
+    nameEl.textContent = (pinned ? '📌 ' : '') + (label || cacheDate);
     nameEl.title = '双击编辑名称';
     nameEl.style.cursor = 'text';
     nameEl.addEventListener('dblclick', function(e) {
@@ -79,7 +87,7 @@ function showCacheModal() {
       var newLabel = prompt('输入新名称（留空则显示日期）：', label || '');
       if (newLabel !== null) {
         updateCachedDateLabel(cacheDate, newLabel);
-        showCacheModal(); // 刷新模态框
+        showCacheModal();
       }
     });
 
@@ -94,6 +102,18 @@ function showCacheModal() {
     var btns = document.createElement('div');
     btns.className = 'cache-entry-btns';
     btns.style.marginTop = '4px';
+
+    // 置顶按钮
+    var pinBtn = document.createElement('button');
+    pinBtn.className = 'btn btn-sm';
+    pinBtn.textContent = pinned ? '📌' : '📍';
+    pinBtn.title = pinned ? '取消置顶' : '置顶保护';
+    pinBtn.style.marginRight = '4px';
+    pinBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleCachedDatePin(cacheDate);
+      showCacheModal();
+    });
 
     // 重命名按钮
     var renameBtn = document.createElement('button');
@@ -130,6 +150,20 @@ function showCacheModal() {
       URL.revokeObjectURL(url);
     });
 
+    // 删除缓存按钮
+    var delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-sm btn-cancel';
+    delBtn.textContent = '🗑️';
+    delBtn.title = '从缓存列表删除（不删除实际数据）';
+    delBtn.style.marginRight = '4px';
+    delBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从导入缓存列表中删除 ' + (label || cacheDate) + '？\n（不会删除该日期的实际任务数据，仅移除缓存索引）')) {
+        removeCachedDate(cacheDate);
+        showCacheModal();
+      }
+    });
+
     // 导入按钮
     var importBtn = document.createElement('button');
     importBtn.className = 'btn btn-sm btn-primary';
@@ -157,8 +191,10 @@ function showCacheModal() {
     importBtn.addEventListener('click', doImport);
     item.addEventListener('click', doImport);
 
+    btns.appendChild(pinBtn);
     btns.appendChild(renameBtn);
     btns.appendChild(exportBtn);
+    btns.appendChild(delBtn);
     btns.appendChild(importBtn);
     item.appendChild(info);
     item.appendChild(btns);

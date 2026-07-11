@@ -219,10 +219,12 @@ function loadCachedDatesIndex() {
     var raw = localStorage.getItem(CACHE_INDEX_KEY);
     if (!raw) return [];
     var arr = JSON.parse(raw);
-    // 向后兼容：string[] → [{date, label}][]
+    // 向后兼容：string[] → [{date, label, pinned}][]
     for (var i = 0; i < arr.length; i++) {
       if (typeof arr[i] === 'string') {
-        arr[i] = { date: arr[i], label: '' };
+        arr[i] = { date: arr[i], label: '', pinned: false };
+      } else if (arr[i].pinned === undefined) {
+        arr[i].pinned = false;
       }
     }
     return arr;
@@ -244,7 +246,7 @@ function markDateAsCached(date) {
     if (cached[i].date === date) { exists = true; break; }
   }
   if (!exists) {
-    cached.push({ date: date, label: '' });
+    cached.push({ date: date, label: '', pinned: false });
     cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
     saveCachedDatesIndex(cached);
   }
@@ -266,12 +268,32 @@ function updateCachedDateLabel(date, label) {
   saveCachedDatesIndex(entries);
 }
 
+// 从导入缓存索引中删除指定日期（不删除实际数据，仅移除索引条目）
+function removeCachedDate(date) {
+  var entries = loadCachedDatesIndex();
+  var filtered = entries.filter(function(e) { return e.date !== date; });
+  if (filtered.length < entries.length) {
+    saveCachedDatesIndex(filtered);
+    return true;
+  }
+  return false;
+}
+
+// 切换导入缓存条目的置顶状态
+function toggleCachedDatePin(date) {
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].date === date) { entries[i].pinned = !entries[i].pinned; break; }
+  }
+  saveCachedDatesIndex(entries);
+}
+
 // One-time migration: seed cache index with all existing dates for backward compat
 function seedCacheIndexIfEmpty() {
   if (loadCachedDatesIndex().length === 0) {
     var allDates = getAllCachedDates();
     if (allDates.length > 0) {
-      saveCachedDatesIndex(allDates.map(function(d) { return { date: d, label: '' }; }));
+      saveCachedDatesIndex(allDates.map(function(d) { return { date: d, label: '', pinned: false }; }));
     }
   }
 }

@@ -486,10 +486,11 @@ function renderBigTaskDeletedCache() {
   section.style.display = '';
 
   var typeLabels = { bigtask: '🏗️大任务', milestone: '📌里程碑', subtask: '📋子任务', stage: '🔹阶段' };
+  var actionLabels = { deleted: '🗑️' };
   listEl.innerHTML = '';
-  // Newest first
   entries.slice().reverse().forEach(function(e) {
     var typeLabel = typeLabels[e.type] || e.type;
+    var actionLabel = (actionLabels[e.action] || '') + ' ';
     var name = '';
     if (e.type === 'bigtask') name = e.data.name || '未命名';
     else if (e.type === 'milestone') name = e.data.name || '未命名';
@@ -499,7 +500,7 @@ function renderBigTaskDeletedCache() {
       parentStr = ' ← ' + (e.parentInfo.bigTaskName || '');
       if (e.parentInfo.milestoneName) parentStr += ' / ' + e.parentInfo.milestoneName;
     }
-    var ts = e.deletedAt || e.timestamp;
+    var ts = e.timestamp || e.deletedAt;
     var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
     var div = document.createElement('div');
@@ -510,13 +511,25 @@ function renderBigTaskDeletedCache() {
         '<div class="bigtask-cache-name"><span class="deleted-type-tag">' + typeLabel + '</span> ' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></div>' +
         '<div class="bigtask-cache-meta">' + Util.escHtml(timeStr) + '</div>' +
       '</div>' +
+      '<button class="task-defer-btn dc-expand-btn" data-cache-id="' + e.id + '" title="查看详情" style="width:22px;height:22px;font-size:12px;padding:0;margin-right:4px;">📋</button>' +
       '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-right:4px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
       '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复到原位置" style="width:22px;height:22px;font-size:11px;padding:0;margin-right:4px;">↩</button>' +
       '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;">&times;</button>';
     listEl.appendChild(div);
   });
 
-  // 置顶切换
+  // 展开查看详情
+  listEl.querySelectorAll('.dc-expand-btn, .bigtask-cache-name').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cacheId = this.dataset.cacheId;
+      if (!cacheId) cacheId = this.parentElement.parentElement.querySelector('[data-cache-id]').dataset.cacheId;
+      var entry = null;
+      for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { entry = entries[i]; break; } }
+      if (entry && typeof _showCacheDetailPopup === 'function') _showCacheDetailPopup(entry);
+    });
+  });
+
   listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -524,7 +537,6 @@ function renderBigTaskDeletedCache() {
       renderBigTaskPanel();
     });
   });
-  // 恢复
   listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -534,7 +546,6 @@ function renderBigTaskDeletedCache() {
       }
     });
   });
-  // 永久删除
   listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -544,6 +555,8 @@ function renderBigTaskDeletedCache() {
       }
     });
   });
+
+  setupCacheSectionToggle('bigTaskDeletedCache');
 }
 
 function renderBigTaskCardHTML(bt, idx) {

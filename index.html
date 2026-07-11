@@ -99,9 +99,9 @@
       <div class="bigtask-cache collapsed" id="bigTaskDeletedCache" style="display:none;">
         <div class="bigtask-cache-header" id="bigTaskDeletedCacheToggle">
           <span>🗑️ 大任务回收站（<span id="bigTaskDeletedCacheCount">0</span>/10）</span>
-          <span class="bigtask-cache-toggle-icon">▼</span>
+          <span class="bigtask-cache-toggle-icon">▶</span>
         </div>
-        <div class="bigtask-cache-body" id="bigTaskDeletedCacheBody">
+        <div class="bigtask-cache-body" id="bigTaskDeletedCacheBody" style="display:none;">
           <div class="bigtask-cache-list" id="bigTaskDeletedCacheList"></div>
         </div>
       </div>
@@ -135,13 +135,23 @@
         <button class="btn btn-sm btn-primary" id="btnAddPrinciple">+ 添加原则</button>
       </div>
       <!-- Deleted Principles Cache -->
-      <div class="deleted-cache-section" id="principlesDeletedCache" style="display:none;">
+      <div class="deleted-cache-section collapsed" id="principlesDeletedCache" style="display:none;">
         <div class="deleted-cache-header" id="principlesDeletedCacheToggle">
-          <span>🗑️ 依循回收站（<span id="principlesDeletedCacheCount">0</span>/10）</span>
-          <span class="deleted-cache-toggle-icon">▼</span>
+          <span>🗑️ 原则回收站（<span id="principlesDeletedCacheCount">0</span>/10）</span>
+          <span class="deleted-cache-toggle-icon">▶</span>
         </div>
-        <div class="deleted-cache-body" id="principlesDeletedCacheBody">
+        <div class="deleted-cache-body" id="principlesDeletedCacheBody" style="display:none;">
           <div class="deleted-cache-list" id="principlesDeletedCacheList"></div>
+        </div>
+      </div>
+      <!-- Deleted Priority Problems Cache -->
+      <div class="deleted-cache-section collapsed" id="priorityProblemsDeletedCache" style="display:none;">
+        <div class="deleted-cache-header" id="priorityProblemsDeletedCacheToggle">
+          <span>🗑️ 优先问题回收站（<span id="priorityProblemsDeletedCacheCount">0</span>/10）</span>
+          <span class="deleted-cache-toggle-icon">▶</span>
+        </div>
+        <div class="deleted-cache-body" id="priorityProblemsDeletedCacheBody" style="display:none;">
+          <div class="deleted-cache-list" id="priorityProblemsDeletedCacheList"></div>
         </div>
       </div>
     </div>
@@ -232,12 +242,12 @@
         <button class="btn btn-sm batch-mode-trigger" id="btnBatchDelPlanPool" title="批量删除">🗑️ 批删</button>
       </div>
       <!-- Plan Pool Deleted/Completed Cache -->
-      <div class="deleted-cache-section" id="planPoolDeletedCache" style="display:none;">
+      <div class="deleted-cache-section collapsed" id="planPoolDeletedCache" style="display:none;">
         <div class="deleted-cache-header" id="planPoolDeletedCacheToggle">
           <span>🗑️ 计划池回收站（<span id="planPoolDeletedCacheCount">0</span>/10）</span>
-          <span class="deleted-cache-toggle-icon">▼</span>
+          <span class="deleted-cache-toggle-icon">▶</span>
         </div>
-        <div class="deleted-cache-body" id="planPoolDeletedCacheBody">
+        <div class="deleted-cache-body" id="planPoolDeletedCacheBody" style="display:none;">
           <div class="deleted-cache-list" id="planPoolDeletedCacheList"></div>
         </div>
       </div>

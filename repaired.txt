@@ -570,6 +570,34 @@
     涉及文件：js/store.js（核心重构） / js/bigtask.js / js/render.js / js/cache-ui.js /
         css/style.css / index.html / service-worker.js
 
+64. ✅ 回收站增强——依循回收站分离、默认收起、详情查看、格式统一
+
+    【原则与优先问题缓存分离】
+    - 新增 `quadrant_priority_problems_deleted` 键，优先问题独立缓存
+    - `_extractAndCachePrinciple` 按类型分别存入不同缓存键
+    - 新增 `restorePriorityProblemFromDeletedCache()` 恢复函数
+    - HTML 新增独立"🗑️ 优先问题回收站"区域
+    - 渲染拆分为 `renderPrinciplesDeletedCache` + `renderPriorityProblemsDeletedCache`
+
+    【回收站默认收起】
+    - 所有回收站（大任务/原则/优先问题/计划池）默认折叠，点击标题栏展开
+    - 折叠状态持久化到 `quadrant_cache_toggle_state`
+    - 新增通用函数：`setupCacheSectionToggle(sectionId)` 处理展开/收起
+    - 标题图标 ▶/▼ 随状态切换
+
+    【缓存内容可展开查看】
+    - 每条缓存增加 📋 详情按钮，点击弹出 Markdown 风格详情面板
+    - 新增 `renderCacheDetailMarkdown(entry)` 生成结构化文本
+    - 新增 `_showCacheDetailPopup(entry)` 弹出模态窗口
+    - 大任务/里程碑/子任务/阶段/任务块 均支持完整信息展示（含阶段进度、日期等）
+    - 新增 `_renderGenericDeletedCacheList()` 统一渲染逻辑（含展开/置顶/恢复/删除）
+
+    【大任务缓存格式统一】
+    - 大任务缓存条目格式改为与计划池一致：`{action, timestamp}` 替代 `deletedAt`
+    - 四项缓存条目（bigtask/milestone/subtask/stage）全部更新
+
+    涉及文件：js/store.js / js/bigtask.js / js/render.js / css/style.css / index.html
+
 ────────────────────────────────────────
 
 【未来计划】

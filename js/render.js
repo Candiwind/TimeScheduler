@@ -2526,6 +2526,7 @@ function renderPrinciplesPanel() {
 
   // 渲染依循删除缓存
   renderPrinciplesDeletedCache();
+  renderPriorityProblemsDeletedCache();
 }
 
 // ============ Principles Deleted Cache Render ============
@@ -2546,51 +2547,137 @@ function renderPrinciplesDeletedCache() {
   section.style.display = '';
   section.style.marginTop = '12px';
 
-  var typeLabels = { principle: '💎原则', priorityProblem: '⚠️优先问题' };
+  _renderGenericDeletedCacheList(listEl, entries, PRINCIPLES_DELETED_KEY, function() { renderPrinciplesPanel(); }, restorePrincipleFromDeletedCache);
+  setupCacheSectionToggle('principlesDeletedCache');
+}
+
+function renderPriorityProblemsDeletedCache() {
+  var section = document.getElementById('priorityProblemsDeletedCache');
+  var listEl = document.getElementById('priorityProblemsDeletedCacheList');
+  var countEl = document.getElementById('priorityProblemsDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var entries = getCacheEntries(PRIORITY_PROBLEMS_DELETED_KEY);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  section.style.marginTop = '12px';
+
+  _renderGenericDeletedCacheList(listEl, entries, PRIORITY_PROBLEMS_DELETED_KEY, function() { renderPrinciplesPanel(); }, restorePriorityProblemFromDeletedCache);
+  setupCacheSectionToggle('priorityProblemsDeletedCache');
+}
+
+// 通用缓存列表渲染：含类型标签、展开查看、置顶/恢复/删除按钮
+// restoreFn(id) 用于恢复条目；若未提供则默认使用 onChanged 刷新（适合委托外部处理的场景）
+function _renderGenericDeletedCacheList(listEl, entries, cacheKey, onChanged, restoreFn) {
+  var typeLabels = { principle: '💎原则', priorityProblem: '⚠️优先问题', task: '📋任务', block: '📦任务块', subtask: '📎子任务', stage: '🔹阶段' };
+  var actionLabels = { completed: '✅', deleted: '🗑️' };
   listEl.innerHTML = '';
   entries.slice().reverse().forEach(function(e) {
     var typeLabel = typeLabels[e.type] || e.type;
-    var name = e.data.text || '未命名';
-    var ts = e.deletedAt || e.timestamp;
+    var actionLabel = (actionLabels[e.action] || '') + ' ';
+    var name = '';
+    if (e.type === 'block' || e.type === 'bigtask') name = e.data.blockName || e.data.name || '未命名';
+    else if (e.type === 'milestone') name = e.data.name || '未命名';
+    else name = e.data.text || '未命名';
+    var parentStr = '';
+    if (e.parentInfo) {
+      parentStr = ' ← ' + (e.parentInfo.bigTaskName || e.parentInfo.ftName || '');
+      if (e.parentInfo.milestoneName) parentStr += ' / ' + e.parentInfo.milestoneName;
+    }
+    var ts = e.timestamp || e.deletedAt;
     var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
     var div = document.createElement('div');
     div.className = 'deleted-cache-item';
     div.innerHTML =
       '<span class="deleted-type-tag">' + typeLabel + '</span> ' +
-      '<span class="deleted-cache-text">' + Util.escHtml(name) + '</span>' +
+      '<span class="deleted-action-tag">' + actionLabel + '</span>' +
+      '<span class="deleted-cache-text" title="点击查看详情" style="cursor:pointer;">' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></span>' +
       '<span class="deleted-cache-time">' + Util.escHtml(timeStr) + '</span>' +
-      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:6px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
+      '<button class="task-defer-btn dc-expand-btn" data-cache-id="' + e.id + '" title="查看详情" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:4px;">📋</button>' +
+      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:4px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
       '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复" style="width:22px;height:22px;font-size:11px;padding:0;margin-left:4px;">↩</button>' +
       '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;margin-left:4px;">&times;</button>';
     listEl.appendChild(div);
   });
 
+  // 展开查看详情
+  listEl.querySelectorAll('.dc-expand-btn, .deleted-cache-text').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cacheId = this.dataset.cacheId;
+      if (!cacheId) cacheId = this.parentElement.querySelector('[data-cache-id]').dataset.cacheId;
+      var entry = null;
+      for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { entry = entries[i]; break; } }
+      if (entry) _showCacheDetailPopup(entry);
+    });
+  });
+
   listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      toggleCachePin(PRINCIPLES_DELETED_KEY, this.dataset.cacheId);
-      renderPrinciplesPanel();
+      toggleCachePin(cacheKey, this.dataset.cacheId);
+      onChanged();
     });
   });
   listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      if (restorePrincipleFromDeletedCache(this.dataset.cacheId)) {
-        renderPrinciplesPanel();
-        Toast.show('已恢复删除的条目');
+      var restored = false;
+      if (restoreFn) {
+        restored = restoreFn(this.dataset.cacheId);
       }
+      if (restored) {
+        Toast.show('已恢复' + (restored ? '' : ''));
+      }
+      onChanged();
     });
   });
   listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
       if (confirm('确定从回收站永久删除？将无法恢复。')) {
-        removeFromCache(PRINCIPLES_DELETED_KEY, this.dataset.cacheId);
-        renderPrinciplesPanel();
+        removeFromCache(cacheKey, this.dataset.cacheId);
+        onChanged();
       }
     });
   });
+}
+
+// 缓存条目详情弹窗（Markdown风格）
+function _showCacheDetailPopup(entry) {
+  var existing = document.getElementById('cacheDetailPopup');
+  if (existing) existing.remove();
+  var md = renderCacheDetailMarkdown(entry);
+  var overlay = document.createElement('div');
+  overlay.id = 'cacheDetailPopup';
+  overlay.className = 'modal-overlay';
+  var content = document.createElement('div');
+  content.className = 'modal-content cache-detail-content';
+  content.style.maxWidth = '520px';
+  content.style.maxHeight = '75vh';
+  content.style.overflowY = 'auto';
+  content.style.whiteSpace = 'pre-wrap';
+  content.style.fontFamily = 'var(--font-mono, Consolas, "Courier New", monospace)';
+  content.style.fontSize = '13px';
+  content.style.lineHeight = '1.6';
+  content.style.padding = '20px 24px';
+  content.textContent = md;
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'btn btn-sm btn-cancel';
+  closeBtn.textContent = '关闭';
+  closeBtn.style.marginTop = '12px';
+  closeBtn.addEventListener('click', function() { overlay.remove(); });
+  content.appendChild(closeBtn);
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
 }
 
 // ============ Plan Pool Deleted Cache Render ============
@@ -2614,56 +2701,6 @@ function renderPlanPoolDeletedCache() {
   section.style.display = '';
   section.style.marginTop = '12px';
 
-  var typeLabels = { task: '📋任务', block: '📦任务块', subtask: '📎子任务', stage: '🔹阶段' };
-  var actionLabels = { completed: '✅已完成', deleted: '🗑️已删除' };
-  listEl.innerHTML = '';
-  entries.slice().reverse().forEach(function(e) {
-    var typeLabel = typeLabels[e.type] || e.type;
-    var actionLabel = actionLabels[e.action] || e.action;
-    var name = '';
-    if (e.type === 'block') name = e.data.blockName || '未命名';
-    else name = e.data.text || '未命名';
-    var parentStr = '';
-    if (e.parentInfo && e.parentInfo.ftName) parentStr = ' ← ' + e.parentInfo.ftName;
-    var ts = e.timestamp;
-    var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-
-    var div = document.createElement('div');
-    div.className = 'deleted-cache-item';
-    div.innerHTML =
-      '<span class="deleted-type-tag">' + typeLabel + '</span> ' +
-      '<span class="deleted-action-tag" style="font-size:10px;">' + actionLabel + '</span> ' +
-      '<span class="deleted-cache-text">' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></span>' +
-      '<span class="deleted-cache-time">' + Util.escHtml(timeStr) + '</span>' +
-      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:6px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
-      '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复到计划池" style="width:22px;height:22px;font-size:11px;padding:0;margin-left:4px;">↩</button>' +
-      '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;margin-left:4px;">&times;</button>';
-    listEl.appendChild(div);
-  });
-
-  listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      toggleCachePin(cacheKey, this.dataset.cacheId);
-      renderPlanPoolPanel();
-    });
-  });
-  listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (restorePlanPoolFromCacheByKey(poolKey, this.dataset.cacheId)) {
-        renderPlanPoolPanel();
-        Toast.show('已恢复到计划池');
-      }
-    });
-  });
-  listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (confirm('确定从回收站永久删除？将无法恢复。')) {
-        removeFromCache(cacheKey, this.dataset.cacheId);
-        renderPlanPoolPanel();
-      }
-    });
-  });
+  _renderGenericDeletedCacheList(listEl, entries, cacheKey, function() { renderPlanPoolPanel(); }, function(id) { return restorePlanPoolFromCacheByKey(poolKey, id); });
+  setupCacheSectionToggle('planPoolDeletedCache');
 }

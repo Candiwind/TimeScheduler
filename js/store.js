@@ -280,6 +280,7 @@ function seedCacheIndexIfEmpty() {
 // 适用于大任务删除缓存、依循删除缓存、计划池完成/删除缓存
 var BIG_TASKS_DELETED_KEY = 'quadrant_big_tasks_deleted';
 var PRINCIPLES_DELETED_KEY = 'quadrant_principles_deleted';
+var PRIORITY_PROBLEMS_DELETED_KEY = 'quadrant_priority_problems_deleted';
 var FUTURE_TASKS_CACHE_KEY = 'quadrant_future_tasks_cache';
 var WEEK_TASKS_CACHE_KEY = 'quadrant_week_tasks_cache';
 var MONTH_TASKS_CACHE_KEY = 'quadrant_month_tasks_cache';
@@ -519,7 +520,8 @@ function _extractAndCacheBigTaskItem(btId, msId, stId, stageId) {
           type: 'bigtask',
           data: JSON.parse(JSON.stringify(removed)),
           parentInfo: null,
-          deletedAt: Date.now(),
+          action: 'deleted',
+          timestamp: Date.now(),
           pinned: false
         };
       } else if (msId && !stId && !stageId && tasks[i].milestones) {
@@ -532,7 +534,8 @@ function _extractAndCacheBigTaskItem(btId, msId, stId, stageId) {
               type: 'milestone',
               data: JSON.parse(JSON.stringify(removedMs)),
               parentInfo: { bigTaskId: btId, bigTaskName: tasks[i].name || '' },
-              deletedAt: Date.now(),
+              action: 'deleted',
+              timestamp: Date.now(),
               pinned: false
             };
             break;
@@ -550,7 +553,8 @@ function _extractAndCacheBigTaskItem(btId, msId, stId, stageId) {
                   type: 'subtask',
                   data: JSON.parse(JSON.stringify(removedSt)),
                   parentInfo: { bigTaskId: btId, bigTaskName: tasks[i].name || '', milestoneId: msId, milestoneName: tasks[i].milestones[k].name || '' },
-                  deletedAt: Date.now(),
+                  action: 'deleted',
+                  timestamp: Date.now(),
                   pinned: false
                 };
                 break;
@@ -574,7 +578,8 @@ function _extractAndCacheBigTaskItem(btId, msId, stId, stageId) {
                       type: 'stage',
                       data: JSON.parse(JSON.stringify(removedStage)),
                       parentInfo: { bigTaskId: btId, bigTaskName: tasks[i].name || '', milestoneId: msId, milestoneName: tasks[i].milestones[m].name || '', subtaskId: stId, subtaskName: t.text || '' },
-                      deletedAt: Date.now(),
+                      action: 'deleted',
+                      timestamp: Date.now(),
                       pinned: false
                     };
                     if (t.stages.length === 0) { delete t.stages; t.completed = false; }
@@ -659,9 +664,11 @@ function restoreBigTaskFromDeletedCache(cacheId) {
 }
 
 // ============ 依循删除缓存 ============
+// 原则与优先问题分别存入独立缓存：PRINCIPLES_DELETED_KEY / PRIORITY_PROBLEMS_DELETED_KEY
 function _extractAndCachePrinciple(id, type) {
   var data = loadPrinciples();
   var entry = null;
+  var cacheKey = type === 'priorityProblem' ? PRIORITY_PROBLEMS_DELETED_KEY : PRINCIPLES_DELETED_KEY;
   if (type === 'principle') {
     for (var i = 0; i < data.principles.length; i++) {
       if (data.principles[i].id === id) {
@@ -682,12 +689,12 @@ function _extractAndCachePrinciple(id, type) {
   }
   if (entry) {
     savePrinciples(data);
-    addToCache(PRINCIPLES_DELETED_KEY, entry);
+    addToCache(cacheKey, entry);
   }
   return entry;
 }
 
-// 从依循删除缓存恢复条目
+// 从原则删除缓存恢复
 function restorePrincipleFromDeletedCache(cacheId) {
   var entries = _loadGenericCache(PRINCIPLES_DELETED_KEY);
   var idx = -1;
@@ -696,12 +703,22 @@ function restorePrincipleFromDeletedCache(cacheId) {
   var entry = entries.splice(idx, 1)[0];
   _saveGenericCache(PRINCIPLES_DELETED_KEY, entries);
   var data = loadPrinciples();
-  if (entry.type === 'principle') {
-    data.principles.push(entry.data);
-  } else if (entry.type === 'priorityProblem') {
-    if (!data.priorityProblems) data.priorityProblems = [];
-    data.priorityProblems.push(entry.data);
-  }
+  data.principles.push(entry.data);
+  savePrinciples(data);
+  return true;
+}
+
+// 从优先问题删除缓存恢复
+function restorePriorityProblemFromDeletedCache(cacheId) {
+  var entries = _loadGenericCache(PRIORITY_PROBLEMS_DELETED_KEY);
+  var idx = -1;
+  for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { idx = i; break; } }
+  if (idx < 0) return false;
+  var entry = entries.splice(idx, 1)[0];
+  _saveGenericCache(PRIORITY_PROBLEMS_DELETED_KEY, entries);
+  var data = loadPrinciples();
+  if (!data.priorityProblems) data.priorityProblems = [];
+  data.priorityProblems.push(entry.data);
   savePrinciples(data);
   return true;
 }
@@ -1758,3 +1775,125 @@ function setStageCollapsed(id, collapsed) {
   saveStagesCollapseState(state);
 }
 
+// ============ 缓存面板折叠状态持久化 ============
+var CACHE_TOGGLE_KEY = 'quadrant_cache_toggle_state';
+
+function loadCacheToggleState() {
+  try {
+    var raw = localStorage.getItem(CACHE_TOGGLE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+
+function saveCacheToggleState(state) {
+  try { localStorage.setItem(CACHE_TOGGLE_KEY, JSON.stringify(state)); }
+  catch (e) { /* silent */ }
+}
+
+// 为缓存面板设置折叠切换：默认收起，点击 header 展开/收起并持久化
+function setupCacheSectionToggle(sectionId) {
+  var section = document.getElementById(sectionId);
+  if (!section) return;
+  var header = section.querySelector('.bigtask-cache-header, .deleted-cache-header');
+  var body = section.querySelector('.bigtask-cache-body, .deleted-cache-body');
+  var icon = header ? header.querySelector('.bigtask-cache-toggle-icon, .deleted-cache-toggle-icon') : null;
+  if (!header || !body) return;
+  // 移除旧监听器（避免重复绑定）
+  var newHeader = header.cloneNode(true);
+  header.parentNode.replaceChild(newHeader, header);
+  header = newHeader;
+  body = section.querySelector('.bigtask-cache-body, .deleted-cache-body');
+  icon = header.querySelector('.bigtask-cache-toggle-icon, .deleted-cache-toggle-icon');
+
+  var state = loadCacheToggleState();
+  var isOpen = !state[sectionId]; // 默认收起
+  if (!isOpen) {
+    body.style.display = 'none';
+    if (icon) icon.textContent = '▶';
+  } else {
+    body.style.display = '';
+    if (icon) icon.textContent = '▼';
+  }
+
+  header.addEventListener('click', function() {
+    var cur = loadCacheToggleState();
+    var nowOpen = body.style.display !== 'none';
+    if (nowOpen) {
+      body.style.display = 'none';
+      if (icon) icon.textContent = '▶';
+      cur[sectionId] = true;
+    } else {
+      body.style.display = '';
+      if (icon) icon.textContent = '▼';
+      delete cur[sectionId];
+    }
+    saveCacheToggleState(cur);
+  });
+}
+
+// 生成缓存条目的 Markdown 风格详情文本（任务/子任务/阶段 含阶段进度、日期等）
+function renderCacheDetailMarkdown(entry) {
+  var lines = [];
+  var data = entry.data || {};
+  var typeLabel = { bigtask: '大任务', milestone: '里程碑', subtask: '子任务', stage: '阶段', task: '任务', block: '任务块' }[entry.type] || entry.type;
+  var actionLabel = entry.action === 'completed' ? '✅ 已完成' : '🗑️ 已删除';
+  lines.push('# ' + (typeLabel || '') + ' · ' + actionLabel);
+  lines.push('');
+
+  if (entry.type === 'bigtask') {
+    lines.push('- **名称**: ' + (data.name || '未命名'));
+    if (data.targetDate) lines.push('- **截止日期**: ' + data.targetDate);
+    if (data.completedDate) lines.push('- **完成日期**: ' + data.completedDate);
+    if (data.progress !== undefined) lines.push('- **进度**: ' + data.progress + '%');
+    if (data.milestones) {
+      lines.push('- **里程碑**: ' + data.milestones.length + ' 个');
+      data.milestones.forEach(function(ms, i) {
+        lines.push('  ' + (i + 1) + '. ' + (ms.name || '未命名') + '（' + (ms.tasks ? ms.tasks.length : 0) + ' 子任务）');
+        if (ms.tasks) {
+          ms.tasks.forEach(function(t) {
+            var status = t.completed ? '✅' : '⬜';
+            lines.push('    - ' + status + ' ' + (t.text || ''));
+            if (t.stages) {
+              t.stages.forEach(function(s) {
+                lines.push('      - ' + (s.completed ? '✅' : '⬜') + ' ' + (s.text || ''));
+              });
+            }
+          });
+        }
+      });
+    }
+  } else if (entry.type === 'milestone') {
+    lines.push('- **名称**: ' + (data.name || '未命名'));
+    if (data.tasks) lines.push('- **子任务数**: ' + data.tasks.length);
+  } else if (entry.type === 'block') {
+    lines.push('- **名称**: ' + (data.blockName || '未命名'));
+    if (data.tasks) {
+      data.tasks.forEach(function(t) {
+        lines.push('  - ' + (t.completed ? '✅' : '⬜') + ' ' + (t.text || ''));
+        if (t.stages) {
+          t.stages.forEach(function(s) {
+            lines.push('    - ' + (s.completed ? '✅' : '⬜') + ' ' + (s.text || ''));
+          });
+        }
+      });
+    }
+  } else {
+    // subtask / stage / task
+    lines.push('- **内容**: ' + (data.text || data.name || '未命名'));
+    if (data.scheduledDate) lines.push('- **计划日期**: ' + data.scheduledDate);
+    if (data.targetQuadrant) {
+      var q = QUADRANTS[data.targetQuadrant];
+      lines.push('- **目标象限**: ' + (q ? q.icon + ' ' + q.label : data.targetQuadrant));
+    }
+    if (data.stages) {
+      lines.push('- **阶段**:');
+      data.stages.forEach(function(s) {
+        lines.push('  - ' + (s.completed ? '✅' : '⬜') + ' ' + (s.text || ''));
+      });
+    }
+  }
+
+  var ts = entry.timestamp;
+  if (ts) lines.push('\n*' + new Date(ts).toLocaleString('zh-CN') + '*');
+  return lines.join('\n');
+}

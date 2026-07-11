@@ -377,6 +377,19 @@
        调用 block 子任务版本函数，否则调用顶层任务版本。复用现有 CSS 类名、事件选择器。
    (4) 样式：planpool-block-stages（padding-left:18px）确保阶段行与子任务文本视觉对齐。
    涉及文件：js/render.js / css/style.css / service-worker.js
+28. ✅ 新增 Gitee Gist 云同步 + 移除百度网盘同步：
+   (1) 新增 Gitee Gist（码云代码片段）云同步：仿照 GitHub Gist 实现，支持公开代码片段免 Token 拉取、
+       Token 推送双向同步、自动拉取、防抖推送、连接诊断。
+      Gitee API：GET/PATCH gitee.com/api/v5/gists/{id}，Token 通过 access_token 参数传递。
+   (2) 移除百度网盘同步功能：删除 setupBaiduSync / autoExportToDisk / importFromBaiduDisk 函数，
+       IndexedDB 文件句柄持久化（openDB / storeFileHandle / restoreFileHandle），相关常量。
+       localStorage 中旧 'baidu-disk' 模式自动迁移为禁用状态。
+   (3) GitHub Gist 模式名从 'gist' 统一改为 'github-gist'，向后兼容自动迁移。
+   (4) 同步设置对话框(openSyncSettings)重构：分别展示 GitHub Gist 和 Gitee Gist 两个配置区，
+       支持 ID+Token 表单连接、推送/拉取按钮、禁用同步。
+   (5) updateSyncIndicator / disableSync 适配双模式，同步图标 title 显示具体平台名称。
+   (6) SW 缓存版本升至 v15。
+   涉及文件：js/cloud-sync.js / service-worker.js
 
 （暂无）
 

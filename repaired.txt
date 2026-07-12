@@ -380,6 +380,22 @@
 
 （暂无）
 
+28. ✅ Gist 云同步 4 项修复——计划池 key 不匹配 + 大任务缓存 key 拼写错误 + 导入绕过自动归档 + 拉取不等待：
+   (1) Bug 1（致命）：exportAllData() 计划池读取 key 从 quadrant_pool_* 改为 quadrant_*_tasks，
+       与 store.js 实际存储 key 一致。此前导出永远为空，手机端永远拉不到计划池数据。
+   (2) Bug 2（致命）：importAllData() 计划池导入写入 key 同上修正为 quadrant_*_tasks。
+   (3) Bug 3（致命）：importAllData() 大任务缓存导入写入 key 从 quadrant_big_task_cache（单数 task）
+       改为 quadrant_big_tasks_cache（复数 tasks），与 store.js loadBigTaskCache() 读取一致。
+   (4) Bug 4（中等）：importAllData() 导入大任务改为走 saveBigTasks()（而非直接写 localStorage），
+       以触发自动归档逻辑——进度 100% 的大任务自动移入缓存库，与本地创建行为一致。
+   (5) Bug 5（中等）：setupGistSync 两个分支（已有Token / 无Token公开访问）原先 pullFromGist()
+       fire-and-forget 不等待完成就调用 openSyncSettings()，导致设置对话框显示拉取前的旧时间戳。
+       改为 .then() 等待拉取完成后再打开设置对话框。
+   (6) SW 缓存版本升 v14→v15，确保手机端 PWA 拉取到修复后的 cloud-sync.js。
+   涉及文件：js/cloud-sync.js / service-worker.js
+
+（暂无）
+
 ────────────────────────────────────────
 
 【未来计划】

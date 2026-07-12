@@ -204,9 +204,10 @@ var CloudSync = (function() {
       principles: loadPrinciples ? loadPrinciples() : {}
     };
 
-    // 也加入未来任务池数据
+    // 也加入未来任务池数据（key 与 store.js 保持一致：quadrant_*_tasks）
+    var poolKeyMap = { future: 'quadrant_future_tasks', week: 'quadrant_week_tasks', month: 'quadrant_month_tasks' };
     ['future', 'week', 'month'].forEach(function(pool) {
-      var key = 'quadrant_pool_' + pool;
+      var key = poolKeyMap[pool];
       try {
         var poolRaw = localStorage.getItem(key);
         if (poolRaw) exportObj['pool_' + pool] = JSON.parse(poolRaw);
@@ -293,8 +294,9 @@ var CloudSync = (function() {
       fetchGist(gistId, existingToken).then(function() {
         saveGistConfig(gistId, existingToken, '完整模式（已有Token）');
         showToast('✅ Gist 已连接（拉取+推送模式）\n两端自动同步已就绪');
-        pullFromGist(false);
-        if (fromForm) openSyncSettings();
+        pullFromGist(false).then(function() {
+          if (fromForm) openSyncSettings();
+        });
       }).catch(function() {
         if (fromForm) {
           // 表单模式：Token 可能不对，提示但不降级（用户可在表单中清除Token重试）
@@ -335,8 +337,9 @@ var CloudSync = (function() {
                     '手机端无需 Token 即可自动同步\n\n' +
                     '如需推送数据，请再次设置并输入 Token。');
         }
-        pullFromGist(false);
-        if (fromForm) openSyncSettings();
+        pullFromGist(false).then(function() {
+          if (fromForm) openSyncSettings();
+        });
       }).catch(function() {
         if (fromForm) {
           alert('无法访问该 Gist。\n\n可能原因：\n1. Gist ID 不存在\n2. Gist 为私密，需填写 Token');
@@ -622,11 +625,12 @@ var CloudSync = (function() {
       }
     }
 
-    // 导入未来任务池
+    // 导入未来任务池（key 与 store.js 保持一致：quadrant_*_tasks）
+    var poolKeyMap = { future: 'quadrant_future_tasks', week: 'quadrant_week_tasks', month: 'quadrant_month_tasks' };
     ['future', 'week', 'month'].forEach(function(pool) {
       var key = 'pool_' + pool;
       if (data[key]) {
-        localStorage.setItem('quadrant_pool_' + pool, JSON.stringify(data[key]));
+        localStorage.setItem(poolKeyMap[pool], JSON.stringify(data[key]));
       }
     });
 
@@ -635,12 +639,14 @@ var CloudSync = (function() {
       localStorage.setItem('quadrant_principles', JSON.stringify(data.principles));
     }
 
-    // 导入大任务
-    if (data.bigTasks) {
+    // 导入大任务（走 saveBigTasks 以触发自动归档逻辑）
+    if (data.bigTasks && typeof saveBigTasks === 'function') {
+      saveBigTasks(data.bigTasks);
+    } else if (data.bigTasks) {
       localStorage.setItem('quadrant_big_tasks', JSON.stringify(data.bigTasks));
     }
     if (data.bigTaskCache) {
-      localStorage.setItem('quadrant_big_task_cache', JSON.stringify(data.bigTaskCache));
+      localStorage.setItem('quadrant_big_tasks_cache', JSON.stringify(data.bigTaskCache));
     }
 
     console.log('[云同步] 已导入数据，合并 ' + dateCount + ' 个日期');

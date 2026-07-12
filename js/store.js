@@ -280,7 +280,38 @@ function loadCachedDatesIndex() {
         if (arr[i].snapshot === undefined) arr[i].snapshot = null;
       }
     }
-    return arr;
+    // 去重：同日期只保留一条（优先保留有快照的、更新的），同时清理空快照条目
+    var seen = {};
+    var deduped = [];
+    for (var j = 0; j < arr.length; j++) {
+      var entry = arr[j];
+      if (!entry.date) { deduped.push(entry); continue; }
+      if (!seen[entry.date]) {
+        seen[entry.date] = entry;
+        deduped.push(entry);
+      } else {
+        // 已有同日期条目：保留有快照的或更新的
+        var prev = seen[entry.date];
+        var prevHasSnap = prev.snapshot && Object.keys(prev.snapshot).length > 0;
+        var curHasSnap = entry.snapshot && Object.keys(entry.snapshot).length > 0;
+        if (curHasSnap && !prevHasSnap) {
+          // 新条目有快照、旧条目没有 → 替换
+          deduped[deduped.indexOf(prev)] = entry;
+          seen[entry.date] = entry;
+        } else if (curHasSnap && prevHasSnap && (entry.cachedAt || 0) > (prev.cachedAt || 0)) {
+          // 都有快照但新条目更新 → 替换
+          deduped[deduped.indexOf(prev)] = entry;
+          seen[entry.date] = entry;
+        }
+        // 否则保留旧条目（旧有条目更好或一样好）
+      }
+    }
+    // 如果去重后有变化，回写清理后的数据
+    if (deduped.length !== arr.length) {
+      deduped.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+      saveCachedDatesIndex(deduped);
+    }
+    return deduped;
   } catch (e) {
     return [];
   }
@@ -303,15 +334,25 @@ function markDateAsCached(date) {
   // 深拷贝创建独立快照
   var snapshot = JSON.parse(JSON.stringify(data));
   var cached = loadCachedDatesIndex();
-  cached.push({
-    id: 'cache_' + generateId(),
-    date: date,
-    label: '',
-    pinned: false,
-    cachedAt: Date.now(),
-    autoWorkday: false, autoSaturday: false, autoSunday: false,
-    snapshot: snapshot  // ★ 存入完整数据快照
-  });
+  // 同日期只保留一条缓存：已有则更新快照，无则新建
+  var existingIdx = -1;
+  for (var i = 0; i < cached.length; i++) {
+    if (cached[i].date === date) { existingIdx = i; break; }
+  }
+  if (existingIdx >= 0) {
+    cached[existingIdx].snapshot = snapshot;
+    cached[existingIdx].cachedAt = Date.now();
+  } else {
+    cached.push({
+      id: 'cache_' + generateId(),
+      date: date,
+      label: '',
+      pinned: false,
+      cachedAt: Date.now(),
+      autoWorkday: false, autoSaturday: false, autoSunday: false,
+      snapshot: snapshot
+    });
+  }
   cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
   saveCachedDatesIndex(cached);
   return true;

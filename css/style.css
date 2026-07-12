@@ -1318,9 +1318,17 @@ kbd {
 }
 @media (max-width: 600px) {
   #app { padding: 4px; }
-  .app-header { flex-direction: column; align-items: stretch; padding: 6px 8px; }
+  /* 手机端 header 排版优化：标题→统计→按钮分区清晰，按钮均分避免末行稀疏 */
+  .app-header { flex-direction: column; align-items: stretch; padding: 6px 8px; gap: 5px; }
   .app-header h1 { font-size: 14px; text-align: center; margin-right: 0; }
-  .header-actions { justify-content: center; }
+  /* 统计行：百分比 badge 居中铺满 */
+  .header-completion { margin-right: 0; justify-content: center; font-size: 11px; }
+  .header-slot-breakdown { margin-right: 0; justify-content: center; flex-wrap: wrap; gap: 2px; }
+  /* 操作按钮行：均分宽度填满，避免末行只有 1~2 个按钮 */
+  .header-actions { justify-content: stretch; gap: 3px; }
+  .header-actions .btn,
+  .header-actions .btn-sm { flex: 1 1 auto; min-width: 56px; }
+  .header-actions .btn-icon { flex: 0 0 auto; }
   .toolbar { flex-direction: column; align-items: stretch; padding: 6px 10px; }
   .btn { font-size: 12px; padding: 8px 16px; min-height: 48px; }
   .btn-sm { padding: 6px 12px; font-size: 11px; min-height: 36px; }
@@ -1333,6 +1341,20 @@ kbd {
   .quadrant-grid { gap: 8px; }
   .quadrant { min-height: 150px; border-radius: 8px; }
   .quadrant-tasks { max-height: 35vh; padding: 6px; }
+  /* 手机端象限标题两行布局：第一行图标+标题+说明，第二行功能按钮+百分比 */
+  .quadrant-header {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    padding: 8px 10px;
+  }
+  .quadrant-header .quadrant-icon { font-size: 16px; }
+  .quadrant-header .quadrant-title { font-size: 12px; }
+  .quadrant-header .quadrant-label { font-size: 9px; padding: 1px 6px; }
+  /* 覆盖桌面端 margin-left:auto，按钮在第二行自然排列 */
+  [id^="btnAddTask-"] { margin-left: 0; }
+  .quadrant-add-btn { width: 48px; height: 48px; font-size: 18px; }
+  /* task-count 在第二行右侧 */
+  .task-count { margin-left: auto; font-size: 10px; min-width: 56px; }
   .timeview-items { max-height: 30vh; }
   .task-item { padding: 10px 12px; font-size: 14px; min-height: 48px; }
   .subtask-item { padding: 8px 10px; font-size: 13px; min-height: 48px; }

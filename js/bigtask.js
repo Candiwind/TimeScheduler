@@ -14,6 +14,15 @@ function setupBigTaskPanel() {
   document.getElementById('btnAddBigTask').addEventListener('click', showAddBigTaskModal);
   document.getElementById('btnClaudePlan').addEventListener('click', showAIPlanModal);
 
+  var bigTaskBatchBtn = document.getElementById('btnBatchDelBigTask');
+  if (bigTaskBatchBtn) {
+    bigTaskBatchBtn.addEventListener('click', function() {
+      if (typeof enterBigTaskBatchMode === 'function') {
+        enterBigTaskBatchMode();
+      }
+    });
+  }
+
   var cacheToggle = document.getElementById('bigTaskCacheToggle');
   if (cacheToggle) {
     cacheToggle.addEventListener('click', function() {
@@ -25,6 +34,7 @@ function setupBigTaskPanel() {
 // ============ Render ============
 
 function renderBigTaskPanel() {
+  if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
   var bigTasks = loadBigTasks();
   var listEl = document.getElementById('bigTaskList');
 
@@ -128,6 +138,14 @@ function renderBigTaskPanel() {
     });
   });
 
+  // Bind card-level "import today's pool" button (📥 on the card header)
+  listEl.querySelectorAll('.bt-import-today-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importBigTaskTodayPoolToToday(this.dataset.btId);
+    });
+  });
+
   // Bind delete
   listEl.querySelectorAll('.bigtask-delete-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
@@ -217,6 +235,12 @@ function renderBigTaskPanel() {
   });
 
   listEl.querySelectorAll('.st-import-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) { e.stopPropagation();
+      importBigSubtaskToToday(this.dataset.btId, this.dataset.msId, this.dataset.stId);
+    });
+  });
+
+  listEl.querySelectorAll('.st-import-all-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) { e.stopPropagation();
       importBigSubtaskToToday(this.dataset.btId, this.dataset.msId, this.dataset.stId);
     });
@@ -371,6 +395,7 @@ function renderBigTaskPanel() {
 
   renderBigTaskPool();
   renderBigTaskCache();
+  renderBigTaskDeletedCache();
   flushArchiveToasts();
 }
 
@@ -443,11 +468,111 @@ function renderBigTaskCache() {
   });
 }
 
+// ============ Deleted Big Task Cache (回收站) ============
+function renderBigTaskDeletedCache() {
+  var section = document.getElementById('bigTaskDeletedCache');
+  var listEl = document.getElementById('bigTaskDeletedCacheList');
+  var countEl = document.getElementById('bigTaskDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var entries = getCacheEntries(BIG_TASKS_DELETED_KEY);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+
+  var typeLabels = { bigtask: '🏗️大任务', milestone: '📌里程碑', subtask: '📋子任务', stage: '🔹阶段' };
+  var actionLabels = { deleted: '🗑️' };
+  listEl.innerHTML = '';
+  entries.slice().reverse().forEach(function(e) {
+    var typeLabel = typeLabels[e.type] || e.type;
+    var actionLabel = (actionLabels[e.action] || '') + ' ';
+    var name = '';
+    if (e.type === 'bigtask') name = e.data.name || '未命名';
+    else if (e.type === 'milestone') name = e.data.name || '未命名';
+    else if (e.type === 'subtask' || e.type === 'stage') name = e.data.text || '未命名';
+    var parentStr = '';
+    if (e.parentInfo) {
+      parentStr = ' ← ' + (e.parentInfo.bigTaskName || '');
+      if (e.parentInfo.milestoneName) parentStr += ' / ' + e.parentInfo.milestoneName;
+    }
+    var ts = e.timestamp || e.deletedAt;
+    var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+    var div = document.createElement('div');
+    div.className = 'bigtask-cache-item deleted-cache-item';
+    div.innerHTML =
+      '<span class="bigtask-cache-icon">🗑️</span>' +
+      '<div class="bigtask-cache-info">' +
+        '<div class="bigtask-cache-name"><span class="deleted-type-tag">' + typeLabel + '</span> ' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></div>' +
+        '<div class="bigtask-cache-meta">' + Util.escHtml(timeStr) + '</div>' +
+      '</div>' +
+      '<button class="task-defer-btn dc-expand-btn" data-cache-id="' + e.id + '" title="查看详情" style="width:22px;height:22px;font-size:12px;padding:0;margin-right:4px;">📋</button>' +
+      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-right:4px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
+      '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复到原位置" style="width:22px;height:22px;font-size:11px;padding:0;margin-right:4px;">↩</button>' +
+      '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;">&times;</button>';
+    listEl.appendChild(div);
+  });
+
+  // 展开查看详情
+  listEl.querySelectorAll('.dc-expand-btn, .bigtask-cache-name').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cacheId = this.dataset.cacheId;
+      if (!cacheId) cacheId = this.parentElement.parentElement.querySelector('[data-cache-id]').dataset.cacheId;
+      var entry = null;
+      for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { entry = entries[i]; break; } }
+      if (entry && typeof _showCacheDetailPopup === 'function') _showCacheDetailPopup(entry);
+    });
+  });
+
+  listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleCachePin(BIG_TASKS_DELETED_KEY, this.dataset.cacheId);
+      renderBigTaskPanel();
+    });
+  });
+  listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (restoreBigTaskFromDeletedCache(this.dataset.cacheId)) {
+        renderBigTaskPanel();
+        Toast.show('已恢复删除的条目');
+      }
+    });
+  });
+  listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从回收站永久删除？将无法恢复。')) {
+        removeFromCache(BIG_TASKS_DELETED_KEY, this.dataset.cacheId);
+        renderBigTaskPanel();
+      }
+    });
+  });
+
+  setupCacheSectionToggle('bigTaskDeletedCache');
+}
+
 function renderBigTaskCardHTML(bt, idx) {
   var daysLeft = Util.calcDaysLeft(bt.targetDate);
   var countdownClass = daysLeft <= 14 ? ' urgent' : '';
 
   var completedClass = (bt.progress >= 100) ? ' completed' : '';
+  // 该大任务"今日任务池"子任务数（plannedDate=当前查看日期 且未完成）—— 用于卡片级一键导入按钮
+  var todayPoolCount = 0;
+  if (bt.milestones) {
+    bt.milestones.forEach(function(ms) {
+      if (ms.tasks) ms.tasks.forEach(function(t) {
+        if (t.plannedDate === currentDate && !t.completed) todayPoolCount++;
+      });
+    });
+  }
   var h = '<div class="bigtask-card' + completedClass + '">';
   h += '<div class="bigtask-card-header">';
   h += '<span class="bigtask-card-icon">📌</span>';
@@ -468,6 +593,9 @@ function renderBigTaskCardHTML(bt, idx) {
     }
   } else {
     h += '<span class="bigtask-card-countdown' + countdownClass + '">' + (daysLeft >= 0 ? '倒计时 ' + daysLeft + ' 天' : '已逾期') + '</span>';
+  }
+  if (todayPoolCount > 0) {
+    h += '<button class="task-defer-btn bt-import-today-btn" data-bt-id="' + bt.id + '" title="一键导入今日任务池（' + todayPoolCount + ' 条）到今日象限" style="width:22px;height:22px;font-size:12px;padding:0;flex-shrink:0;">📥</button>';
   }
   h += '<button class="bigtask-complete-btn' + (bt.progress >= 100 ? ' completed' : '') + '" data-bt-id="' + bt.id + '" title="' + (bt.progress >= 100 ? '标记为未完成' : '标记为完成') + '" style="font-size:14px;padding:0;width:22px;height:22px;border:1px solid var(--border);border-radius:4px;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">' + (bt.progress >= 100 ? '✅' : '⬜') + '</button>';
   h += '<span class="bigtask-card-toggle" style="font-size:10px;color:var(--text3);transition:transform var(--t);">▼</span>';
@@ -527,6 +655,8 @@ function renderBigTaskCardHTML(bt, idx) {
             h += '<span class="bigtask-subtask-date st-editable-date" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.plannedDate || '') + '" title="点击修改日期" style="cursor:pointer;">' + (t.plannedDate || '📅') + '</span>';
             h += '<span class="bigtask-subtask-weight st-editable-weight" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" data-value="' + (t.weight || 5) + '" title="点击修改参考权重" style="cursor:pointer;">' + (t.weight || 5) + '%</span>';
             h += '<button class="task-defer-btn st-import-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务" style="width:18px;height:18px;font-size:11px;">📥</button>';
+          } else {
+            h += '<button class="task-defer-btn st-import-all-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="导入今日任务（含全部阶段）" style="width:18px;height:18px;font-size:11px;">📥</button>';
           }
           h += '<button class="task-extra-btn bt-st-hl-btn" data-bt-id="' + bt.id + '" data-st-id="' + t.id + '" title="高亮/取消高亮" style="width:18px;height:18px;font-size:11px;padding:0;">' + hlIcon + '</button>';
           h += '<button class="task-delete-btn st-delete-btn" data-bt-id="' + bt.id + '" data-ms-id="' + ms.id + '" data-st-id="' + t.id + '" title="删除子任务" style="width:16px;height:16px;font-size:12px;">&times;</button>';
@@ -1231,31 +1361,11 @@ function editSubtaskField(btId, msId, stId, field, value) {
 }
 
 function deleteMilestone(btId, msId) {
-  var tasks = loadBigTasks();
-  for (var i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === btId && tasks[i].milestones) {
-      tasks[i].milestones = tasks[i].milestones.filter(function(ms) { return ms.id !== msId; });
-      recalcBigTaskProgress(tasks[i]);
-      saveBigTasks(tasks);
-      return;
-    }
-  }
+  _extractAndCacheBigTaskItem(btId, msId, null, null);
 }
 
 function deleteSubtaskFromBigTask(btId, msId, stId) {
-  var tasks = loadBigTasks();
-  for (var i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === btId && tasks[i].milestones) {
-      for (var j = 0; j < tasks[i].milestones.length; j++) {
-        if (tasks[i].milestones[j].id === msId && tasks[i].milestones[j].tasks) {
-          tasks[i].milestones[j].tasks = tasks[i].milestones[j].tasks.filter(function(t) { return t.id !== stId; });
-          recalcBigTaskProgress(tasks[i]);
-          saveBigTasks(tasks);
-          return;
-        }
-      }
-    }
-  }
+  _extractAndCacheBigTaskItem(btId, msId, stId, null);
 }
 
 function addMilestoneToBigTask(btId, name) {

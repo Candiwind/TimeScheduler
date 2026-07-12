@@ -9,9 +9,14 @@ function getCurrentDate() { return currentDate; }
 
 function renderAll(date) {
   currentDate = date;
+  // 自动导入：检查是否有置顶缓存条目设置了当天星期自动导入
+  var autoLabels = runAutoImportsForDate(date);
+  if (autoLabels.length > 0) {
+    console.log('[AutoImport] 已自动导入 ' + autoLabels.length + ' 条缓存：' + autoLabels.join(', '));
+  }
   var data = loadDateData(date);
   if (viewMode === 'time') {
-    renderTimeView(date);
+    renderTimeView(date, data);
   } else {
     resetGridLayout();
     QUADRANT_KEYS.forEach(function(key) {
@@ -147,8 +152,8 @@ var QUADRANT_BG = {
   IV: 'rgba(195,240,195,0.18)'
 };
 
-function renderTimeView(date) {
-  var data = loadDateData(date);
+function renderTimeView(date, preloadedData) {
+  var data = preloadedData || loadDateData(date);
   var grid = document.querySelector('.quadrant-grid');
   if (!grid) return;
 
@@ -793,6 +798,29 @@ function createTaskElement(item, quadrantKey, index) {
     // Insert before delBtn so both appear at top-right
     el.insertBefore(addStageBtn, delBtn);
     el.appendChild(stagesContainer);
+
+    // 折叠切换按钮
+    var toggleBtn = document.createElement('button');
+    toggleBtn.className = 'stages-toggle-btn';
+    var isCollapsed = loadStagesCollapseState()[item.id];
+    toggleBtn.innerHTML = isCollapsed ? '▶' : '▼';
+    toggleBtn.title = isCollapsed ? '展开阶段' : '折叠阶段';
+    if (isCollapsed) {
+      stagesContainer.style.display = 'none';
+      addStageBtn.style.display = 'none';
+    }
+    toggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var nowCollapsed = stagesContainer.style.display !== 'none';
+      stagesContainer.style.display = nowCollapsed ? 'none' : '';
+      toggleBtn.innerHTML = nowCollapsed ? '▶' : '▼';
+      toggleBtn.title = nowCollapsed ? '展开阶段' : '折叠阶段';
+      var addBtn = el.querySelector('.add-stage-btn');
+      if (addBtn) addBtn.style.display = nowCollapsed ? 'none' : '';
+      setStageCollapsed(item.id, nowCollapsed);
+    });
+    toggleBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    el.insertBefore(toggleBtn, delBtn);
   }
 
   // Bind drag handlers directly
@@ -1092,6 +1120,30 @@ function createSubTaskElement(task, quadrantKey, blockId, opts) {
     // Insert before delBtn so both appear at top-right
     el.insertBefore(addStageBtn, delBtn);
     el.appendChild(stagesContainer);
+
+    // 折叠切换按钮
+    var stCollapseId = blockId + '_' + task.id;
+    var stToggleBtn = document.createElement('button');
+    stToggleBtn.className = 'stages-toggle-btn';
+    var stIsCollapsed = loadStagesCollapseState()[stCollapseId];
+    stToggleBtn.innerHTML = stIsCollapsed ? '▶' : '▼';
+    stToggleBtn.title = stIsCollapsed ? '展开阶段' : '折叠阶段';
+    if (stIsCollapsed) {
+      stagesContainer.style.display = 'none';
+      addStageBtn.style.display = 'none';
+    }
+    stToggleBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var nowCollapsed = stagesContainer.style.display !== 'none';
+      stagesContainer.style.display = nowCollapsed ? 'none' : '';
+      stToggleBtn.innerHTML = nowCollapsed ? '▶' : '▼';
+      stToggleBtn.title = nowCollapsed ? '展开阶段' : '折叠阶段';
+      var addBtn = el.querySelector('.add-stage-btn');
+      if (addBtn) addBtn.style.display = nowCollapsed ? 'none' : '';
+      setStageCollapsed(stCollapseId, nowCollapsed);
+    });
+    stToggleBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    el.insertBefore(stToggleBtn, delBtn);
   }
 
   return el;
@@ -1361,7 +1413,7 @@ function calcTimeSlotCompletion(data) {
 }
 
 function updateStatsBar(data) {
-  var stats = calcWeightedCompletion(data);
+  var stats = calcAllStats(data);
   var hcDone = document.getElementById('hcDone');
   var hcTotal = document.getElementById('hcTotal');
   var hcRate = document.getElementById('hcRate');
@@ -1375,13 +1427,12 @@ function updateStatsBar(data) {
   }
 
   // Time slot breakdown in header — each group in a pill badge
-  var slotStats = calcTimeSlotCompletion(data);
   var slotEl = document.getElementById('headerSlotBreakdown');
   if (!slotEl) return;
   var slotGroupKeys = ['早晨 + 上午', '中午 + 下午', '傍晚 + 晚上'];
   var parts = [];
   slotGroupKeys.forEach(function(gk) {
-    var gd = slotStats[gk];
+    var gd = stats.slotGroups[gk];
     var rate = gd.total > 0 ? Math.round((gd.done / gd.total) * 100) : 0;
     parts.push('<span class="header-slot-badge" title="' + gk + '">' + gd.icons + ' <span>' + gd.done + '/' + gd.total + ' ' + rate + '%</span></span>');
   });
@@ -1390,6 +1441,40 @@ function updateStatsBar(data) {
   }
   slotEl.style.display = '';
   slotEl.innerHTML = parts.join('');
+}
+
+// 合并统计计算：一次遍历叶子项，同时算出象限/加权/时段三组指标
+function calcAllStats(data) {
+  var quadCounts = { I: {total:0, done:0}, II: {total:0, done:0}, III: {total:0, done:0}, IV: {total:0, done:0} };
+  var totalAll = 0, doneAll = 0;
+  var slotGroups = {
+    '早晨 + 上午': { total: 0, done: 0, icons: '🌄🕘' },
+    '中午 + 下午': { total: 0, done: 0, icons: '☀️🕒' },
+    '傍晚 + 晚上': { total: 0, done: 0, icons: '🌇🌙' }
+  };
+  var slotToGroup = {
+    'early_morn': '早晨 + 上午', 'forenoon': '早晨 + 上午',
+    'noon': '中午 + 下午', 'afternoon': '中午 + 下午',
+    'dusk': '傍晚 + 晚上', 'night': '傍晚 + 晚上'
+  };
+
+  QUADRANT_KEYS.forEach(function(key) {
+    walkLeafItems(data[key] || [], function(leaf, info) {
+      quadCounts[key].total++;
+      totalAll++;
+      if (leaf.completed) { quadCounts[key].done++; doneAll++; }
+      var g = slotToGroup[info.timeSlot];
+      if (g) { slotGroups[g].total++; if (leaf.completed) slotGroups[g].done++; }
+    });
+  });
+
+  var weightedRate = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
+
+  return {
+    quadCounts: quadCounts,
+    total: totalAll, done: doneAll, weightedRate: weightedRate,
+    slotGroups: slotGroups
+  };
 }
 
 function setSearchTerm(term) {
@@ -1575,6 +1660,7 @@ var PLAN_POOL_CONFIGS = {
 };
 
 function renderPlanPoolPanel() {
+  if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
   var cfg = PLAN_POOL_CONFIGS[activePlanPool];
   if (!cfg) return;
   var ptasks = cfg.loadFn();
@@ -1656,10 +1742,15 @@ function renderPlanPoolPanel() {
       var ftId = this.dataset.ftId;
       var stId = this.dataset.stId;
       var checked = this.checked;
-      if (stId) {
-        cfg.editSubFn(ftId, stId, 'completed', checked);
+      if (checked) {
+        // 完成 → 移入缓存
+        _extractAndCachePlanPoolItem(cfg.poolKey, cfg.saveFn, ftId, stId || null, 'completed');
       } else {
-        cfg.updateFn(ftId, { completed: checked });
+        if (stId) {
+          cfg.editSubFn(ftId, stId, 'completed', checked);
+        } else {
+          cfg.updateFn(ftId, { completed: checked });
+        }
       }
       renderPlanPoolPanel();
     });
@@ -1832,14 +1923,71 @@ function renderPlanPoolPanel() {
     });
   });
 
+  // 计划池导入按钮
+  listEl.querySelectorAll('.planpool-import-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importPlanPoolItemToToday(
+        this.dataset.ftId,
+        this.dataset.stId || null,
+        this.dataset.ftText
+      );
+    });
+  });
+
+  listEl.querySelectorAll('.planpool-import-all-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importPlanPoolItemWithStagesToToday(
+        this.dataset.ftId,
+        this.dataset.stId || null,
+        this.dataset.ftText
+      );
+    });
+  });
+
   listEl.querySelectorAll('.planpool-draggable').forEach(function(el) {
     el.addEventListener('dragstart', handleFutureDragStart);
     el.addEventListener('dragend', handleFutureDragEnd);
   });
+
+  // 任务块批量导入按钮（一键导入块内全部未完成子任务）
+  listEl.querySelectorAll('.pp-block-import-all-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      importPlanBlockAllToToday(this.dataset.ftId);
+    });
+  });
+
+  // 阶段折叠切换（复用 store.js setStageCollapsed 持久化）
+  listEl.querySelectorAll('.planpool-stages-toggle').forEach(function(btn) {
+    var collapseId = btn.dataset.collapseId;
+    var stagesEl = document.getElementById(collapseId);
+    var isCollapsed = loadStagesCollapseState()[collapseId];
+    if (isCollapsed && stagesEl) {
+      stagesEl.style.display = 'none';
+      btn.innerHTML = '▶';
+      btn.title = '展开阶段';
+    }
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var el = document.getElementById(this.dataset.collapseId);
+      if (!el) return;
+      var nowHidden = el.style.display !== 'none';
+      el.style.display = nowHidden ? 'none' : '';
+      this.innerHTML = nowHidden ? '▶' : '▼';
+      this.title = nowHidden ? '展开阶段' : '折叠阶段';
+      setStageCollapsed(this.dataset.collapseId, nowHidden);
+    });
+  });
+
+  // 渲染计划池回收站
+  renderPlanPoolDeletedCache();
 }
 
 function switchPlanPoolTab(poolName) {
   if (activePlanPool === poolName) return;
+  if (typeof ensureBatchModeExited === 'function') ensureBatchModeExited();
   activePlanPool = poolName;
   var tabs = document.querySelectorAll('.planpool-tab');
   tabs.forEach(function(t) {
@@ -1873,12 +2021,17 @@ function _renderPlanTaskHTML(ft) {
   }
   h += '<span class="planpool-item-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>';
   h += '<span class="planpool-item-quad' + quadClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>';
+  h += '<button class="task-defer-btn planpool-import-btn" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '" title="导入今日Q-II" style="width:18px;height:18px;font-size:11px;">📥</button>';
+  // 阶段折叠切换按钮（有阶段时显示）
+  if (hasStages) {
+    h += '<button class="stages-toggle-btn planpool-stages-toggle" data-collapse-id="pp-stages-' + ft.id + '" title="折叠阶段">▼</button>';
+  }
   h += '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
   h += '</div>';
 
   // 阶段行容器
   if (hasStages) {
-    h += '<div class="planpool-stages">';
+    h += '<div class="planpool-stages" id="pp-stages-' + ft.id + '">';
     ft.stages.forEach(function(stage) {
       var stageCompleted = stage.completed ? ' completed' : '';
       h += '<div class="planpool-stage-item' + stageCompleted + '" data-ft-id="' + ft.id + '" data-stage-id="' + stage.id + '">';
@@ -1888,6 +2041,7 @@ function _renderPlanTaskHTML(ft) {
       h += '</div>';
     });
     h += '<button class="planpool-add-stage-btn" data-ft-id="' + ft.id + '">+ 阶段</button>';
+    h += '<button class="planpool-import-all-btn" data-ft-id="' + ft.id + '" data-ft-text="' + escHtml(ft.text || '') + '" title="导入全部阶段到今日" style="width:100%;padding:3px 6px;border:1px dashed var(--border2);background:transparent;color:var(--accent);font-size:11px;cursor:pointer;border-radius:4px;margin-top:4px;">📥 导入全部阶段到今日</button>';
     h += '</div>';
   }
 
@@ -1907,6 +2061,14 @@ function _renderPlanBlockHTML(ft) {
   h += '<span class="planpool-item-date pp-block-date' + dateClass + '" data-ft-id="' + ft.id + '" data-value="' + (ft.scheduledDate || '') + '" title="点击设定日期">' + dateDisplay + '</span>';
   h += '<span class="planpool-item-quad pp-block-quad" data-ft-id="' + ft.id + '" data-value="' + (ft.targetQuadrant || '') + '" title="点击选择象限">' + quadDisplay + '</span>';
   h += '</div>';
+  // 块级别一键导入：统计未完成子任务数
+  var nonCompletedCount = 0;
+  if (ft.tasks) {
+    ft.tasks.forEach(function(st) { if (!st.completed) nonCompletedCount++; });
+  }
+  if (nonCompletedCount > 0) {
+    h += '<button class="task-defer-btn pp-block-import-all-btn" data-ft-id="' + ft.id + '" title="一键导入全部子任务（' + nonCompletedCount + ' 条）到今日Q-II" style="width:22px;height:22px;font-size:12px;flex-shrink:0;margin-left:4px;">📥</button>';
+  }
   h += '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
   h += '</div>';
 
@@ -1929,11 +2091,16 @@ function _renderPlanBlockHTML(ft) {
       }
       h += '<span class="planpool-item-date pp-st-date" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.scheduledDate || '') + '" title="点击设定日期">' + stDateDisplay + '</span>';
       h += '<span class="planpool-item-quad pp-st-quad" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-value="' + (st.targetQuadrant || '') + '" title="点击选择象限">' + (stQuadDisplay || '选择象限') + '</span>';
+      h += '<button class="task-defer-btn planpool-import-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '" title="导入今日Q-II" style="width:16px;height:16px;font-size:10px;">📥</button>';
+      // 阶段折叠切换按钮（有阶段时显示）
+      if (stHasStages) {
+        h += '<button class="stages-toggle-btn planpool-stages-toggle" data-collapse-id="pp-stages-' + ft.id + '-' + st.id + '" title="折叠阶段">▼</button>';
+      }
       h += '<button class="task-delete-btn pp-st-delete-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" title="删除子任务" style="width:18px;height:18px;font-size:12px;">&times;</button>';
       h += '</div>';
       // 子任务阶段容器
       if (stHasStages) {
-        h += '<div class="planpool-stages planpool-block-stages">';
+        h += '<div class="planpool-stages planpool-block-stages" id="pp-stages-' + ft.id + '-' + st.id + '">';
         st.stages.forEach(function(stage) {
           var stageCompleted = stage.completed ? ' completed' : '';
           h += '<div class="planpool-stage-item' + stageCompleted + '" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-stage-id="' + stage.id + '">';
@@ -1943,6 +2110,7 @@ function _renderPlanBlockHTML(ft) {
           h += '</div>';
         });
         h += '<button class="planpool-add-stage-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '">+ 阶段</button>';
+        h += '<button class="planpool-import-all-btn" data-ft-id="' + ft.id + '" data-st-id="' + st.id + '" data-ft-text="' + escHtml(st.text || '') + '" title="导入全部阶段到今日" style="width:100%;padding:3px 6px;border:1px dashed var(--border2);background:transparent;color:var(--accent);font-size:11px;cursor:pointer;border-radius:4px;margin-top:4px;">📥 导入全部阶段到今日</button>';
         h += '</div>';
       }
     });
@@ -1971,14 +2139,7 @@ function _editPlanSubtaskField(poolKey, saveFn, ftId, stId, field, value) {
 }
 
 function _deletePlanSubtask(poolKey, saveFn, ftId, stId) {
-  var tasks = loadPlanTasks(poolKey);
-  for (var i = 0; i < tasks.length; i++) {
-    if (tasks[i].id === ftId && tasks[i].tasks) {
-      tasks[i].tasks = tasks[i].tasks.filter(function(st) { return st.id !== stId; });
-      saveFn(tasks);
-      return;
-    }
-  }
+  _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, stId, 'deleted');
 }
 
 function _addPlanSubtask(poolKey, saveFn, ftId, text) {
@@ -2045,17 +2206,32 @@ function _addPlanTaskStage(poolKey, saveFn, ftId, stageText) {
 function _deletePlanTaskStage(poolKey, saveFn, ftId, stageId) {
   if (!confirm('确定删除该阶段？')) return;
   var tasks = loadPlanTasks(poolKey);
+  var cacheKey = getPlanPoolCacheKey(poolKey);
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].id === ftId) {
       var ft = tasks[i];
-      ft.stages = (ft.stages || []).filter(function(s) { return s.id !== stageId; });
-      if (ft.stages.length === 0) {
-        delete ft.stages;
-        ft.completed = false;
-      } else {
-        ft.completed = ft.stages.every(function(s) { return s.completed; });
+      var entry = null;
+      for (var j = 0; j < (ft.stages || []).length; j++) {
+        if (ft.stages[j].id === stageId) {
+          entry = {
+            id: stageId,
+            type: 'stage',
+            data: JSON.parse(JSON.stringify(ft.stages[j])),
+            parentInfo: { ftId: ftId, ftName: ft.text || ft.blockName || '' },
+            action: 'deleted',
+            timestamp: Date.now(),
+            pinned: false
+          };
+          ft.stages = ft.stages.filter(function(s) { return s.id !== stageId; });
+          break;
+        }
       }
-      saveFn(tasks);
+      if (entry) {
+        if (ft.stages.length === 0) { delete ft.stages; ft.completed = false; }
+        else { ft.completed = ft.stages.every(function(s) { return s.completed; }); }
+        saveFn(tasks);
+        addToCache(cacheKey, entry);
+      }
       return;
     }
   }
@@ -2070,6 +2246,10 @@ function _togglePlanTaskStageComplete(poolKey, saveFn, ftId, stageId, completed)
           tasks[i].stages[j].completed = completed;
           tasks[i].completed = tasks[i].stages.every(function(s) { return s.completed; });
           saveFn(tasks);
+          // 所有阶段完成 → 自动移入缓存
+          if (tasks[i].completed) {
+            _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, null, 'completed');
+          }
           return;
         }
       }
@@ -2142,15 +2322,34 @@ function _addPlanBlockSubStage(poolKey, saveFn, ftId, stId, stageText) {
 function _deletePlanBlockSubStage(poolKey, saveFn, ftId, stId, stageId) {
   if (!confirm('确定删除该阶段？')) return;
   var tasks = loadPlanTasks(poolKey);
+  var cacheKey = getPlanPoolCacheKey(poolKey);
   for (var i = 0; i < tasks.length; i++) {
     if (tasks[i].id === ftId && tasks[i].tasks) {
       for (var j = 0; j < tasks[i].tasks.length; j++) {
         var st = tasks[i].tasks[j];
         if (st.id === stId && st.stages) {
-          st.stages = st.stages.filter(function(s) { return s.id !== stageId; });
-          if (st.stages.length === 0) { delete st.stages; st.completed = false; }
-          else { st.completed = st.stages.every(function(s) { return s.completed; }); }
-          saveFn(tasks);
+          var entry = null;
+          for (var k = 0; k < st.stages.length; k++) {
+            if (st.stages[k].id === stageId) {
+              entry = {
+                id: stageId,
+                type: 'stage',
+                data: JSON.parse(JSON.stringify(st.stages[k])),
+                parentInfo: { ftId: ftId, ftName: tasks[i].blockName || tasks[i].text || '', stId: stId, stName: st.text || '' },
+                action: 'deleted',
+                timestamp: Date.now(),
+                pinned: false
+              };
+              st.stages = st.stages.filter(function(s) { return s.id !== stageId; });
+              break;
+            }
+          }
+          if (entry) {
+            if (st.stages.length === 0) { delete st.stages; st.completed = false; }
+            else { st.completed = st.stages.every(function(s) { return s.completed; }); }
+            saveFn(tasks);
+            addToCache(cacheKey, entry);
+          }
           return;
         }
       }
@@ -2170,6 +2369,10 @@ function _togglePlanBlockSubStageComplete(poolKey, saveFn, ftId, stId, stageId, 
               st.stages[k].completed = completed;
               st.completed = st.stages.every(function(s) { return s.completed; });
               saveFn(tasks);
+              // 子任务所有阶段完成 → 自动移入缓存
+              if (st.completed) {
+                _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, stId, 'completed');
+              }
               return;
             }
           }
@@ -2225,47 +2428,274 @@ function renderPrinciplesPanel() {
     dateDisplay.style.color = hasDates ? '' : 'var(--text3)';
   }
 
+  // --- Principles rendering ---
   var listEl = document.getElementById('principlesList');
   var emptyEl = document.getElementById('principlesEmpty');
-  if (!listEl) return;
+  if (listEl) {
+    listEl.querySelectorAll('.principle-item').forEach(function(el) { el.remove(); });
 
-  // Remove existing items but keep emptyEl reference
-  listEl.querySelectorAll('.principle-item').forEach(function(el) { el.remove(); });
-
-  if (data.principles.length === 0) {
-    if (emptyEl) emptyEl.style.display = '';
-    return;
+    if (data.principles.length === 0) {
+      if (emptyEl) emptyEl.style.display = '';
+    } else {
+      if (emptyEl) emptyEl.style.display = 'none';
+      data.principles.forEach(function(p, idx) {
+        var el = document.createElement('div');
+        el.className = 'principle-item';
+        el.innerHTML = '<span class="principle-index">' + (idx + 1) + '.</span>' +
+          '<span class="principle-text">' + Util.escHtml(p.text) + '</span>' +
+          '<button class="task-delete-btn principle-del-btn" data-pid="' + p.id + '">&times;</button>';
+        listEl.appendChild(el);
+      });
+      // Bind edit on dblclick
+      listEl.querySelectorAll('.principle-text').forEach(function(el) {
+        el.addEventListener('dblclick', function() {
+          var pid = this.parentElement.querySelector('.principle-del-btn').dataset.pid;
+          startEdit(this, this.textContent, function(newVal) {
+            updatePrinciple(pid, newVal);
+            renderPrinciplesPanel();
+          });
+        });
+      });
+      // Bind delete
+      listEl.querySelectorAll('.principle-del-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (!confirm('删除该原则？')) return;
+          deletePrinciple(this.dataset.pid);
+          renderPrinciplesPanel();
+        });
+      });
+    }
   }
 
-  if (emptyEl) emptyEl.style.display = 'none';
+  // ===== 优先问题渲染 =====
+  var ppListEl = document.getElementById('priorityProblemsList');
+  var ppSeparator = document.getElementById('priorityProblemsSeparator');
+  var ppActions = document.getElementById('priorityProblemsActions');
+  var ppAddBtn = document.getElementById('btnAddPriorityProblem');
 
-  data.principles.forEach(function(p, idx) {
-    var el = document.createElement('div');
-    el.className = 'principle-item';
-    el.innerHTML = '<span class="principle-index">' + (idx + 1) + '.</span>' +
-      '<span class="principle-text">' + Util.escHtml(p.text) + '</span>' +
-      '<button class="task-delete-btn principle-del-btn" data-pid="' + p.id + '">&times;</button>';
-    listEl.appendChild(el);
+  if (ppListEl) {
+    ppListEl.querySelectorAll('.priority-problem-item').forEach(function(el) { el.remove(); });
+
+    var problems = data.priorityProblems || [];
+
+    if (problems.length === 0) {
+      if (ppSeparator) ppSeparator.style.display = 'none';
+      if (ppActions) ppActions.style.display = '';
+      if (ppAddBtn) ppAddBtn.style.display = '';
+    } else {
+      if (ppSeparator) ppSeparator.style.display = '';
+      if (ppActions) {
+        if (ppAddBtn) ppAddBtn.style.display = problems.length >= 2 ? 'none' : '';
+        ppActions.style.display = '';
+      }
+      problems.forEach(function(p, idx) {
+        var el = document.createElement('div');
+        el.className = 'priority-problem-item';
+        el.innerHTML = '<span class="priority-problem-index">' + (idx + 1) + '.</span>' +
+          '<span class="priority-problem-text">' + Util.escHtml(p.text) + '</span>' +
+          '<button class="task-delete-btn priority-problem-del-btn" data-ppid="' + p.id + '">&times;</button>';
+        ppListEl.appendChild(el);
+      });
+      // Bind edit on dblclick
+      ppListEl.querySelectorAll('.priority-problem-text').forEach(function(el) {
+        el.addEventListener('dblclick', function() {
+          var ppid = this.parentElement.querySelector('.priority-problem-del-btn').dataset.ppid;
+          startEdit(this, this.textContent, function(newVal) {
+            updatePriorityProblem(ppid, newVal);
+            renderPrinciplesPanel();
+          });
+        });
+      });
+      // Bind delete
+      ppListEl.querySelectorAll('.priority-problem-del-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (!confirm('删除该优先问题？')) return;
+          deletePriorityProblem(this.dataset.ppid);
+          renderPrinciplesPanel();
+        });
+      });
+    }
+  }
+
+  // ===== 回收站（始终渲染，不受上面早期返回影响）=====
+  renderPrinciplesDeletedCache();
+  renderPriorityProblemsDeletedCache();
+}
+
+// ============ Principles Deleted Cache Render ============
+function renderPrinciplesDeletedCache() {
+  var section = document.getElementById('principlesDeletedCache');
+  var listEl = document.getElementById('principlesDeletedCacheList');
+  var countEl = document.getElementById('principlesDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var entries = getCacheEntries(PRINCIPLES_DELETED_KEY);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  section.style.marginTop = '12px';
+
+  _renderGenericDeletedCacheList(listEl, entries, PRINCIPLES_DELETED_KEY, function() { renderPrinciplesPanel(); }, restorePrincipleFromDeletedCache);
+  setupCacheSectionToggle('principlesDeletedCache');
+}
+
+function renderPriorityProblemsDeletedCache() {
+  var section = document.getElementById('priorityProblemsDeletedCache');
+  var listEl = document.getElementById('priorityProblemsDeletedCacheList');
+  var countEl = document.getElementById('priorityProblemsDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var entries = getCacheEntries(PRIORITY_PROBLEMS_DELETED_KEY);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  section.style.marginTop = '12px';
+
+  _renderGenericDeletedCacheList(listEl, entries, PRIORITY_PROBLEMS_DELETED_KEY, function() { renderPrinciplesPanel(); }, restorePriorityProblemFromDeletedCache);
+  setupCacheSectionToggle('priorityProblemsDeletedCache');
+}
+
+// 通用缓存列表渲染：含类型标签、展开查看、置顶/恢复/删除按钮
+// restoreFn(id) 用于恢复条目；若未提供则默认使用 onChanged 刷新（适合委托外部处理的场景）
+function _renderGenericDeletedCacheList(listEl, entries, cacheKey, onChanged, restoreFn) {
+  var typeLabels = { principle: '💎原则', priorityProblem: '⚠️优先问题', task: '📋任务', block: '📦任务块', subtask: '📎子任务', stage: '🔹阶段' };
+  var actionLabels = { completed: '✅', deleted: '🗑️' };
+  listEl.innerHTML = '';
+  entries.slice().reverse().forEach(function(e) {
+    var typeLabel = typeLabels[e.type] || e.type;
+    var actionLabel = (actionLabels[e.action] || '') + ' ';
+    var name = '';
+    if (e.type === 'block' || e.type === 'bigtask') name = e.data.blockName || e.data.name || '未命名';
+    else if (e.type === 'milestone') name = e.data.name || '未命名';
+    else name = e.data.text || '未命名';
+    var parentStr = '';
+    if (e.parentInfo) {
+      parentStr = ' ← ' + (e.parentInfo.bigTaskName || e.parentInfo.ftName || '');
+      if (e.parentInfo.milestoneName) parentStr += ' / ' + e.parentInfo.milestoneName;
+    }
+    var ts = e.timestamp || e.deletedAt;
+    var timeStr = ts ? new Date(ts).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+
+    var div = document.createElement('div');
+    div.className = 'deleted-cache-item';
+    div.innerHTML =
+      '<span class="deleted-type-tag">' + typeLabel + '</span> ' +
+      '<span class="deleted-action-tag">' + actionLabel + '</span>' +
+      '<span class="deleted-cache-text" title="点击查看详情" style="cursor:pointer;">' + Util.escHtml(name) + '<small style="color:var(--text-muted)">' + Util.escHtml(parentStr) + '</small></span>' +
+      '<span class="deleted-cache-time">' + Util.escHtml(timeStr) + '</span>' +
+      '<button class="task-defer-btn dc-expand-btn" data-cache-id="' + e.id + '" title="查看详情" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:4px;">📋</button>' +
+      '<button class="task-defer-btn dc-pin-btn" data-cache-id="' + e.id + '" title="' + (e.pinned ? '取消置顶' : '置顶保护') + '" style="width:22px;height:22px;font-size:12px;padding:0;margin-left:4px;">' + (e.pinned ? '📌' : '📍') + '</button>' +
+      '<button class="task-defer-btn dc-restore-btn" data-cache-id="' + e.id + '" title="恢复" style="width:22px;height:22px;font-size:11px;padding:0;margin-left:4px;">↩</button>' +
+      '<button class="task-delete-btn dc-delete-btn" data-cache-id="' + e.id + '" title="永久删除" style="width:18px;height:18px;font-size:13px;margin-left:4px;">&times;</button>';
+    listEl.appendChild(div);
   });
 
-  // Bind edit on dblclick
-  listEl.querySelectorAll('.principle-text').forEach(function(el) {
-    el.addEventListener('dblclick', function() {
-      var pid = this.parentElement.querySelector('.principle-del-btn').dataset.pid;
-      startEdit(this, this.textContent, function(newVal) {
-        updatePrinciple(pid, newVal);
-        renderPrinciplesPanel();
-      });
+  // 展开查看详情
+  listEl.querySelectorAll('.dc-expand-btn, .deleted-cache-text').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cacheId = this.dataset.cacheId;
+      if (!cacheId) cacheId = this.parentElement.querySelector('[data-cache-id]').dataset.cacheId;
+      var entry = null;
+      for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { entry = entries[i]; break; } }
+      if (entry) _showCacheDetailPopup(entry);
     });
   });
 
-  // Bind delete
-  listEl.querySelectorAll('.principle-del-btn').forEach(function(btn) {
+  listEl.querySelectorAll('.dc-pin-btn').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      if (!confirm('删除该原则？')) return;
-      deletePrinciple(this.dataset.pid);
-      renderPrinciplesPanel();
+      toggleCachePin(cacheKey, this.dataset.cacheId);
+      onChanged();
     });
   });
+  listEl.querySelectorAll('.dc-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var restored = false;
+      if (restoreFn) {
+        restored = restoreFn(this.dataset.cacheId);
+      }
+      if (restored) {
+        Toast.show('已恢复' + (restored ? '' : ''));
+      }
+      onChanged();
+    });
+  });
+  listEl.querySelectorAll('.dc-delete-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (confirm('确定从回收站永久删除？将无法恢复。')) {
+        removeFromCache(cacheKey, this.dataset.cacheId);
+        onChanged();
+      }
+    });
+  });
+}
+
+// 缓存条目详情弹窗（Markdown风格）
+function _showCacheDetailPopup(entry) {
+  var existing = document.getElementById('cacheDetailPopup');
+  if (existing) existing.remove();
+  var md = renderCacheDetailMarkdown(entry);
+  var overlay = document.createElement('div');
+  overlay.id = 'cacheDetailPopup';
+  overlay.className = 'modal-overlay';
+  var content = document.createElement('div');
+  content.className = 'modal-content cache-detail-content';
+  content.style.maxWidth = '520px';
+  content.style.maxHeight = '75vh';
+  content.style.overflowY = 'auto';
+  content.style.whiteSpace = 'pre-wrap';
+  content.style.fontFamily = 'var(--font-mono, Consolas, "Courier New", monospace)';
+  content.style.fontSize = '13px';
+  content.style.lineHeight = '1.6';
+  content.style.padding = '20px 24px';
+  content.textContent = md;
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'btn btn-sm btn-cancel';
+  closeBtn.textContent = '关闭';
+  closeBtn.style.marginTop = '12px';
+  closeBtn.addEventListener('click', function() { overlay.remove(); });
+  content.appendChild(closeBtn);
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+}
+
+// ============ Plan Pool Deleted Cache Render ============
+function renderPlanPoolDeletedCache() {
+  var section = document.getElementById('planPoolDeletedCache');
+  var listEl = document.getElementById('planPoolDeletedCacheList');
+  var countEl = document.getElementById('planPoolDeletedCacheCount');
+  if (!section || !listEl) return;
+
+  var poolKey = (PLAN_POOL_CONFIGS[activePlanPool] || {}).poolKey;
+  if (!poolKey) return;
+  var cacheKey = getPlanPoolCacheKey(poolKey);
+  var entries = getCacheEntries(cacheKey);
+  if (countEl) countEl.textContent = entries.length;
+
+  if (entries.length === 0) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = '';
+  section.style.marginTop = '12px';
+
+  _renderGenericDeletedCacheList(listEl, entries, cacheKey, function() { renderPlanPoolPanel(); }, function(id) { return restorePlanPoolFromCacheByKey(poolKey, id); });
+  setupCacheSectionToggle('planPoolDeletedCache');
 }

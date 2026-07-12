@@ -377,65 +377,427 @@
        调用 block 子任务版本函数，否则调用顶层任务版本。复用现有 CSS 类名、事件选择器。
    (4) 样式：planpool-block-stages（padding-left:18px）确保阶段行与子任务文本视觉对齐。
    涉及文件：js/render.js / css/style.css / service-worker.js
+28. ✅ 新增 Gitee Gist 云同步 + 移除百度网盘同步：
+   (1) 新增 Gitee Gist（码云代码片段）云同步：仿照 GitHub Gist 实现，支持公开代码片段免 Token 拉取、
+       Token 推送双向同步、自动拉取、防抖推送、连接诊断。
+      Gitee API：GET/PATCH gitee.com/api/v5/gists/{id}，Token 通过 access_token 参数传递。
+   (2) 移除百度网盘同步功能：删除 setupBaiduSync / autoExportToDisk / importFromBaiduDisk 函数，
+       IndexedDB 文件句柄持久化（openDB / storeFileHandle / restoreFileHandle），相关常量。
+       localStorage 中旧 'baidu-disk' 模式自动迁移为禁用状态。
+   (3) GitHub Gist 模式名从 'gist' 统一改为 'github-gist'，向后兼容自动迁移。
+   (4) 同步设置对话框(openSyncSettings)重构：分别展示 GitHub Gist 和 Gitee Gist 两个配置区，
+       支持 ID+Token 表单连接、推送/拉取按钮、禁用同步。
+   (5) updateSyncIndicator / disableSync 适配双模式，同步图标 title 显示具体平台名称。
+   (6) SW 缓存版本升至 v15。
+   涉及文件：js/cloud-sync.js / service-worker.js
+29. ✅ 依循项下新增"最近优先解决的问题"模块：
+   (1) 数据模型：principles 对象新增 priorityProblems 数组（{id, text}），最多2条（建议1条）。
+       向后兼容旧数据（自动初始化空数组）。
+   (2) 存储：新增 addPriorityProblem / updatePriorityProblem / deletePriorityProblem。
+   (3) UI：在原则列表和"+ 添加原则"按钮之间渲染红色主题分隔线和优先问题列表。
+       双击编辑文字、×删除，满2条自动隐藏添加按钮。
+   涉及文件：js/store.js / js/render.js / js/app.js / index.html / css/style.css
+30. ✅ 大任务和小任务划分阶段支持可折叠功能：
+   (1) 象限视图的任务/子任务有阶段时，右侧新增 ▼/▶ 折叠切换按钮。
+   (2) 折叠状态持久化到 localStorage（quadrant_stages_collapsed），刷新页面保持。
+   (3) 折叠时隐藏 .subtask-stages 容器和"+ 阶段"按钮。
+   (4) 默认不折叠（▼ 展开态），仅象限视图生效（时间视图阶段分散分布，无需折叠）。
+   涉及文件：js/store.js / js/render.js / css/style.css
+31. ✅ 计划池任务和大任务加"立刻导入"选项：
+   (1) 计划池任务（待办/周/月）：无阶段任务行新增 📥 导入按钮，含阶段任务在阶段容器底部
+       新增"📥 导入全部阶段到今日"按钮；块内子任务同理。
+   (2) 大任务含阶段子任务：原来有阶段时隐藏 📥 导入按钮（仅显示逐阶段导入），
+       现在新增 📥"导入全部"按钮（复用 importBigSubtaskToToday，已支持 copyBigSubtaskStages）。
+   (3) 导入语义：复制到今日 Q-II，不删除源数据。导入任务附带 planPoolRef 追溯字段。
+       新增 importPlanPoolItemToToday / importPlanPoolItemWithStagesToToday。
+   (4) SW 缓存版本升至 v16。
+   涉及文件：js/render.js / js/future.js / js/bigtask.js / css/style.css / service-worker.js
+32. ✅ 移除 Gitee Gist 云同步（仅保留 GitHub Gist）：
+   (1) 删除 Gitee 全部同步代码：常量（GITEE_GIST_ID_KEY / GITEE_GIST_TOKEN_KEY）、
+       syncInfo 的 giteeGistId / giteeGistToken 字段、init 中的 Gitee 自动拉取、
+       onDataChanged 的 Gitee 分支、8 个 Gitee 函数（setupGiteeGist / saveGiteeGistConfig /
+       fetchGiteeGist / diagnoseGiteeGistConnection / pushToGiteeGist / pullFromGiteeGist /
+       autoPullFromGiteeGist / debouncePushToGiteeGist）、公开 API 的 Gitee 导出。
+   (2) openSyncSettings 对话框移除 Gitee Gist 配置区，仅保留 GitHub Gist。
+   (3) updateSyncIndicator / disableSync 移除 Gitee 分支。
+   (4) 向后兼容：init 检测旧 'gitee-gist' 模式自动清空配置（含 localStorage 残留的
+       cloudsync_gitee_gist_id / cloudsync_gitee_gist_token），降级为未启用状态。
+   (5) CODE_VERSION 更新为 '2026-07-11-remove-gitee'，SW 缓存版本升至 v17。
+   涉及文件：js/cloud-sync.js / service-worker.js
+33. ✅ 修复优先问题模块空状态下无法添加的 bug：
+   renderPrinciplesPanel 中，当 priorityProblems 为空时把 ppActions
+   （含"+ 添加优先问题"按钮）一并隐藏，导致用户永远无法添加第一条——
+   功能看起来"不存在"。改为空状态仅隐藏分隔线，保留添加按钮可见。
+   SW 缓存版本升至 v18。
+   涉及文件：js/render.js / service-worker.js
+34. ✅ 大任务卡片新增"一键导入今日任务池"按钮（📥，卡片标题栏可见，无需展开）：
+   (1) 痛点：原大任务导入入口埋在 卡片→里程碑→子任务 三层折叠里，极难发现；
+        且与计划池（平铺、显眼）体验不一致。
+   (2) 新增 future.js planBigTaskTodayImport（纯函数，去重逻辑同 migrateBigTaskSubtasks，
+        但限定单个大任务）+ importBigTaskTodayPoolToToday：把该大任务"今日任务池"
+        （plannedDate=当前查看日期 且未完成）的全部子任务一键导入今日 Q-II，
+        已导入的自动跳过（跨 I/II/III/IV 象限及块内子任务均去重），含阶段一并深拷贝。
+   (3) bigtask.js renderBigTaskCardHTML 头部按 todayPoolCount>0 条件渲染 📥 按钮
+        （标题"一键导入今日任务池（N 条）"）；renderBigTaskPanel 绑定 .bt-import-today-btn。
+   (4) 新增回归测试 test/test-bigtask-import-today.js（6 组用例：空数据/去重/跨象限/
+        块子任务/跨大任务不误删/空池），全部通过。
+   (5) SW 缓存版本升至 v19。
+   涉及文件：js/future.js / js/bigtask.js / service-worker.js / test/test-bigtask-import-today.js
 
 （暂无）
 
-28. ✅ Gist 云同步 4 项修复——计划池 key 不匹配 + 大任务缓存 key 拼写错误 + 导入绕过自动归档 + 拉取不等待：
-   (1) Bug 1（致命）：exportAllData() 计划池读取 key 从 quadrant_pool_* 改为 quadrant_*_tasks，
-       与 store.js 实际存储 key 一致。此前导出永远为空，手机端永远拉不到计划池数据。
-   (2) Bug 2（致命）：importAllData() 计划池导入写入 key 同上修正为 quadrant_*_tasks。
-   (3) Bug 3（致命）：importAllData() 大任务缓存导入写入 key 从 quadrant_big_task_cache（单数 task）
-       改为 quadrant_big_tasks_cache（复数 tasks），与 store.js loadBigTaskCache() 读取一致。
-   (4) Bug 4（中等）：importAllData() 导入大任务改为走 saveBigTasks()（而非直接写 localStorage），
-       以触发自动归档逻辑——进度 100% 的大任务自动移入缓存库，与本地创建行为一致。
-   (5) Bug 5（中等）：setupGistSync 两个分支（已有Token / 无Token公开访问）原先 pullFromGist()
-       fire-and-forget 不等待完成就调用 openSyncSettings()，导致设置对话框显示拉取前的旧时间戳。
-       改为 .then() 等待拉取完成后再打开设置对话框。
-   (6) SW 缓存版本升 v14→v15，确保手机端 PWA 拉取到修复后的 cloud-sync.js。
-   涉及文件：js/cloud-sync.js / service-worker.js
+60. ✅ 计划池阶段可折叠：为计划池任务（_renderPlanTaskHTML）和块内子任务（_renderPlanBlockHTML）
+    的阶段容器新增 ▼/▶ 折叠切换按钮，复用 store.js 的 setStageCollapsed 持久化到
+    localStorage（quadrant_stages_collapsed，用 pp-stages- 前缀避免与象限视图冲突）。
+    默认展开（▼），点击折叠后刷新页面保持状态。
+61. ✅ 计划池任务块批量导入：新增 importPlanBlockAllToToday（js/future.js），
+    在块头部新增 📥 一键导入全部子任务按钮（仅当有未完成子任务时显示），
+    去重依据 planPoolRef（跨象限 + 块内子任务），含阶段的子任务一并深拷贝阶段。
+    SW 缓存版本升至 v21。
+    涉及文件：js/render.js / js/future.js / service-worker.js
+62. ✅ 批量删除功能：新增 js/batch-delete.js，支持在象限/计划池/大任务三大区域
+    进入批次模式（📋批删按钮），多选条目后一键批量删除。
+    - 进入批次模式后每行左侧出现选择复选框，底部出现操作栏（全选/反选/删除/取消）
+    - 象限视图：支持批量删除任务、任务块、块内子任务、阶段（含 bigTaskRef 解绑）
+    - 计划池：支持批量删除待办/周/月池的任务、任务块、块内子任务、阶段
+    - 大任务面板：支持批量删除卡片、里程碑、子任务、阶段
+    - 切换视图/面板/日期自动退出批次模式
+    SW 缓存版本升至 v22。
+    涉及文件：js/batch-delete.js / js/render.js / js/bigtask.js / js/future.js
+              / js/app.js / index.html / css/style.css / service-worker.js
 
+────────────────────────────────────────
+
+【同步可靠性深度重构 + 性能优化 — 2026-07-11】
+
+── 同步数据丢失缺陷修复 ──
+35. ✅ 计划池 localStorage key 错配修复：cloud-sync.js 导出/导入计划池键从错误的
+    "quadrant_pool_*" 改为正确的 "quadrant_future_tasks"/"quadrant_week_tasks"/"quadrant_month_tasks"
+36. ✅ 大任务缓存库 key 单复数错配修复：cloud-sync.js 导入大任务缓存从单数 "quadrant_big_task_cache"
+    改为复数 "quadrant_big_tasks_cache"
+37. ✅ 移除诊断测试 PATCH 毒化云端：diagnoseGistConnection 不再用测试 payload 覆盖 Gist，
+    改为直接真实推送
+38. ✅ 修复启动时静默 autoPull 覆盖本地未推送修改：setupGistSync 初始化不再自动拉取，
+    改为 toast 提示手动拉取
+39. ✅ onDataChanged 遗漏修复：saveBigTasks/saveBigTaskCache/savePlanTasks/savePrinciples
+    末尾统一调用 CloudSync.onDataChanged()
+
+── 可靠合并同步引擎 ──
+40. ✅ 新建 js/sync-merge.js：逐条目 LWW（最后写赢）合并引擎，纯函数、node 可测
+    - lwwWinner：按 updatedAt 比较，墓碑优先，旧数据向后兼容
+    - mergeArrayById：按 ID 合并两个数组，支持递归子条目
+    - mergeDateData / mergeAllDateData：象限/多日数据合并
+    - mergeFlatArray / mergePrinciples / mergeCachedDatesIndex
+    - countRemoteChanges：远端变更统计
+    - 验证：test/test-cloudsync-merge.js（25 测试全通过）
+41. ✅ 拉取流程改为非破坏性合并：pullFromGist 使用 mergeImportData 逐集合合并
+    （替代原 importAllData 全量覆盖），显示合并统计 toast
+42. ✅ 推送流程改为推前合并：pushToGist 先 GET 远程、mergeImportData 合并到本地、
+    再 PATCH 合并后数据（推前合并不覆盖远程改动）
+43. ✅ 竞态控制：_syncInFlight 锁 + _pendingPush 排队，推送完成后自动 flush 排队请求
+44. ✅ 推送成功清除 lastLocalEdit 标记
+
+── 性能优化（渲染与存储）──
+45. ✅ store.js 内存缓存层：_allDataCache + _fastDeepClone，loadAllData 命中缓存时
+    零 JSON.parse 开销；saveAllData 自动更新缓存
+46. ✅ 备份轮转限频：_rotateRollingBackups 限频 30s，高频小操作跳过备份轮转
+47. ✅ 统计合并遍历：新增 calcAllStats 函数，一次 walkLeafItems 同时算出象限/加权/时段
+    三组指标，updateStatsBar 从 2 次遍历减为 1 次
+48. ✅ renderTimeView 去重数据加载：renderAll 将已加载 data 传给 renderTimeView，
+    避免重复 loadDateData（减少一次完整 JSON.parse）
+49. ✅ migrate 短路：_migratedToday 按日期缓存，同一天多次 renderAll 只执行一次迁移
+50. ✅ renderAll debounce：renderAllDebounced 50ms 防抖，连续操作合并为一次渲染
+51. ✅ SourceEditor 延迟初始化：init 改为首次 open 时调用，避免启动时捕获完整 DOM
+52. ✅ 启动任务延迟：migrateFutureTasks/WeekTasks/MonthTasks 改为 setTimeout(0) 延迟执行，
+    seedCacheIndexIfEmpty 同步延迟；大任务自动归档改为 one-time migration
+    （quadrant_bigtask_autoarchive_v1 标记）
+53. ✅ 消除启动时双重面板渲染：renderAll 已内调 renderBigTaskPanel/renderPlanPoolPanel/
+    renderPrinciplesPanel，移除 initApp 中的冗余调用
+
+── Service Worker 与缓存策略 ──
+54. ✅ SW 缓存版本升级至 v20
+55. ✅ 新增 js/sync-merge.js 到 PRECACHE_ASSETS（原遗漏）
+56. ✅ fetchAndCache 修复：cache.put 前 clone 响应，避免 body stream 被消费两次
+57. ✅ 后台更新扩展至 JS/CSS：SW 对 HTML/JS/CSS 资源都执行 Stale-While-Revalidate
+58. ✅ index.html 所有 <script> 加 defer 属性 + ?v=20 缓存刷新参数；
+    <link> CSS 同样加 ?v=20
+
+── 回归测试 ──
+59. ✅ 全部 8 个测试套件（100+ 测试）通过：
+    test-cloudsync-merge.js / test-cloudsync-store-keys.js /
+    test-timeview-columns.js / test-timeview-distribution.js /
+    test-timeview-grouping.js / test-bigtask-completion.js /
+    test-bigtask-import-today.js / test-bigtask-cache.js
+
+涉及文件：js/cloud-sync.js / js/sync-merge.js（新增）/ js/store.js / js/render.js /
+    js/app.js / js/source-editor.js / service-worker.js / index.html /
+    test/test-cloudsync-merge.js（新增）/ test/test-cloudsync-store-keys.js（新增）
+
+63. ✅ 缓存系统增强——回收站机制：大任务/依循/计划池的删除和完成操作
+    不再永久删除，而是移入回收站缓存，支持置顶保护和恢复。
+
+    【导入缓存UI升级】
+    - 缓存日期索引从 string[] 升级为 [{date, label}][]，向后兼容自动迁移
+    - 导入缓存界面支持重命名：双击名称或点击 ✏️ 按钮自定义标签（如"工作日常用"）
+    - 每条缓存增加 📤 导出JSON 按钮，可将单日数据导出为 tasks-xxx.json
+    - 新增 getCachedDateEntries() / updateCachedDateLabel() 函数
+
+    【大任务回收站】
+    - 删除大任务/里程碑/子任务/阶段 → 移入 `quadrant_big_tasks_deleted`（上限10条）
+    - 新增 `_extractAndCacheBigTaskItem()` 通用提取函数，自动处理父信息记录
+    - 大任务面板底部新增"🗑️ 大任务回收站"可折叠区域
+    - 每条缓存支持：📌 置顶保护 / ↩ 恢复到原位置 / 🗑 永久删除
+    - 删除大任务整卡时正确跳过 recalcBigTaskProgress（修复 splice 后索引错位bug）
+
+    【依循回收站】
+    - 删除原则/优先问题 → 移入 `quadrant_principles_deleted`（上限10条）
+    - 依循面板底部新增"🗑️ 依循回收站"可折叠区域
+    - 同样支持 📌 置顶 / ↩ 恢复 / 🗑 永久删除
+
+    【计划池回收站】
+    - 待办/周/月三个池各自独立的缓存键：`quadrant_future_tasks_cache` 等（各上限10条）
+    - 完成时自动移入：勾选checkbox → 从池中移除 → 缓存区出现（action: "completed"）
+    - 阶段全部完成也自动触发父任务移入缓存
+    - 删除时自动移入：所有 delete 函数改造为 move-to-cache（action: "deleted"）
+    - 计划池面板底部新增"🗑️ 计划池回收站"可折叠区域（按Tab切换显示对应池缓存）
+    - 同样支持 📌 置顶保护 / ↩ 恢复到池中（清除completed状态）/ 🗑 永久删除
+
+    【通用缓存引擎】
+    - 新增通用函数：addToCache / removeFromCache / toggleCachePin / getCacheEntries
+    - 缓存满（10条）自动驱逐最旧的 unpinned 条目；全置顶时拒绝添加并提示
+    - 所有缓存条目带 timestamp 和 pinned 字段
+
+    涉及文件：js/store.js（核心重构） / js/bigtask.js / js/render.js / js/cache-ui.js /
+        css/style.css / index.html / service-worker.js
+
+64. ✅ 回收站增强——依循回收站分离、默认收起、详情查看、格式统一
+
+    【原则与优先问题缓存分离】
+    - 新增 `quadrant_priority_problems_deleted` 键，优先问题独立缓存
+    - `_extractAndCachePrinciple` 按类型分别存入不同缓存键
+    - 新增 `restorePriorityProblemFromDeletedCache()` 恢复函数
+    - HTML 新增独立"🗑️ 优先问题回收站"区域
+    - 渲染拆分为 `renderPrinciplesDeletedCache` + `renderPriorityProblemsDeletedCache`
+
+    【回收站默认收起】
+    - 所有回收站（大任务/原则/优先问题/计划池）默认折叠，点击标题栏展开
+    - 折叠状态持久化到 `quadrant_cache_toggle_state`
+    - 新增通用函数：`setupCacheSectionToggle(sectionId)` 处理展开/收起
+    - 标题图标 ▶/▼ 随状态切换
+
+    【缓存内容可展开查看】
+    - 每条缓存增加 📋 详情按钮，点击弹出 Markdown 风格详情面板
+    - 新增 `renderCacheDetailMarkdown(entry)` 生成结构化文本
+    - 新增 `_showCacheDetailPopup(entry)` 弹出模态窗口
+    - 大任务/里程碑/子任务/阶段/任务块 均支持完整信息展示（含阶段进度、日期等）
+    - 新增 `_renderGenericDeletedCacheList()` 统一渲染逻辑（含展开/置顶/恢复/删除）
+
+    【大任务缓存格式统一】
+    - 大任务缓存条目格式改为与计划池一致：`{action, timestamp}` 替代 `deletedAt`
+    - 四项缓存条目（bigtask/milestone/subtask/stage）全部更新
+
+    涉及文件：js/store.js / js/bigtask.js / js/render.js / css/style.css / index.html
+
+65. ✅ 导入缓存增强——支持删除缓存条目和置顶保护
+
+    【导入缓存删除+置顶】
+    - `quadrant_cached_dates_index` 新增 `pinned` 字段，向后兼容自动迁移
+    - 新增 `removeCachedDate(date)` — 从导入索引中移除指定日期（不删除实际数据）
+    - 新增 `toggleCachedDatePin(date)` — 切换缓存条目的置顶状态（点击即切换）
+    - 导入缓存列表：置顶条目排在最前面 + 📌 图标，非置顶显示 📍
+    - 每条缓存增加 📌 置顶按钮和 🗑️ 删除按钮
+    - 删除缓存仅移除索引条目，不影响 localStorage 中实际日期数据
+
+    涉及文件：js/store.js / js/cache-ui.js
+
+66. ✅ 同日期支持多条缓存快照——每次缓存生成独立条目
+
+    【同日期多次缓存】
+    - `quadrant_cached_dates_index` 条目新增 `id` 和 `cachedAt` 字段（V3），向后兼容自动迁移
+    - `markDateAsCached(date)` 不再检查重复，每次调用都创建新条目并分配唯一ID
+    - `getCachedDates()` 返回去重后的唯一日期列表，保证导入等逻辑不受影响
+    - `updateCachedDateLabel(id)` / `removeCachedDate(id)` / `toggleCachedDatePin(id)` 改用ID操作
+    - `seedCacheIndexIfEmpty()` 也生成 `id` + `cachedAt` 字段
+    - `cache-ui.js` 中所有操作（置顶/删除/重命名）使用 `entry.id` 而非 `entry.date`
+
+    涉及文件：js/store.js / js/cache-ui.js
+
+
+────────────────────────────────────────
+
+67. ✅ 置顶缓存支持按星期自动导入——工作日/周六/周日三个独立开关
+
+    【自动导入机制】
+    - `quadrant_cached_dates_index` 条目新增 `autoWorkday`/`autoSaturday`/`autoSunday` 字段（V4）
+    - 向后兼容自动迁移，旧条目缺失字段默认 false
+    - 新增 `setCachedDateAutoImport(id, field, value)` — 设置单条目的自动导入选项
+    - 新增 `getAutoImportEntriesForDate(dateStr)` — 按星期筛选匹配的置顶条目
+    - 新增 `silentImportCachedData(sourceDate, targetDate)` — 静默合并（无alert/confirm）
+    - 新增 `runAutoImportsForDate(dateStr)` — 对指定日期执行全部匹配的自动导入
+    - `renderAll()` 开头调用 `runAutoImportsForDate()`，数据变更后重新加载渲染
+
+    【导入缓存UI】
+    - 置顶条目下方新增"⏰ 自动导入"行，含三个切换按钮：工作日 / 周六 / 周日
+    - 激活的按钮高亮显示（btn-primary样式），点击即切换开关状态
+    - 仅置顶条目显示自动导入选项（非置顶不显示）
+
+    【星期映射】
+    - 工作日：周一至周五（getDay 1-5）
+    - 周六：getDay 6
+    - 周日：getDay 0
+
+    涉及文件：js/store.js / js/cache-ui.js / js/render.js / service-worker.js
+
+68. ✅ 导入缓存界面重构——两行紧凑布局 + 象限数量徽标
+
+    【布局重构】
+    - Row 1：名称（左）+ 四象限任务数量徽标（右），space-between 对齐
+    - Row 2：日期提示（仅自定义名称时显示）+ 全部操作按钮 + 自动导入开关
+    - 卡片改为 column 方向布局，整体更紧凑美观
+    - 象限徽标按 I/II/III/IV 配色：红/蓝/金/绿，仅非零时着色
+    - 暗色模式：徽标适配深色背景，降低亮度避免刺眼
+    - 移动端：徽标和按钮缩小适配窄屏
+
+    涉及文件：js/cache-ui.js / css/style.css / service-worker.js
+
+69. ✅ 修复待办池任务加入象限后删除/完成/推迟失效——4项根因修复
+
+    【根因1：自动导入重复触发（CRITICAL）】
+    - `runAutoImportsForDate` 在每次 `renderAll` 中运行，导致用户删除任务后又被重新导入
+    - 新增 `quadrant_auto_import_tracker` 追踪机制：每个(entryId, targetDate)对仅自动导入一次
+    - 新增 `_wasAutoImported` / `_markAutoImported` 辅助函数
+
+    【根因2：_migratePlanPool 缺少 timeSlot】
+    - 简单任务迁移路径：缺少 `timeSlot` → 新增 `timeSlot: getDefaultTimeSlot()`
+    - 块内子任务提取路径：缺少 `timeSlot` → 新增 `timeSlot: st.timeSlot || getDefaultTimeSlot()`
+    - 块迁移子任务：改用 `st.timeSlot || getDefaultTimeSlot()` 优先保留原时段
+    - 块迁移子任务：补充缺失的 `progress: '100%'`
+
+    【根因3：_migratePlanPool 丢失 bigTaskRef】
+    - 简单任务 + 块内子任务迁移时，保留 pool 条目的 `bigTaskRef`（若存在）
+    - 确保推迟回池后再迁移的任务仍能关联大任务，删除/完成可正确同步
+
+    【根因4：deferQuadrantTask 丢失 bigTaskRef】
+    - 推迟象限任务到待办池时，`bigTaskRef` 未被保留
+    - 修复后池中任务携带 `bigTaskRef`，再迁移回象限时保持关联
+
+    涉及文件：js/store.js / service-worker.js
+
+70. ✅ 修复依循回收站消失 + 移动端JSON粘贴导入
+
+    【依循回收站恢复】
+    - `renderPrinciplesPanel` 中3处早期 `return` 导致回收站渲染代码不可达
+    - 原则为空时 return（line 2440）、ppListEl 缺失时 return（line 2481）、
+      优先问题为空时 return（line 2493）——均跳过末尾的 recycle bin 渲染
+    - 重构为条件块结构：active items 渲染与 recycle bin 渲染解耦，
+      回收站在函数末尾始终执行，无论是否有活跃条目
+
+    【移动端JSON导入增强】
+    - 原先导入仅支持文件选择器（`<input type="file">`），移动端体验差
+    - 新增 `showJsonImportModal()`：同时支持 📁 选择文件 + 📋 粘贴JSON
+    - 粘贴模式提供"合并导入"和"覆盖导入"两个按钮
+    - 电脑端导出JSON → 复制文本 → 手机端粘贴导入，无需文件传输
+    - 模态框适配移动端：全宽按钮、大触摸目标
+
+    涉及文件：js/render.js / js/json-io.js / service-worker.js
+
+71. ✅ 彻底修复依循回收站消失 + 手机端导入电脑端数据
+
+    【根因：资源缓存版本号未同步（关键）】
+    - 上一轮（#70）改了 js/render.js、js/json-io.js 的代码内容，
+      但 index.html 的 `?v=23` 资源版本号未升级
+    - SW 用 Stale-While-Revalidate，cache key 含 `?v=23`，
+      持续返回修复前的旧代码 → 用户设备上回收站仍不显示、导入仍只有文件选择器
+    - 修复：index.html 所有资源 `?v=23` → `?v=29`（1 CSS + 24 JS）
+    - SW `CACHE_VERSION` v28 → v29，激活时清空旧缓存
+    - 双管齐下确保用户刷新后必拿到 #70 的修复代码
+
+    【跨设备导入闭环增强】
+    - #70 已实现手机端粘贴导入，但电脑端导出只下载文件，缺复制文本入口
+    - 新增 `showJsonExportModal(jsonText)`：导出时弹出模态框
+      含只读 textarea 显示完整 JSON + "📋 复制全部"按钮
+    - 复制兼容性：优先 execCommand('copy')，降级 navigator.clipboard
+    - `exportAllDataAsJSON` 浏览器分支下载后调用该模态框
+    - 完整流程：电脑端导出 → 复制文本 → 发到手机 → 手机端导入JSON → 粘贴
+
+    【验证】
+    - 新增 test/test-json-io.js：覆盖 merge 保留旧日期/overwrite 全覆盖/
+      非法JSON拒绝/非对象拒绝/不污染原数据/空库导入 6 组场景
+    - 全部 9 套测试通过（含新增 1 套）
+
+    【说明】
+    - 若手机端是 Capacitor 打包的 App（非浏览器 PWA），SW 缓存机制不适用，
+      需重新打包 App 才能更新代码；浏览器访问的 PWA 本次修复直接生效
+    - 首次刷新时 SW 会自动检测新版本并在 3 秒后 reload（index.html 已有逻辑）
+
+    涉及文件：index.html / service-worker.js / js/json-io.js / js/store.js /
+        test/test-json-io.js（新增）
+
+72. ✅ 修复手机端无法同步电脑端/云端数据 — 3项根因修复
+
+    【Bug 1：Gist 连接成功后不自动拉取数据（最直接影响手机端）】
+    - `setupGistSync` 连接 Gist 后只保存配置 + 提示"点击拉取"
+    - 用户输入 Gist ID 点连接后，数据并未实际下载，界面仍为空
+    - 直到下次启动 App 时 `autoPullFromGist` 才会拉取
+    - 手机端新用户连上 Gist 后看到空界面，不知还需手动点"拉取"
+    - 修复：新增 `onConnectSuccess` 辅助函数，连接成功后立即调
+      `pullFromGist()` 自动拉取数据并刷新界面
+
+    【Bug 2：Capacitor 导出文件名与 autoSyncFromDevice 不匹配】
+    - `exportAllDataAsJSON` 导出到 Documents/quadrant_tasks_backup_YYYY-MM-DD.json
+    - `autoSyncFromDevice` 读取 Documents/quadrant_tasks_backup.json（固定名）
+    - 两者文件名永远对不上 → autoSyncFromDevice 永远读不到导出文件
+    - 修复：导出时同时写入 dated 文件名和 SYNC_FILENAME 固定名，
+      确保 autoSyncFromDevice 在下次启动时能检测到备份
+
+    【Bug 3：Capacitor 导出不显示可复制 JSON 弹窗】
+    - `showJsonExportModal(json)` 调用仅在浏览器分支（else），
+      Capacitor 分支导出后不显示可复制文本弹窗
+    - 手机端导出后无法复制 JSON 文本发送给另一设备
+    - 修复：将 showJsonExportModal 调用移到 if/else 两个分支都执行
+
+    【缓存版本同步】
+    - SW CACHE_VERSION v29 → v30
+    - index.html 所有资源 ?v=29 → ?v=30
+
+    【测试验证】
+    - test/test-cloudsync-merge.js：25/25 通过
+    - test/test-cloudsync-store-keys.js：通过
+    - test/test-json-io.js：全部通过
+
+    涉及文件：js/cloud-sync.js / js/store.js / service-worker.js / index.html
+
+────────────────────────────────────────
+
+【V1.6 云同步修复，已修正】
 29. ✅ Gist 云同步 4 项修复——诊断覆盖正式数据 + 静默失败无感知 + 无重试 + SW缓存过期：
    (1) Bug 1（致命）：pushToGist() 诊断阶段 diagnoseGistConnection 将测试数据
-       {_test:true} 写入正式文件 SYNC_FILE_NAME（quadrant_tasks_backup.json），
-       若后续真实推送失败（超时/断网），Gist 中残留测试数据（无 _version 字段）。
-       手机端 autoPullFromGist → importAllData 检测不到 _version → 认为数据无效。
-       修复：诊断改用独立测试文件 _sync_test_.json，推送成功后清理（payload.files 设 null）。
-   (2) Bug 2（致命）：autoPullFromGist → pullFromGist(true) 静默模式下，fetch 失败或数据无效
-       仅 console.error 日志，手机端用户完全无感知——看不到数据、不知道失败了。
-       修复：静默模式错误也闪烁 ⚠️ 图标 3 秒；importAllData 无效数据改返回 false（不弹 alert），
-       pullFromGist 根据返回值设置 _lastAutoPullError 标志位。
-   (3) Bug 3（中等）：自动拉取无重试机制，一次网络抖动就永久失败。
+       {_test:true} 写入正式文件，若后续推送失败 Gist 残留无效数据。
+       修复：诊断改用独立测试文件 _sync_test_.json，推送成功后清理。
+   (2) Bug 2（致命）：autoPullFromGist 静默模式错误仅 console.error，手机端无感知。
+       修复：静默模式也闪烁 ⚠️ 图标 3 秒；importAllData 无效数据返回 false。
+   (3) Bug 3（中等）：自动拉取无重试机制。
        修复：_autoPullWithRetry 最多重试 2 次，指数退避 2s→4s。
-   (4) SW 缓存版本升 v15→v16，确保手机端 PWA 拉取到修复后的代码。
+   (4) SW 缓存版本升 v15→v16。
    涉及文件：js/cloud-sync.js / service-worker.js
 
 30. ✅ 同步拉取改为合并模式 + 桌面端定时拉取（手机→电脑方向修复）：
-   (1) 拉取合并策略：importAllData() 全部数据导入从覆盖改为按 ID 合并（本地优先，云端补充）。
-       - dateData：按日期→象限→任务ID 合并，本地已有任务保留、云端独有任务追加
-       - 计划池（待办/周/月）：按 ID 合并数组
-       - 大任务活跃列表+缓存库：按 ID 合并
-       原则（principles）仍保持云端覆盖（单项原则共用）。
-   (2) Bug 修复：桌面端仅有 init() 时一次 autoPull，之后一直不拉取；
-       手机端有 Token 推送到 Gist 后，桌面端永远收不到。
-       新增定时自动拉取：每 60 秒静默 pullFromGist(true)。
-       页面不可见时暂停定时器（省电省流量），恢复可见时立即拉取+恢复定时器。
+   (1) 拉取合并策略：importAllData() 从覆盖改为按 ID 合并（本地优先，云端补充）。
+       涵盖 dateData/计划池/大任务活跃列表+缓存库。
+   (2) 新增定时自动拉取：每 60 秒静默 pullFromGist(true)。
+       页面不可见时暂停，恢复可见时立即拉取。
    (3) SW 缓存版本升 v16→v17。
    涉及文件：js/cloud-sync.js / service-worker.js
 
 31. ✅ 修复 SW 缓存 Gist API 响应导致永远返回旧数据（GitHub Pages 同步根因）：
-   (1) Bug（致命）：Service Worker 的 Cache First 策略拦截了所有 GET 请求，
-       包括 api.github.com/gists/* 的 Gist API 调用。首次拉取成功后，API 响应
-       被缓存到 SW Cache。后续拉取时，SW 直接返回缓存的旧数据，永远不再访问真实 API。
-       背景更新（Stale-While-Revalidate）仅在 Accept: text/html 时触发，
-       而 Gist API 的 Accept 是 application/vnd.github.v3+json，故缓存永不刷新。
-       这是 GitHub Pages 站点（有 SW）无法同步的根因。
-       修复：fetch handler 中检测到 api.github.com 直接 bypass SW 走网络。
-   (2) 双重保险：cloud-sync.js 中所有 Gist GET 请求添加 cache: 'no-cache'，
-       阻止浏览器 HTTP 缓存也缓存 API 响应。
+   (1) Bug（致命）：SW Cache First 策略拦截 api.github.com GET 请求，
+       首次成功后缓存 API 响应，后续永远返回旧数据。
+       Stale-While-Revalidate 仅在 text/html 时触发，API 请求永不刷新。
+       这是 GitHub Pages 站点无法同步的根因。
+       修复：api.github.com 直接 bypass SW 走网络。
+   (2) 双重保险：所有 Gist GET 请求添加 cache: 'no-cache'。
    (3) SW 缓存版本升 v17→v18。
    涉及文件：service-worker.js / js/cloud-sync.js
-
-（暂无）
 
 ────────────────────────────────────────
 

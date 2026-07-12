@@ -51,6 +51,15 @@ function setupPlanPoolPanel() {
     (addFn[activePlanPool] || addFutureTask)(block);
     renderPlanPoolPanel();
   });
+
+  var planPoolBatchBtn = document.getElementById('btnBatchDelPlanPool');
+  if (planPoolBatchBtn) {
+    planPoolBatchBtn.addEventListener('click', function() {
+      if (typeof enterPlanPoolBatchMode === 'function') {
+        enterPlanPoolBatchMode();
+      }
+    });
+  }
 }
 
 // Backward compat stubs
@@ -97,4 +106,277 @@ function importBigSubtaskToToday(btId, msId, stId) {
   data['II'].push(newTask);
   saveDateData(today, data);
   renderAll(currentDate);
+}
+
+// ---- Import a big task's "today pool" to today (card-level one-click) ----
+
+// 纯函数：计算某大任务"今日任务池"的导入计划（去重）。
+// 逻辑与 migrateBigTaskSubtasks 的去重一致，但限定单个大任务，便于测试与复用。
+// 返回 { poolCount, toImport: [{t, ms}], alreadyCount }
+function planBigTaskTodayImport(bt, dateData, btId, date) {
+  var poolItems = [];
+  if (bt && bt.milestones) {
+    bt.milestones.forEach(function(ms) {
+      if (ms.tasks) ms.tasks.forEach(function(t) {
+        if (t.plannedDate === date && !t.completed) poolItems.push({ t: t, ms: ms });
+      });
+    });
+  }
+  var toImport = [];
+  var alreadyCount = 0;
+  poolItems.forEach(function(it) {
+    var alreadyImported = false;
+    QUADRANT_KEYS.forEach(function(key) {
+      (dateData[key] || []).forEach(function(task) {
+        if (task.bigTaskRef && task.bigTaskRef.bigTaskId === btId && task.bigTaskRef.subtaskId === it.t.id) {
+          alreadyImported = true;
+        }
+        if (task.blockName !== undefined && task.tasks) {
+          task.tasks.forEach(function(st) {
+            if (st.bigTaskRef && st.bigTaskRef.bigTaskId === btId && st.bigTaskRef.subtaskId === it.t.id) {
+              alreadyImported = true;
+            }
+          });
+        }
+      });
+    });
+    if (alreadyImported) alreadyCount++;
+    else toImport.push(it);
+  });
+  return { poolCount: poolItems.length, toImport: toImport, alreadyCount: alreadyCount };
+}
+
+// 大任务卡片级一键导入：把该大任务"今日任务池"（plannedDate=当前查看日期 且未完成）
+// 的全部子任务导入今日 Q-II，已导入的自动跳过（去重），含阶段的一并深拷贝。
+function importBigTaskTodayPoolToToday(btId) {
+  var date = currentDate;
+  var bigTasks = loadBigTasks();
+  var bt = null;
+  for (var i = 0; i < bigTasks.length; i++) {
+    if (bigTasks[i].id === btId) { bt = bigTasks[i]; break; }
+  }
+  var data = loadDateData(date);
+  if (!data['II']) data['II'] = [];
+
+  var plan = planBigTaskTodayImport(bt, data, btId, date);
+
+  if (plan.poolCount === 0) {
+    Toast.show('该大任务今日任务池为空（无计划日期=今日 的子任务）');
+    return;
+  }
+
+  var imported = 0;
+  plan.toImport.forEach(function(it) {
+    var newTask = {
+      id: generateId(),
+      text: it.t.text,
+      completed: false,
+      progress: '100%',
+      dueDate: '',
+      timeSlot: it.t.timeSlot || getDefaultTimeSlot(),
+      bigTaskRef: { bigTaskId: btId, subtaskId: it.t.id, milestoneId: it.ms.id }
+    };
+    var copiedStages = copyBigSubtaskStages(it.t);
+    if (copiedStages) newTask.stages = copiedStages;
+    data['II'].push(newTask);
+    imported++;
+  });
+  if (imported > 0) saveDateData(date, data);
+
+  if (imported > 0) {
+    Toast.show('已导入 ' + imported + ' 条到今日 Q-II' + (plan.alreadyCount > 0 ? '（另 ' + plan.alreadyCount + ' 条已存在）' : ''));
+  } else {
+    Toast.show('今日任务池 ' + plan.poolCount + ' 条均已导入，无需重复');
+  }
+  renderAll(currentDate);
+  renderBigTaskPanel();
+}
+
+// ---- Import Plan Pool Item to Today ----
+
+// 导入计划池任务（无阶段）到今日 Q-II
+function importPlanPoolItemToToday(ftId, stId, text) {
+  var today = currentDate;
+  var data = loadDateData(today);
+  if (!data['II']) data['II'] = [];
+
+  if (stId) {
+    // 块内子任务
+    var cfg = PLAN_POOL_CONFIGS[activePlanPool];
+    var tasks = cfg.loadFn();
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
+        for (var j = 0; j < tasks[i].tasks.length; j++) {
+          if (tasks[i].tasks[j].id === stId) {
+            var st = tasks[i].tasks[j];
+            data['II'].push({
+              id: generateId(),
+              text: st.text,
+              completed: false,
+              progress: '100%',
+              dueDate: '',
+              timeSlot: st.timeSlot || getDefaultTimeSlot(),
+              planPoolRef: { pool: activePlanPool, ftId: ftId, stId: stId }
+            });
+            break;
+          }
+        }
+        break;
+      }
+    }
+  } else {
+    // 顶层任务
+    data['II'].push({
+      id: generateId(),
+      text: text,
+      completed: false,
+      progress: '100%',
+      dueDate: '',
+      timeSlot: getDefaultTimeSlot(),
+      planPoolRef: { pool: activePlanPool, ftId: ftId }
+    });
+  }
+
+  saveDateData(today, data);
+  renderAll(today);
+}
+
+// 导入计划池任务（含全部阶段）到今日 Q-II
+function importPlanPoolItemWithStagesToToday(ftId, stId, text) {
+  var today = currentDate;
+  var data = loadDateData(today);
+  if (!data['II']) data['II'] = [];
+
+  var cfg = PLAN_POOL_CONFIGS[activePlanPool];
+  var tasks = cfg.loadFn();
+  var sourceTask = null;
+
+  if (stId) {
+    // 块内子任务
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
+        for (var j = 0; j < tasks[i].tasks.length; j++) {
+          if (tasks[i].tasks[j].id === stId) { sourceTask = tasks[i].tasks[j]; break; }
+        }
+        break;
+      }
+    }
+  } else {
+    // 顶层任务
+    for (var k = 0; k < tasks.length; k++) {
+      if (tasks[k].id === ftId) { sourceTask = tasks[k]; break; }
+    }
+  }
+
+  if (!sourceTask) return;
+
+  var newTask = {
+    id: generateId(),
+    text: sourceTask.text,
+    completed: false,
+    progress: '100%',
+    dueDate: '',
+    timeSlot: sourceTask.timeSlot || getDefaultTimeSlot(),
+    planPoolRef: { pool: activePlanPool, ftId: ftId, stId: stId || undefined }
+  };
+
+  if (sourceTask.stages && sourceTask.stages.length > 0) {
+    newTask.stages = sourceTask.stages.map(function(s) {
+      return {
+        id: generateId(),
+        text: s.text,
+        completed: s.completed || false,
+        timeSlot: s.timeSlot || getDefaultTimeSlot(),
+        highlights: s.highlights ? s.highlights.slice() : undefined,
+        extraCompleted: s.extraCompleted || false
+      };
+    });
+  }
+
+  data['II'].push(newTask);
+  saveDateData(today, data);
+  renderAll(today);
+}
+
+// 计划池任务块批量导入：一键导入块内全部未完成子任务到今日 Q-II
+// 已导入的自动跳过（去重依据 planPoolRef），含阶段的一并深拷贝
+function importPlanBlockAllToToday(ftId) {
+  var today = currentDate;
+  var cfg = PLAN_POOL_CONFIGS[activePlanPool];
+  if (!cfg) return;
+  var ptasks = cfg.loadFn();
+  var block = null;
+  for (var i = 0; i < ptasks.length; i++) {
+    if (ptasks[i].id === ftId && ptasks[i].type === 'block') { block = ptasks[i]; break; }
+  }
+  if (!block || !block.tasks || block.tasks.length === 0) {
+    Toast.show('该任务块没有子任务');
+    return;
+  }
+
+  var data = loadDateData(today);
+  if (!data['II']) data['II'] = [];
+
+  var imported = 0, skipped = 0;
+
+  block.tasks.forEach(function(st) {
+    if (st.completed) return;
+
+    // 去重：检查今日所有象限是否已有相同 planPoolRef 的任务
+    var alreadyImported = false;
+    QUADRANT_KEYS.forEach(function(key) {
+      (data[key] || []).forEach(function(task) {
+        if (task.planPoolRef && task.planPoolRef.ftId === ftId && task.planPoolRef.stId === st.id) {
+          alreadyImported = true;
+        }
+        // 检查块内子任务
+        if (task.blockName !== undefined && task.tasks) {
+          task.tasks.forEach(function(sub) {
+            if (sub.planPoolRef && sub.planPoolRef.ftId === ftId && sub.planPoolRef.stId === st.id) {
+              alreadyImported = true;
+            }
+          });
+        }
+      });
+    });
+
+    if (alreadyImported) { skipped++; return; }
+
+    // 创建新任务
+    var newTask = {
+      id: generateId(),
+      text: st.text,
+      completed: false,
+      progress: '100%',
+      dueDate: '',
+      timeSlot: st.timeSlot || getDefaultTimeSlot(),
+      planPoolRef: { pool: activePlanPool, ftId: ftId, stId: st.id }
+    };
+
+    // 深拷贝阶段
+    if (st.stages && st.stages.length > 0) {
+      newTask.stages = st.stages.map(function(s) {
+        return {
+          id: generateId(),
+          text: s.text,
+          completed: s.completed || false,
+          timeSlot: s.timeSlot || getDefaultTimeSlot(),
+          highlights: s.highlights ? s.highlights.slice() : undefined,
+          extraCompleted: s.extraCompleted || false
+        };
+      });
+    }
+
+    data['II'].push(newTask);
+    imported++;
+  });
+
+  if (imported === 0 && skipped === 0) {
+    Toast.show('该任务块无可导入的子任务');
+    return;
+  }
+
+  saveDateData(today, data);
+  renderAll(today);
+  Toast.show('已导入 ' + imported + ' 条' + (skipped > 0 ? '，跳过 ' + skipped + ' 条已存在' : ''));
 }

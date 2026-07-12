@@ -21,7 +21,7 @@
 <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
 <link rel="manifest" href="manifest.json">
 <title>四象限任务管理器 v4</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
 <div id="app">
@@ -83,6 +83,7 @@
       <div class="bigtask-actions">
         <button class="btn btn-sm btn-primary" id="btnAddBigTask">+ 新建大任务</button>
         <button class="btn btn-sm btn-info" id="btnClaudePlan" data-tooltip="用 AI 调研规划大任务">🤖 AI 规划</button>
+        <button class="btn btn-sm batch-mode-trigger" id="btnBatchDelBigTask" title="批量删除">🗑️ 批删</button>
       </div>
       <!-- Completed Big Task Cache (auto-populated when a big task finishes) -->
       <div class="bigtask-cache collapsed" id="bigTaskCache" style="display:none;">
@@ -92,6 +93,16 @@
         </div>
         <div class="bigtask-cache-body" id="bigTaskCacheBody">
           <div class="bigtask-cache-list" id="bigTaskCacheList"></div>
+        </div>
+      </div>
+      <!-- Deleted Big Task Cache (recycle bin for deleted milestones/subtasks/stages) -->
+      <div class="bigtask-cache collapsed" id="bigTaskDeletedCache" style="display:none;">
+        <div class="bigtask-cache-header" id="bigTaskDeletedCacheToggle">
+          <span>🗑️ 大任务回收站（<span id="bigTaskDeletedCacheCount">0</span>/10）</span>
+          <span class="bigtask-cache-toggle-icon">▶</span>
+        </div>
+        <div class="bigtask-cache-body" id="bigTaskDeletedCacheBody" style="display:none;">
+          <div class="bigtask-cache-list" id="bigTaskDeletedCacheList"></div>
         </div>
       </div>
     </div>
@@ -111,8 +122,37 @@
       <div class="principles-list" id="principlesList">
         <div class="empty-hint" id="principlesEmpty">暂无原则，点击下方按钮添加</div>
       </div>
+      <div class="priority-problems-separator" id="priorityProblemsSeparator" style="display:none;">
+        <span class="priority-separator-line"></span>
+        <span class="priority-separator-label">⚠️ 最近优先解决</span>
+        <span class="priority-separator-line"></span>
+      </div>
+      <div class="priority-problems-list" id="priorityProblemsList"></div>
+      <div class="priority-problems-actions" id="priorityProblemsActions" style="display:none;">
+        <button class="btn btn-sm btn-warning" id="btnAddPriorityProblem">+ 添加优先问题</button>
+      </div>
       <div class="principles-actions">
         <button class="btn btn-sm btn-primary" id="btnAddPrinciple">+ 添加原则</button>
+      </div>
+      <!-- Deleted Principles Cache -->
+      <div class="deleted-cache-section collapsed" id="principlesDeletedCache" style="display:none;">
+        <div class="deleted-cache-header" id="principlesDeletedCacheToggle">
+          <span>🗑️ 原则回收站（<span id="principlesDeletedCacheCount">0</span>/10）</span>
+          <span class="deleted-cache-toggle-icon">▶</span>
+        </div>
+        <div class="deleted-cache-body" id="principlesDeletedCacheBody" style="display:none;">
+          <div class="deleted-cache-list" id="principlesDeletedCacheList"></div>
+        </div>
+      </div>
+      <!-- Deleted Priority Problems Cache -->
+      <div class="deleted-cache-section collapsed" id="priorityProblemsDeletedCache" style="display:none;">
+        <div class="deleted-cache-header" id="priorityProblemsDeletedCacheToggle">
+          <span>🗑️ 优先问题回收站（<span id="priorityProblemsDeletedCacheCount">0</span>/10）</span>
+          <span class="deleted-cache-toggle-icon">▶</span>
+        </div>
+        <div class="deleted-cache-body" id="priorityProblemsDeletedCacheBody" style="display:none;">
+          <div class="deleted-cache-list" id="priorityProblemsDeletedCacheList"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -128,6 +168,7 @@
         <span class="quadrant-label">立即处理</span>
         <button class="quadrant-add-btn" id="btnAddTask-I" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-I" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-I" title="批量删除">🗑️</button>
         <span class="task-count" id="count-I">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -141,6 +182,7 @@
         <span class="quadrant-label">计划安排</span>
         <button class="quadrant-add-btn" id="btnAddTask-II" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-II" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-II" title="批量删除">🗑️</button>
         <span class="task-count" id="count-II">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -154,6 +196,7 @@
         <span class="quadrant-label">委派处理</span>
         <button class="quadrant-add-btn" id="btnAddTask-III" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-III" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-III" title="批量删除">🗑️</button>
         <span class="task-count" id="count-III">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -167,6 +210,7 @@
         <span class="quadrant-label">尽量减少</span>
         <button class="quadrant-add-btn" id="btnAddTask-IV" title="添加任务">＋</button>
         <button class="quadrant-add-btn" id="btnAddBlock-IV" title="添加任务块">📦</button>
+        <button class="quadrant-add-btn quadrant-batch-btn" id="btnBatchDel-IV" title="批量删除">🗑️</button>
         <span class="task-count" id="count-IV">0</span>
       </div>
       <div class="quadrant-tasks"></div>
@@ -195,6 +239,17 @@
       <div class="planpool-actions">
         <button class="btn btn-sm btn-primary" id="btnAddPlanTask">+ 添加任务</button>
         <button class="btn btn-sm btn-info" id="btnAddPlanBlock">+ 添加任务块</button>
+        <button class="btn btn-sm batch-mode-trigger" id="btnBatchDelPlanPool" title="批量删除">🗑️ 批删</button>
+      </div>
+      <!-- Plan Pool Deleted/Completed Cache -->
+      <div class="deleted-cache-section collapsed" id="planPoolDeletedCache" style="display:none;">
+        <div class="deleted-cache-header" id="planPoolDeletedCacheToggle">
+          <span>🗑️ 计划池回收站（<span id="planPoolDeletedCacheCount">0</span>/10）</span>
+          <span class="deleted-cache-toggle-icon">▶</span>
+        </div>
+        <div class="deleted-cache-body" id="planPoolDeletedCacheBody" style="display:none;">
+          <div class="deleted-cache-list" id="planPoolDeletedCacheList"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -233,27 +288,29 @@
     });
   }
 </script>
-<script src="js/util.js"></script>
-<script src="js/config.js"></script>
-<script src="js/store.js"></script>
-<script src="js/edit.js"></script>
-<script src="js/toast.js"></script>
-<script src="js/highlight.js"></script>
-<script src="js/timeslot.js"></script>
-<script src="js/render.js"></script>
-<script src="js/drag.js"></script>
-<script src="js/markdown.js"></script>
-<script src="js/json-io.js"></script>
-<script src="js/cache-ui.js"></script>
-<script src="js/stats-ui.js"></script>
-<script src="js/shortcuts.js"></script>
-<script src="js/quadrant-ops.js"></script>
-<script src="js/defer.js"></script>
-<script src="js/future.js"></script>
-<script src="js/bigtask.js"></script>
-<script src="js/daily-report.js"></script>
-<script src="js/source-editor.js"></script>
-<script src="js/cloud-sync.js"></script>
-<script src="js/app.js"></script>
+<script defer src="js/util.js?v=19"></script>
+<script defer src="js/config.js?v=19"></script>
+<script defer src="js/store.js?v=19"></script>
+<script defer src="js/edit.js?v=19"></script>
+<script defer src="js/toast.js?v=19"></script>
+<script defer src="js/highlight.js?v=19"></script>
+<script defer src="js/timeslot.js?v=19"></script>
+<script defer src="js/render.js?v=19"></script>
+<script defer src="js/drag.js?v=19"></script>
+<script defer src="js/markdown.js?v=19"></script>
+<script defer src="js/json-io.js?v=19"></script>
+<script defer src="js/cache-ui.js?v=19"></script>
+<script defer src="js/stats-ui.js?v=19"></script>
+<script defer src="js/shortcuts.js?v=19"></script>
+<script defer src="js/quadrant-ops.js?v=19"></script>
+<script defer src="js/defer.js?v=19"></script>
+<script defer src="js/future.js?v=19"></script>
+<script defer src="js/bigtask.js?v=19"></script>
+<script defer src="js/daily-report.js?v=19"></script>
+<script defer src="js/source-editor.js?v=19"></script>
+<script defer src="js/sync-merge.js?v=19"></script>
+<script defer src="js/cloud-sync.js?v=19"></script>
+<script defer src="js/batch-delete.js?v=19"></script>
+<script defer src="js/app.js?v=19"></script>
 </body>
 </html>

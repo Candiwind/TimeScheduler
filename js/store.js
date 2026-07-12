@@ -195,27 +195,22 @@ function importCachedDataFromSnapshot(entryId, targetDate, silent) {
   }
   var all = loadAllData();
   var sourceData = JSON.parse(JSON.stringify(entry.snapshot));
-  if (entry.date === targetDate) {
-    // 同日期：直接覆盖
-    all[targetDate] = sourceData;
-  } else {
-    // 跨日期：ID 合并
-    var targetData = all[targetDate] || { I: [], II: [], III: [], IV: [] };
-    QUADRANT_KEYS.forEach(function(key) {
-      var existingIds = {};
-      (targetData[key] || []).forEach(function(item) {
-        existingIds[item.id] = true;
-        if (item.tasks) item.tasks.forEach(function(st) { existingIds[st.id] = true; });
-      });
-      (sourceData[key] || []).forEach(function(item) {
-        if (!existingIds[item.id]) {
-          if (!targetData[key]) targetData[key] = [];
-          targetData[key].push(item);
-        }
-      });
+  // 始终按 ID 合并，不覆盖已有任务
+  var targetData = all[targetDate] || { I: [], II: [], III: [], IV: [] };
+  QUADRANT_KEYS.forEach(function(key) {
+    var existingIds = {};
+    (targetData[key] || []).forEach(function(item) {
+      existingIds[item.id] = true;
+      if (item.tasks) item.tasks.forEach(function(st) { existingIds[st.id] = true; });
     });
-    all[targetDate] = targetData;
-  }
+    (sourceData[key] || []).forEach(function(item) {
+      if (!existingIds[item.id]) {
+        if (!targetData[key]) targetData[key] = [];
+        targetData[key].push(item);
+      }
+    });
+  });
+  all[targetDate] = targetData;
   saveAllData(all);
   return true;
 }

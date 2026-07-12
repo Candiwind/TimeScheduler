@@ -683,6 +683,24 @@
 
     涉及文件：js/store.js / service-worker.js
 
+70. ✅ 修复依循回收站消失 + 移动端JSON粘贴导入
+
+    【依循回收站恢复】
+    - `renderPrinciplesPanel` 中3处早期 `return` 导致回收站渲染代码不可达
+    - 原则为空时 return（line 2440）、ppListEl 缺失时 return（line 2481）、
+      优先问题为空时 return（line 2493）——均跳过末尾的 recycle bin 渲染
+    - 重构为条件块结构：active items 渲染与 recycle bin 渲染解耦，
+      回收站在函数末尾始终执行，无论是否有活跃条目
+
+    【移动端JSON导入增强】
+    - 原先导入仅支持文件选择器（`<input type="file">`），移动端体验差
+    - 新增 `showJsonImportModal()`：同时支持 📁 选择文件 + 📋 粘贴JSON
+    - 粘贴模式提供"合并导入"和"覆盖导入"两个按钮
+    - 电脑端导出JSON → 复制文本 → 手机端粘贴导入，无需文件传输
+    - 模态框适配移动端：全宽按钮、大触摸目标
+
+    涉及文件：js/render.js / js/json-io.js / service-worker.js
+
 ────────────────────────────────────────
 
 【未来计划】

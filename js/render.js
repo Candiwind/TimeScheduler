@@ -2428,49 +2428,45 @@ function renderPrinciplesPanel() {
     dateDisplay.style.color = hasDates ? '' : 'var(--text3)';
   }
 
+  // --- Principles rendering ---
   var listEl = document.getElementById('principlesList');
   var emptyEl = document.getElementById('principlesEmpty');
-  if (!listEl) return;
+  if (listEl) {
+    listEl.querySelectorAll('.principle-item').forEach(function(el) { el.remove(); });
 
-  // Remove existing items but keep emptyEl reference
-  listEl.querySelectorAll('.principle-item').forEach(function(el) { el.remove(); });
-
-  if (data.principles.length === 0) {
-    if (emptyEl) emptyEl.style.display = '';
-    return;
-  }
-
-  if (emptyEl) emptyEl.style.display = 'none';
-
-  data.principles.forEach(function(p, idx) {
-    var el = document.createElement('div');
-    el.className = 'principle-item';
-    el.innerHTML = '<span class="principle-index">' + (idx + 1) + '.</span>' +
-      '<span class="principle-text">' + Util.escHtml(p.text) + '</span>' +
-      '<button class="task-delete-btn principle-del-btn" data-pid="' + p.id + '">&times;</button>';
-    listEl.appendChild(el);
-  });
-
-  // Bind edit on dblclick
-  listEl.querySelectorAll('.principle-text').forEach(function(el) {
-    el.addEventListener('dblclick', function() {
-      var pid = this.parentElement.querySelector('.principle-del-btn').dataset.pid;
-      startEdit(this, this.textContent, function(newVal) {
-        updatePrinciple(pid, newVal);
-        renderPrinciplesPanel();
+    if (data.principles.length === 0) {
+      if (emptyEl) emptyEl.style.display = '';
+    } else {
+      if (emptyEl) emptyEl.style.display = 'none';
+      data.principles.forEach(function(p, idx) {
+        var el = document.createElement('div');
+        el.className = 'principle-item';
+        el.innerHTML = '<span class="principle-index">' + (idx + 1) + '.</span>' +
+          '<span class="principle-text">' + Util.escHtml(p.text) + '</span>' +
+          '<button class="task-delete-btn principle-del-btn" data-pid="' + p.id + '">&times;</button>';
+        listEl.appendChild(el);
       });
-    });
-  });
-
-  // Bind delete
-  listEl.querySelectorAll('.principle-del-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (!confirm('删除该原则？')) return;
-      deletePrinciple(this.dataset.pid);
-      renderPrinciplesPanel();
-    });
-  });
+      // Bind edit on dblclick
+      listEl.querySelectorAll('.principle-text').forEach(function(el) {
+        el.addEventListener('dblclick', function() {
+          var pid = this.parentElement.querySelector('.principle-del-btn').dataset.pid;
+          startEdit(this, this.textContent, function(newVal) {
+            updatePrinciple(pid, newVal);
+            renderPrinciplesPanel();
+          });
+        });
+      });
+      // Bind delete
+      listEl.querySelectorAll('.principle-del-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (!confirm('删除该原则？')) return;
+          deletePrinciple(this.dataset.pid);
+          renderPrinciplesPanel();
+        });
+      });
+    }
+  }
 
   // ===== 优先问题渲染 =====
   var ppListEl = document.getElementById('priorityProblemsList');
@@ -2478,58 +2474,52 @@ function renderPrinciplesPanel() {
   var ppActions = document.getElementById('priorityProblemsActions');
   var ppAddBtn = document.getElementById('btnAddPriorityProblem');
 
-  if (!ppListEl) return;
+  if (ppListEl) {
+    ppListEl.querySelectorAll('.priority-problem-item').forEach(function(el) { el.remove(); });
 
-  // 清空旧优先问题项
-  ppListEl.querySelectorAll('.priority-problem-item').forEach(function(el) { el.remove(); });
+    var problems = data.priorityProblems || [];
 
-  var problems = data.priorityProblems || [];
-
-  if (problems.length === 0) {
-    if (ppSeparator) ppSeparator.style.display = 'none';
-    // 仍显示"+ 添加优先问题"按钮，否则空状态下无法添加第一条
-    if (ppActions) ppActions.style.display = '';
-    if (ppAddBtn) ppAddBtn.style.display = '';
-    return;
-  }
-
-  if (ppSeparator) ppSeparator.style.display = '';
-  if (ppActions) {
-    if (ppAddBtn) ppAddBtn.style.display = problems.length >= 2 ? 'none' : '';
-    ppActions.style.display = '';
-  }
-
-  problems.forEach(function(p, idx) {
-    var el = document.createElement('div');
-    el.className = 'priority-problem-item';
-    el.innerHTML = '<span class="priority-problem-index">' + (idx + 1) + '.</span>' +
-      '<span class="priority-problem-text">' + Util.escHtml(p.text) + '</span>' +
-      '<button class="task-delete-btn priority-problem-del-btn" data-ppid="' + p.id + '">&times;</button>';
-    ppListEl.appendChild(el);
-  });
-
-  // 绑定双击编辑
-  ppListEl.querySelectorAll('.priority-problem-text').forEach(function(el) {
-    el.addEventListener('dblclick', function() {
-      var ppid = this.parentElement.querySelector('.priority-problem-del-btn').dataset.ppid;
-      startEdit(this, this.textContent, function(newVal) {
-        updatePriorityProblem(ppid, newVal);
-        renderPrinciplesPanel();
+    if (problems.length === 0) {
+      if (ppSeparator) ppSeparator.style.display = 'none';
+      if (ppActions) ppActions.style.display = '';
+      if (ppAddBtn) ppAddBtn.style.display = '';
+    } else {
+      if (ppSeparator) ppSeparator.style.display = '';
+      if (ppActions) {
+        if (ppAddBtn) ppAddBtn.style.display = problems.length >= 2 ? 'none' : '';
+        ppActions.style.display = '';
+      }
+      problems.forEach(function(p, idx) {
+        var el = document.createElement('div');
+        el.className = 'priority-problem-item';
+        el.innerHTML = '<span class="priority-problem-index">' + (idx + 1) + '.</span>' +
+          '<span class="priority-problem-text">' + Util.escHtml(p.text) + '</span>' +
+          '<button class="task-delete-btn priority-problem-del-btn" data-ppid="' + p.id + '">&times;</button>';
+        ppListEl.appendChild(el);
       });
-    });
-  });
+      // Bind edit on dblclick
+      ppListEl.querySelectorAll('.priority-problem-text').forEach(function(el) {
+        el.addEventListener('dblclick', function() {
+          var ppid = this.parentElement.querySelector('.priority-problem-del-btn').dataset.ppid;
+          startEdit(this, this.textContent, function(newVal) {
+            updatePriorityProblem(ppid, newVal);
+            renderPrinciplesPanel();
+          });
+        });
+      });
+      // Bind delete
+      ppListEl.querySelectorAll('.priority-problem-del-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (!confirm('删除该优先问题？')) return;
+          deletePriorityProblem(this.dataset.ppid);
+          renderPrinciplesPanel();
+        });
+      });
+    }
+  }
 
-  // 绑定删除
-  ppListEl.querySelectorAll('.priority-problem-del-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (!confirm('删除该优先问题？')) return;
-      deletePriorityProblem(this.dataset.ppid);
-      renderPrinciplesPanel();
-    });
-  });
-
-  // 渲染依循删除缓存
+  // ===== 回收站（始终渲染，不受上面早期返回影响）=====
   renderPrinciplesDeletedCache();
   renderPriorityProblemsDeletedCache();
 }

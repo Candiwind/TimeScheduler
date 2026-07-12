@@ -280,30 +280,29 @@ function loadCachedDatesIndex() {
         if (arr[i].snapshot === undefined) arr[i].snapshot = null;
       }
     }
-    // 去重：同日期只保留一条（优先保留有快照的、更新的），同时清理空快照条目
-    var seen = {};
+    // 去重：仅清理同日期且都未命名的重复条目（有 label 的条目是用户保留的版本，不去重）
+    var seenUnlabeled = {}; // date → entry (only for unlabeled entries)
     var deduped = [];
     for (var j = 0; j < arr.length; j++) {
       var entry = arr[j];
       if (!entry.date) { deduped.push(entry); continue; }
-      if (!seen[entry.date]) {
-        seen[entry.date] = entry;
+      if (entry.label) {
+        // 有名称的条目始终保留（用户刻意保存的版本）
+        deduped.push(entry);
+        continue;
+      }
+      // 未命名条目：同日期只保留一条
+      if (!seenUnlabeled[entry.date]) {
+        seenUnlabeled[entry.date] = entry;
         deduped.push(entry);
       } else {
-        // 已有同日期条目：保留有快照的或更新的
-        var prev = seen[entry.date];
-        var prevHasSnap = prev.snapshot && Object.keys(prev.snapshot).length > 0;
-        var curHasSnap = entry.snapshot && Object.keys(entry.snapshot).length > 0;
-        if (curHasSnap && !prevHasSnap) {
-          // 新条目有快照、旧条目没有 → 替换
+        var prev = seenUnlabeled[entry.date];
+        if ((entry.cachedAt || 0) > (prev.cachedAt || 0)) {
+          // 新条目更新 → 替换旧未命名条目
           deduped[deduped.indexOf(prev)] = entry;
-          seen[entry.date] = entry;
-        } else if (curHasSnap && prevHasSnap && (entry.cachedAt || 0) > (prev.cachedAt || 0)) {
-          // 都有快照但新条目更新 → 替换
-          deduped[deduped.indexOf(prev)] = entry;
-          seen[entry.date] = entry;
+          seenUnlabeled[entry.date] = entry;
         }
-        // 否则保留旧条目（旧有条目更好或一样好）
+        // 否则保留旧条目
       }
     }
     // 如果去重后有变化，回写清理后的数据
@@ -334,12 +333,13 @@ function markDateAsCached(date) {
   // 深拷贝创建独立快照
   var snapshot = JSON.parse(JSON.stringify(data));
   var cached = loadCachedDatesIndex();
-  // 同日期只保留一条缓存：已有则更新快照，无则新建
+  // 查找同日期且未命名的条目（无 label 视为通用缓存，可覆盖；有 label 视为用户保留的版本，不可覆盖）
   var existingIdx = -1;
   for (var i = 0; i < cached.length; i++) {
-    if (cached[i].date === date) { existingIdx = i; break; }
+    if (cached[i].date === date && !cached[i].label) { existingIdx = i; break; }
   }
   if (existingIdx >= 0) {
+    // 更新已有未命名条目的快照
     cached[existingIdx].snapshot = snapshot;
     cached[existingIdx].cachedAt = Date.now();
   } else {

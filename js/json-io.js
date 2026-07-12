@@ -136,3 +136,77 @@ function importJsonFile(file) {
   };
   reader.readAsText(file);
 }
+
+// 显示导出JSON模态框：含可复制文本，便于跨设备粘贴导入
+// 电脑端导出 → 复制文本 → 手机端"导入JSON"粘贴，无需文件传输
+function showJsonExportModal(jsonText) {
+  var existing = document.getElementById('jsonExportModal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'jsonExportModal';
+  modal.className = 'modal-overlay';
+
+  var content = document.createElement('div');
+  content.className = 'modal-content';
+  content.style.maxWidth = '560px';
+
+  var title = document.createElement('h2');
+  title.textContent = '📦 导出JSON数据';
+  content.appendChild(title);
+
+  var desc = document.createElement('p');
+  desc.textContent = '文件已开始下载。如需同步到手机端，复制下方文本，在另一设备的"导入JSON → 粘贴"中即可：';
+  desc.style.color = 'var(--text2)';
+  desc.style.fontSize = '13px';
+  desc.style.marginBottom = '10px';
+  content.appendChild(desc);
+
+  var textarea = document.createElement('textarea');
+  textarea.readOnly = true;
+  textarea.value = jsonText;
+  textarea.style.cssText = 'width:100%;height:200px;padding:10px;font-size:11px;font-family:monospace;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);resize:vertical;box-sizing:border-box;';
+  content.appendChild(textarea);
+
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
+
+  var copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-primary';
+  copyBtn.textContent = '📋 复制全部';
+  copyBtn.style.flex = '1';
+  copyBtn.addEventListener('click', function() {
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    if (ok) {
+      copyBtn.textContent = '✅ 已复制';
+      setTimeout(function() { copyBtn.textContent = '📋 复制全部'; }, 1500);
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(jsonText).then(function() {
+        copyBtn.textContent = '✅ 已复制';
+        setTimeout(function() { copyBtn.textContent = '📋 复制全部'; }, 1500);
+      }).catch(function() {
+        alert('复制失败，请手动选择文本后复制');
+      });
+    } else {
+      alert('复制失败，请手动选择文本后复制');
+    }
+  });
+  btns.appendChild(copyBtn);
+
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'btn btn-cancel';
+  closeBtn.textContent = '关闭';
+  closeBtn.addEventListener('click', function() { modal.remove(); });
+  btns.appendChild(closeBtn);
+
+  content.appendChild(btns);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) modal.remove();
+  });
+}

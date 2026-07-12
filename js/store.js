@@ -906,6 +906,8 @@ function exportAllDataAsJSON() {
     }
   } else {
     fallbackBlobDownload(json, fileName);
+    // 显示可复制文本，便于跨设备粘贴导入（电脑端复制 → 手机端粘贴）
+    if (typeof showJsonExportModal === 'function') showJsonExportModal(json);
   }
 }
 

@@ -701,6 +701,38 @@
 
     涉及文件：js/render.js / js/json-io.js / service-worker.js
 
+71. ✅ 彻底修复依循回收站消失 + 手机端导入电脑端数据
+
+    【根因：资源缓存版本号未同步（关键）】
+    - 上一轮（#70）改了 js/render.js、js/json-io.js 的代码内容，
+      但 index.html 的 `?v=23` 资源版本号未升级
+    - SW 用 Stale-While-Revalidate，cache key 含 `?v=23`，
+      持续返回修复前的旧代码 → 用户设备上回收站仍不显示、导入仍只有文件选择器
+    - 修复：index.html 所有资源 `?v=23` → `?v=29`（1 CSS + 24 JS）
+    - SW `CACHE_VERSION` v28 → v29，激活时清空旧缓存
+    - 双管齐下确保用户刷新后必拿到 #70 的修复代码
+
+    【跨设备导入闭环增强】
+    - #70 已实现手机端粘贴导入，但电脑端导出只下载文件，缺复制文本入口
+    - 新增 `showJsonExportModal(jsonText)`：导出时弹出模态框
+      含只读 textarea 显示完整 JSON + "📋 复制全部"按钮
+    - 复制兼容性：优先 execCommand('copy')，降级 navigator.clipboard
+    - `exportAllDataAsJSON` 浏览器分支下载后调用该模态框
+    - 完整流程：电脑端导出 → 复制文本 → 发到手机 → 手机端导入JSON → 粘贴
+
+    【验证】
+    - 新增 test/test-json-io.js：覆盖 merge 保留旧日期/overwrite 全覆盖/
+      非法JSON拒绝/非对象拒绝/不污染原数据/空库导入 6 组场景
+    - 全部 9 套测试通过（含新增 1 套）
+
+    【说明】
+    - 若手机端是 Capacitor 打包的 App（非浏览器 PWA），SW 缓存机制不适用，
+      需重新打包 App 才能更新代码；浏览器访问的 PWA 本次修复直接生效
+    - 首次刷新时 SW 会自动检测新版本并在 3 秒后 reload（index.html 已有逻辑）
+
+    涉及文件：index.html / service-worker.js / js/json-io.js / js/store.js /
+        test/test-json-io.js（新增）
+
 ────────────────────────────────────────
 
 【未来计划】

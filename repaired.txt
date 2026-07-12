@@ -660,6 +660,29 @@
 
     涉及文件：js/cache-ui.js / css/style.css / service-worker.js
 
+69. ✅ 修复待办池任务加入象限后删除/完成/推迟失效——4项根因修复
+
+    【根因1：自动导入重复触发（CRITICAL）】
+    - `runAutoImportsForDate` 在每次 `renderAll` 中运行，导致用户删除任务后又被重新导入
+    - 新增 `quadrant_auto_import_tracker` 追踪机制：每个(entryId, targetDate)对仅自动导入一次
+    - 新增 `_wasAutoImported` / `_markAutoImported` 辅助函数
+
+    【根因2：_migratePlanPool 缺少 timeSlot】
+    - 简单任务迁移路径：缺少 `timeSlot` → 新增 `timeSlot: getDefaultTimeSlot()`
+    - 块内子任务提取路径：缺少 `timeSlot` → 新增 `timeSlot: st.timeSlot || getDefaultTimeSlot()`
+    - 块迁移子任务：改用 `st.timeSlot || getDefaultTimeSlot()` 优先保留原时段
+    - 块迁移子任务：补充缺失的 `progress: '100%'`
+
+    【根因3：_migratePlanPool 丢失 bigTaskRef】
+    - 简单任务 + 块内子任务迁移时，保留 pool 条目的 `bigTaskRef`（若存在）
+    - 确保推迟回池后再迁移的任务仍能关联大任务，删除/完成可正确同步
+
+    【根因4：deferQuadrantTask 丢失 bigTaskRef】
+    - 推迟象限任务到待办池时，`bigTaskRef` 未被保留
+    - 修复后池中任务携带 `bigTaskRef`，再迁移回象限时保持关联
+
+    涉及文件：js/store.js / service-worker.js
+
 ────────────────────────────────────────
 
 【未来计划】

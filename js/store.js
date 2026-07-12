@@ -348,14 +348,44 @@ function silentImportCachedData(sourceDate, targetDate) {
   return true;
 }
 
-// 对指定日期执行所有匹配的自动导入，返回导入的条目标签列表
+// 自动导入追踪：记录哪些(entryId, targetDate)已导入过，避免重复导入
+var AUTO_IMPORT_TRACKER_KEY = 'quadrant_auto_import_tracker';
+
+function _getAutoImportTracker() {
+  try {
+    var raw = localStorage.getItem(AUTO_IMPORT_TRACKER_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+
+function _saveAutoImportTracker(tracker) {
+  try { localStorage.setItem(AUTO_IMPORT_TRACKER_KEY, JSON.stringify(tracker)); } catch(e) {}
+}
+
+function _wasAutoImported(entryId, targetDate) {
+  var tracker = _getAutoImportTracker();
+  return !!(tracker[targetDate] && tracker[targetDate][entryId]);
+}
+
+function _markAutoImported(entryId, targetDate) {
+  var tracker = _getAutoImportTracker();
+  if (!tracker[targetDate]) tracker[targetDate] = {};
+  tracker[targetDate][entryId] = true;
+  _saveAutoImportTracker(tracker);
+}
+
+// 对指定日期执行所有尚未导入的自动导入，返回导入的条目标签列表
+// 每个(entryId, targetDate)对只会自动导入一次，防止重复导入已删除的任务
 function runAutoImportsForDate(dateStr) {
   var entries = getAutoImportEntriesForDate(dateStr);
   if (entries.length === 0) return [];
   var labels = [];
   entries.forEach(function(e) {
-    if (silentImportCachedData(e.date, dateStr)) {
-      labels.push(e.label || e.date);
+    if (!_wasAutoImported(e.id, dateStr)) {
+      if (silentImportCachedData(e.date, dateStr)) {
+        _markAutoImported(e.id, dateStr);
+        labels.push(e.label || e.date);
+      }
     }
   });
   return labels;
@@ -1651,6 +1681,8 @@ function deferQuadrantTask(taskData) {
       scheduledDate: nextDate,
       targetQuadrant: taskData.quadrantKey || ''
     };
+    // 保留 bigTaskRef，以便 migrate 回象限时仍能关联大任务
+    if (taskData.bigTaskRef) ft.bigTaskRef = taskData.bigTaskRef;
     addFutureTask(ft);
     return 'future';
   }
@@ -1722,13 +1754,17 @@ function _migratePlanPool(poolKey, date, shouldMigrate) {
       }
       extractedSubs.forEach(function(st) {
         if (!data[st.targetQuadrant]) data[st.targetQuadrant] = [];
-        data[st.targetQuadrant].push({
+        var newTask = {
           id: generateId(),
           text: st.text,
           completed: false,
           progress: '100%',
-          dueDate: ''
-        });
+          dueDate: '',
+          timeSlot: st.timeSlot || getDefaultTimeSlot()
+        };
+        // 保留来源信息，确保删除/完成时能关联回大任务
+        if (st.bigTaskRef) newTask.bigTaskRef = st.bigTaskRef;
+        data[st.targetQuadrant].push(newTask);
         migrated++;
       });
       ft.tasks = keptTasks;
@@ -1739,7 +1775,7 @@ function _migratePlanPool(poolKey, date, shouldMigrate) {
           blockName: ft.blockName,
           progress: '100%',
           tasks: keptTasks.map(function(st) {
-            return { id: generateId(), text: st.text, completed: false, timeSlot: getDefaultTimeSlot() };
+            return { id: generateId(), text: st.text, completed: false, progress: '100%', timeSlot: st.timeSlot || getDefaultTimeSlot() };
           })
         };
         data[ft.targetQuadrant].push(block);
@@ -1750,13 +1786,17 @@ function _migratePlanPool(poolKey, date, shouldMigrate) {
     } else {
       if (shouldMigrate(ft.scheduledDate || '') && ft.targetQuadrant) {
         if (!data[ft.targetQuadrant]) data[ft.targetQuadrant] = [];
-        data[ft.targetQuadrant].push({
+        var newTask = {
           id: generateId(),
           text: ft.text,
           completed: false,
           progress: '100%',
-          dueDate: ''
-        });
+          dueDate: '',
+          timeSlot: getDefaultTimeSlot()
+        };
+        // 保留 bigTaskRef，使推迟回池后再迁移时仍能关联大任务
+        if (ft.bigTaskRef) newTask.bigTaskRef = ft.bigTaskRef;
+        data[ft.targetQuadrant].push(newTask);
         migrated++;
       } else {
         remaining.push(ft);

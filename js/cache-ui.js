@@ -62,6 +62,9 @@ function showCacheModal() {
   var list = document.createElement('div');
   list.className = 'cache-date-list';
 
+  // 性能关键：一次性加载全量数据，避免每个条目深拷贝整个数据集
+  var allData = loadAllData();
+
   entries.forEach(function(entry) {
     var cacheDate = entry.date;
     var entryId = entry.id;
@@ -72,7 +75,7 @@ function showCacheModal() {
     item.className = 'cache-date-item';
     item.title = '点击合并数据到 ' + currentDate + '，已有任务不变';
 
-    var cacheData = getCachedDateData(cacheDate);
+    var cacheData = allData[cacheDate] || { I: [], II: [], III: [], IV: [] };
 
     // 计算四象限任务数量
     var qCounts = { I: 0, II: 0, III: 0, IV: 0 };

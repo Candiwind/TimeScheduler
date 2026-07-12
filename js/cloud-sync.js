@@ -38,7 +38,7 @@ var CloudSync = (function() {
    * 初始化：恢复之前的同步配置
    */
   // 版本标记——用于排查浏览器是否缓存了旧代码
-  var CODE_VERSION = '2026-07-12-merge-periodic-pull';
+  var CODE_VERSION = '2026-07-12-fix-sw-api-cache';
 
   function init() {
     console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
@@ -378,7 +378,10 @@ var CloudSync = (function() {
   function fetchGist(gistId, token) {
     var headers = { 'Accept': 'application/vnd.github.v3+json' };
     if (token) headers['Authorization'] = 'token ' + token;
-    return fetch('https://api.github.com/gists/' + gistId, { headers: headers }).then(function(res) {
+    return fetch('https://api.github.com/gists/' + gistId, {
+      headers: headers,
+      cache: 'no-cache' // 禁止浏览器 HTTP 缓存（配合 SW 直通 API）
+    }).then(function(res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.json();
     });
@@ -545,7 +548,10 @@ var CloudSync = (function() {
     var headers = { 'Accept': 'application/vnd.github.v3+json' };
     if (syncInfo.gistToken) headers['Authorization'] = 'token ' + syncInfo.gistToken;
 
-    return fetch('https://api.github.com/gists/' + syncInfo.gistId, { headers: headers }).then(function(res) {
+    return fetch('https://api.github.com/gists/' + syncInfo.gistId, {
+      headers: headers,
+      cache: 'no-cache' // 禁止浏览器 HTTP 缓存（配合 SW 直通 API）
+    }).then(function(res) {
       if (!res.ok) throw new Error('HTTP ' + res.status + ' — Gist 不可访问（私密 Gist 需要 Token）');
       return res.json();
     }).then(function(gist) {
@@ -829,7 +835,8 @@ var CloudSync = (function() {
       headers: {
         'Authorization': 'token ' + token,
         'Accept': 'application/vnd.github.v3+json'
-      }
+      },
+      cache: 'no-cache'
     }).then(function(res) {
       return res.ok;
     }).catch(function() {

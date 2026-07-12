@@ -1,6 +1,6 @@
 // service-worker.js — PWA Service Worker
 // 版本号：修改此值可触发缓存更新（新旧缓存并存，激活后清理旧版）
-const CACHE_VERSION = 'v17';
+const CACHE_VERSION = 'v18';
 const CACHE_NAME = 'quadrant-tasks-' + CACHE_VERSION;
 
 // 需要预缓存的核心资源（首次安装时缓存）
@@ -86,6 +86,13 @@ self.addEventListener('fetch', function(event) {
 
   // 跳过 chrome-extension:// 等非 http(s) 请求
   if (!event.request.url.startsWith('http')) return;
+
+  // 关键：外部 API 请求（Gist、GitHub API）直接走网络，不缓存
+  // 否则 SW 会把第一次 API 响应缓存起来，后续拉取永远返回旧数据！
+  if (event.request.url.indexOf('api.github.com') !== -1) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(function(cachedResponse) {

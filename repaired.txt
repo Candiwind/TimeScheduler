@@ -422,6 +422,19 @@
    (3) SW 缓存版本升 v16→v17。
    涉及文件：js/cloud-sync.js / service-worker.js
 
+31. ✅ 修复 SW 缓存 Gist API 响应导致永远返回旧数据（GitHub Pages 同步根因）：
+   (1) Bug（致命）：Service Worker 的 Cache First 策略拦截了所有 GET 请求，
+       包括 api.github.com/gists/* 的 Gist API 调用。首次拉取成功后，API 响应
+       被缓存到 SW Cache。后续拉取时，SW 直接返回缓存的旧数据，永远不再访问真实 API。
+       背景更新（Stale-While-Revalidate）仅在 Accept: text/html 时触发，
+       而 Gist API 的 Accept 是 application/vnd.github.v3+json，故缓存永不刷新。
+       这是 GitHub Pages 站点（有 SW）无法同步的根因。
+       修复：fetch handler 中检测到 api.github.com 直接 bypass SW 走网络。
+   (2) 双重保险：cloud-sync.js 中所有 Gist GET 请求添加 cache: 'no-cache'，
+       阻止浏览器 HTTP 缓存也缓存 API 响应。
+   (3) SW 缓存版本升 v17→v18。
+   涉及文件：service-worker.js / js/cloud-sync.js
+
 （暂无）
 
 ────────────────────────────────────────

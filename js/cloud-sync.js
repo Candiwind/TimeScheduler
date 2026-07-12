@@ -58,6 +58,12 @@ var CloudSync = (function() {
     syncInfo.gistToken = localStorage.getItem(GIST_TOKEN_KEY) || null;
     syncInfo.syncDirPath = localStorage.getItem('cloudsync_dir_path') || null;
 
+    // 向后兼容：新版代码用 'github-gist'，旧版用 'gist'，统一为 'gist'
+    if (syncInfo.mode === 'github-gist') {
+      syncInfo.mode = 'gist';
+      localStorage.setItem('cloudsync_mode', 'gist');
+    }
+
     // 尝试恢复文件句柄
     if (syncInfo.enabled && syncInfo.mode === 'baidu-disk') {
       restoreFileHandle();

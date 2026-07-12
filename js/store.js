@@ -174,10 +174,10 @@ function getCachedDateData(date) {
   return loadDateData(date);
 }
 
-function importCachedData(sourceDate, targetDate) {
+function importCachedData(sourceDate, targetDate, silent) {
   var all = loadAllData();
   if (!all[sourceDate]) {
-    alert('源日期没有缓存数据');
+    if (!silent) alert('源日期没有缓存数据');
     return false;
   }
   var sourceData = JSON.parse(JSON.stringify(all[sourceDate]));
@@ -208,6 +208,11 @@ function importCachedData(sourceDate, targetDate) {
   }
   saveAllData(all);
   return true;
+}
+
+// 静默版导入（无 alert/confirm），供自动导入使用
+function silentImportCachedData(sourceDate, targetDate) {
+  return importCachedData(sourceDate, targetDate, true);
 }
 
 // ============ Explicit Cache Index (only dates user clicked "缓存当前") ============
@@ -519,8 +524,10 @@ function _extractAndCachePlanPoolItem(poolKey, saveFn, ftId, stId, action) {
     }
   }
   if (entry) {
-    saveFn(tasks);
-    addToCache(cacheKey, entry);
+    // 先尝试写入缓存，成功后才持久化删除（避免缓存满时数据丢失）
+    if (addToCache(cacheKey, entry)) {
+      saveFn(tasks);
+    }
   }
   return entry;
 }
@@ -590,8 +597,10 @@ function _maybeCompleteAndCachePlanPoolItem(poolKey, saveFn, ftId, stId) {
     }
   }
   if (entry) {
-    saveFn(tasks);
-    addToCache(cacheKey, entry);
+    // 先尝试写入缓存，成功后才持久化移除
+    if (addToCache(cacheKey, entry)) {
+      saveFn(tasks);
+    }
   }
   return entry;
 }
@@ -609,7 +618,18 @@ function restorePlanPoolFromCache(poolKey, saveFn, cacheId) {
   var idx = -1;
   for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { idx = i; break; } }
   if (idx < 0) return false;
-  var entry = entries.splice(idx, 1)[0];
+  var entry = entries[idx];
+  var tasks = loadPlanTasks(poolKey);
+  if (entry.type === 'subtask' && entry.parentInfo) {
+    // 子任务：先验证父 block 是否存在于活跃池中
+    var parentFound = false;
+    for (var pi = 0; pi < tasks.length; pi++) {
+      if (tasks[pi].id === entry.parentInfo.ftId && tasks[pi].tasks) { parentFound = true; break; }
+    }
+    if (!parentFound) return false; // 父 block 不存在，保留在缓存中不恢复
+  }
+  // 验证通过，从缓存中移除
+  entries.splice(idx, 1)[0];
   _saveGenericCache(cacheKey, entries);
   // 恢复时清除 completed 状态（如果是因为完成而缓存的）
   if (entry.data) {
@@ -618,7 +638,6 @@ function restorePlanPoolFromCache(poolKey, saveFn, cacheId) {
       entry.data.stages.forEach(function(s) { s.completed = false; });
     }
   }
-  var tasks = loadPlanTasks(poolKey);
   if (entry.type === 'subtask' && entry.parentInfo) {
     // 恢复到对应 block 中
     for (var j = 0; j < tasks.length; j++) {
@@ -733,8 +752,10 @@ function _extractAndCacheBigTaskItem(btId, msId, stId, stageId) {
         if (tasks[bi].id === btId) { recalcBigTaskProgress(tasks[bi]); break; }
       }
     }
-    saveBigTasks(tasks);
-    addToCache(BIG_TASKS_DELETED_KEY, entry);
+    // 先尝试写入缓存，成功后才保存到 localStorage（避免缓存满时数据丢失）
+    if (addToCache(BIG_TASKS_DELETED_KEY, entry)) {
+      saveBigTasks(tasks);
+    }
   }
   return entry;
 }
@@ -745,43 +766,66 @@ function restoreBigTaskFromDeletedCache(cacheId) {
   var idx = -1;
   for (var i = 0; i < entries.length; i++) { if (entries[i].id === cacheId) { idx = i; break; } }
   if (idx < 0) return false;
-  var entry = entries.splice(idx, 1)[0];
-  _saveGenericCache(BIG_TASKS_DELETED_KEY, entries);
+  var entry = entries[idx];
   var tasks = loadBigTasks();
   if (entry.type === 'bigtask') {
+    // 整卡恢复：直接移除缓存并恢复（无父任务依赖）
+    entries.splice(idx, 1)[0];
+    _saveGenericCache(BIG_TASKS_DELETED_KEY, entries);
     tasks.push(entry.data);
     saveBigTasks(tasks);
+    return true;
   } else if (entry.parentInfo && entry.parentInfo.bigTaskId) {
-    // 里程碑/子任务/阶段：恢复到原大任务中
-    for (var i = 0; i < tasks.length; i++) {
-      if (tasks[i].id === entry.parentInfo.bigTaskId) {
-        if (entry.type === 'milestone') {
+    // 非整卡（里程碑/子任务/阶段）：先验证父大任务是否存在于活跃数据中
+    var parentFound = false;
+    for (var pi = 0; pi < tasks.length; pi++) {
+      if (tasks[pi].id === entry.parentInfo.bigTaskId) { parentFound = true; break; }
+    }
+    if (!parentFound) return false; // 父大任务不存在，保留在缓存中不恢复
+    // 父任务存在，移除缓存并恢复
+    entries.splice(idx, 1)[0];
+    _saveGenericCache(BIG_TASKS_DELETED_KEY, entries);
+    if (entry.type === 'milestone') {
+      for (var i = 0; i < tasks.length; i++) {
+        if (tasks[i].id === entry.parentInfo.bigTaskId) {
           if (!tasks[i].milestones) tasks[i].milestones = [];
           tasks[i].milestones.push(entry.data);
-        } else if (entry.type === 'subtask') {
-          for (var j = 0; j < (tasks[i].milestones || []).length; j++) {
+          recalcBigTaskProgress(tasks[i]);
+          break;
+        }
+      }
+    } else if (entry.type === 'subtask') {
+      for (var i = 0; i < tasks.length; i++) {
+        if (tasks[i].id === entry.parentInfo.bigTaskId && tasks[i].milestones) {
+          for (var j = 0; j < tasks[i].milestones.length; j++) {
             if (tasks[i].milestones[j].id === entry.parentInfo.milestoneId) {
               if (!tasks[i].milestones[j].tasks) tasks[i].milestones[j].tasks = [];
               tasks[i].milestones[j].tasks.push(entry.data);
+              recalcBigTaskProgress(tasks[i]);
               break;
             }
           }
-        } else if (entry.type === 'stage') {
-          for (var k = 0; k < (tasks[i].milestones || []).length; k++) {
-            if (tasks[i].milestones[k].id === entry.parentInfo.milestoneId && tasks[i].milestones[k].tasks) {
-              for (var l = 0; l < tasks[i].milestones[k].tasks.length; l++) {
-                if (tasks[i].milestones[k].tasks[l].id === entry.parentInfo.subtaskId) {
-                  if (!tasks[i].milestones[k].tasks[l].stages) tasks[i].milestones[k].tasks[l].stages = [];
-                  tasks[i].milestones[k].tasks[l].stages.push(entry.data);
+          break;
+        }
+      }
+    } else if (entry.type === 'stage') {
+      for (var i = 0; i < tasks.length; i++) {
+        if (tasks[i].id === entry.parentInfo.bigTaskId && tasks[i].milestones) {
+          for (var j = 0; j < tasks[i].milestones.length; j++) {
+            if (tasks[i].milestones[j].id === entry.parentInfo.milestoneId && tasks[i].milestones[j].tasks) {
+              for (var k = 0; k < tasks[i].milestones[j].tasks.length; k++) {
+                if (tasks[i].milestones[j].tasks[k].id === entry.parentInfo.subtaskId) {
+                  if (!tasks[i].milestones[j].tasks[k].stages) tasks[i].milestones[j].tasks[k].stages = [];
+                  tasks[i].milestones[j].tasks[k].stages.push(entry.data);
+                  recalcBigTaskProgress(tasks[i]);
                   break;
                 }
               }
               break;
             }
           }
+          break;
         }
-        recalcBigTaskProgress(tasks[i]);
-        break;
       }
     }
     saveBigTasks(tasks);
@@ -816,8 +860,10 @@ function _extractAndCachePrinciple(id, type) {
     }
   }
   if (entry) {
-    savePrinciples(data);
-    addToCache(cacheKey, entry);
+    // 先尝试写入缓存，成功后才持久化删除
+    if (addToCache(cacheKey, entry)) {
+      savePrinciples(data);
+    }
   }
   return entry;
 }
@@ -2044,4 +2090,13 @@ function renderCacheDetailMarkdown(entry) {
   var ts = entry.timestamp;
   if (ts) lines.push('\n*' + new Date(ts).toLocaleString('zh-CN') + '*');
   return lines.join('\n');
+}
+
+// 监听其他标签页/窗口的 localStorage 变化，自动失效内存缓存
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('storage', function(e) {
+    if (e.key === STORAGE_KEY || e.key === STORAGE_BACKUP_KEY) {
+      invalidateDataCache();
+    }
+  });
 }

@@ -48,3 +48,11 @@
 
 ## 修复功能描述
 - 查看 [repairing.txt](repairing.txt) 中的条目，在完成后加入到 [repaired.txt](repaired.txt) 对应版本的位置中。[repairing.txt](repairing.txt) 中写入"暂无"。
+
+## 高风险模块
+同步：修改前必须阅读 docs/sync.md，否则极易造成数据覆盖。
+Store：禁止直接操作 LocalStorage。
+Render：修改后必须重新 Render。
+Service Worker
+统计
+时间视图：必须跑三个测试。

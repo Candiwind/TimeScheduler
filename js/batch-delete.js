@@ -436,134 +436,138 @@ function batchExecuteDelete() {
     }
   });
 
-  // 处理计划池删除
-  var ppTypes = ['pp-task', 'pp-block', 'pp-subtask', 'pp-task-stage', 'pp-subtask-stage'];
-  ppTypes.forEach(function(ppType) {
-    if (!groups[ppType]) return;
-    groups[ppType].forEach(function(p) {
-      var pool = p[1];
-      if (!needSavePlan[pool]) needSavePlan[pool] = true;
-      var cfg = PLAN_POOL_CONFIGS[pool];
-      if (!cfg) return;
-      var tasks = cfg.loadFn();
-
-      if (ppType === 'pp-task') {
-        var id = p[2];
-        for (var i = 0; i < tasks.length; i++) {
-          if (tasks[i].id === id) { tasks.splice(i, 1); deleted++; break; }
-        }
-      } else if (ppType === 'pp-block') {
-        var id = p[2];
-        for (var i = 0; i < tasks.length; i++) {
-          if (tasks[i].id === id) { tasks.splice(i, 1); deleted++; break; }
-        }
-      } else if (ppType === 'pp-subtask') {
-        var ftId = p[2], stId = p[3];
-        for (var i = 0; i < tasks.length; i++) {
-          if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
-            for (var j = 0; j < tasks[i].tasks.length; j++) {
-              if (tasks[i].tasks[j].id === stId) { tasks[i].tasks.splice(j, 1); deleted++; break; }
+  // 处理计划池删除（通过回收站缓存）
+  // pp-task / pp-block / pp-subtask：委托 _extractAndCachePlanPoolItem
+  (groups['pp-task'] || []).forEach(function(p) {
+    var pool = p[1], ftId = p[2];
+    var cfg = PLAN_POOL_CONFIGS[pool];
+    if (!cfg) return;
+    var entry = _extractAndCachePlanPoolItem(cfg.poolKey, cfg.saveFn, ftId, null, 'deleted');
+    if (entry) deleted++;
+  });
+  (groups['pp-block'] || []).forEach(function(p) {
+    var pool = p[1], ftId = p[2];
+    var cfg = PLAN_POOL_CONFIGS[pool];
+    if (!cfg) return;
+    var entry = _extractAndCachePlanPoolItem(cfg.poolKey, cfg.saveFn, ftId, null, 'deleted');
+    if (entry) deleted++;
+  });
+  (groups['pp-subtask'] || []).forEach(function(p) {
+    var pool = p[1], ftId = p[2], stId = p[3];
+    var cfg = PLAN_POOL_CONFIGS[pool];
+    if (!cfg) return;
+    var entry = _extractAndCachePlanPoolItem(cfg.poolKey, cfg.saveFn, ftId, stId, 'deleted');
+    if (entry) deleted++;
+  });
+  // pp-task-stage / pp-subtask-stage：_extractAndCachePlanPoolItem 不支持阶段，手动缓存
+  (groups['pp-task-stage'] || []).forEach(function(p) {
+    var pool = p[1], ftId = p[2], stageId = p[3];
+    var cfg = PLAN_POOL_CONFIGS[pool];
+    if (!cfg) return;
+    var tasks = cfg.loadFn();
+    var cacheKey = getPlanPoolCacheKey(cfg.poolKey);
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === ftId && tasks[i].stages) {
+        for (var j = 0; j < tasks[i].stages.length; j++) {
+          if (tasks[i].stages[j].id === stageId) {
+            var removed = tasks[i].stages.splice(j, 1)[0];
+            var entry = { id: stageId, type: 'stage', data: JSON.parse(JSON.stringify(removed)),
+              parentInfo: { ftId: ftId, ftName: tasks[i].text || tasks[i].blockName || '' },
+              action: 'deleted', timestamp: Date.now(), pinned: false };
+            if (addToCache(cacheKey, entry)) {
+              if (tasks[i].stages.length === 0) delete tasks[i].stages;
+              cfg.saveFn(tasks);
+              deleted++;
             }
             break;
           }
         }
-      } else if (ppType === 'pp-task-stage') {
-        var ftId = p[2], stageId = p[3];
-        for (var i = 0; i < tasks.length; i++) {
-          if (tasks[i].id === ftId && tasks[i].stages) {
-            for (var j = 0; j < tasks[i].stages.length; j++) {
-              if (tasks[i].stages[j].id === stageId) { tasks[i].stages.splice(j, 1); deleted++; break; }
-            }
-            if (tasks[i].stages.length === 0) delete tasks[i].stages;
-            break;
-          }
-        }
-      } else if (ppType === 'pp-subtask-stage') {
-        var ftId = p[2], stId = p[3], stageId = p[4];
-        for (var i = 0; i < tasks.length; i++) {
-          if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
-            for (var j = 0; j < tasks[i].tasks.length; j++) {
-              if (tasks[i].tasks[j].id === stId && tasks[i].tasks[j].stages) {
-                for (var k = 0; k < tasks[i].tasks[j].stages.length; k++) {
-                  if (tasks[i].tasks[j].stages[k].id === stageId) { tasks[i].tasks[j].stages.splice(k, 1); deleted++; break; }
+        break;
+      }
+    }
+  });
+  (groups['pp-subtask-stage'] || []).forEach(function(p) {
+    var pool = p[1], ftId = p[2], stId = p[3], stageId = p[4];
+    var cfg = PLAN_POOL_CONFIGS[pool];
+    if (!cfg) return;
+    var tasks = cfg.loadFn();
+    var cacheKey = getPlanPoolCacheKey(cfg.poolKey);
+    for (var i = 0; i < tasks.length; i++) {
+      if (tasks[i].id === ftId && tasks[i].type === 'block' && tasks[i].tasks) {
+        for (var j = 0; j < tasks[i].tasks.length; j++) {
+          if (tasks[i].tasks[j].id === stId && tasks[i].tasks[j].stages) {
+            for (var k = 0; k < tasks[i].tasks[j].stages.length; k++) {
+              if (tasks[i].tasks[j].stages[k].id === stageId) {
+                var removed = tasks[i].tasks[j].stages.splice(k, 1)[0];
+                var entry = { id: stageId, type: 'stage', data: JSON.parse(JSON.stringify(removed)),
+                  parentInfo: { ftId: ftId, ftName: tasks[i].text || tasks[i].blockName || '' },
+                  action: 'deleted', timestamp: Date.now(), pinned: false };
+                if (addToCache(cacheKey, entry)) {
+                  if (tasks[i].tasks[j].stages.length === 0) delete tasks[i].tasks[j].stages;
+                  cfg.saveFn(tasks);
+                  deleted++;
                 }
-                if (tasks[i].tasks[j].stages.length === 0) delete tasks[i].tasks[j].stages;
                 break;
               }
             }
             break;
           }
         }
+        break;
       }
-      cfg.saveFn(tasks);
-    });
+    }
   });
 
-  // 处理大任务删除
-  if (groups['bt-card'] || groups['bt-ms'] || groups['bt-st'] || groups['bt-stage']) {
-    needSaveBig = true;
+  // 处理大任务删除（通过回收站缓存 + 进度重算）
+  // bt-card / bt-ms / bt-st：委托 _extractAndCacheBigTaskItem
+  (groups['bt-card'] || []).forEach(function(p) {
+    var entry = _extractAndCacheBigTaskItem(p[1]);
+    if (entry) deleted++;
+  });
+  (groups['bt-ms'] || []).forEach(function(p) {
+    var entry = _extractAndCacheBigTaskItem(p[1], p[2]);
+    if (entry) deleted++;
+  });
+  (groups['bt-st'] || []).forEach(function(p) {
+    var entry = _extractAndCacheBigTaskItem(p[1], p[2], p[3]);
+    if (entry) deleted++;
+  });
+  // bt-stage：batch key 不含 msId，手动查找并缓存
+  (groups['bt-stage'] || []).forEach(function(p) {
+    var btId = p[1], stId = p[2], stageId = p[3];
     var bigTasks = loadBigTasks();
-
-    (groups['bt-card'] || []).forEach(function(p) {
-      var btId = p[1];
-      for (var i = 0; i < bigTasks.length; i++) {
-        if (bigTasks[i].id === btId) { bigTasks.splice(i, 1); deleted++; break; }
-      }
-    });
-
-    (groups['bt-ms'] || []).forEach(function(p) {
-      var btId = p[1], msId = p[2];
-      for (var i = 0; i < bigTasks.length; i++) {
-        if (bigTasks[i].id === btId && bigTasks[i].milestones) {
-          for (var j = 0; j < bigTasks[i].milestones.length; j++) {
-            if (bigTasks[i].milestones[j].id === msId) { bigTasks[i].milestones.splice(j, 1); deleted++; break; }
-          }
-          break;
-        }
-      }
-    });
-
-    (groups['bt-st'] || []).forEach(function(p) {
-      var btId = p[1], msId = p[2], stId = p[3];
-      for (var i = 0; i < bigTasks.length; i++) {
-        if (bigTasks[i].id === btId && bigTasks[i].milestones) {
-          for (var j = 0; j < bigTasks[i].milestones.length; j++) {
-            if (bigTasks[i].milestones[j].id === msId && bigTasks[i].milestones[j].tasks) {
-              for (var k = 0; k < bigTasks[i].milestones[j].tasks.length; k++) {
-                if (bigTasks[i].milestones[j].tasks[k].id === stId) { bigTasks[i].milestones[j].tasks.splice(k, 1); deleted++; break; }
-              }
-              break;
-            }
-          }
-          break;
-        }
-      }
-    });
-
-    (groups['bt-stage'] || []).forEach(function(p) {
-      var btId = p[1], stId = p[2], stageId = p[3];
-      for (var i = 0; i < bigTasks.length; i++) {
-        if (bigTasks[i].id === btId && bigTasks[i].milestones) {
-          for (var j = 0; j < bigTasks[i].milestones.length; j++) {
-            if (bigTasks[i].milestones[j].tasks) {
-              for (var k = 0; k < bigTasks[i].milestones[j].tasks.length; k++) {
-                if (bigTasks[i].milestones[j].tasks[k].id === stId && bigTasks[i].milestones[j].tasks[k].stages) {
-                  for (var l = 0; l < bigTasks[i].milestones[j].tasks[k].stages.length; l++) {
-                    if (bigTasks[i].milestones[j].tasks[k].stages[l].id === stageId) { bigTasks[i].milestones[j].tasks[k].stages.splice(l, 1); deleted++; break; }
+    for (var i = 0; i < bigTasks.length; i++) {
+      if (bigTasks[i].id === btId && bigTasks[i].milestones) {
+        for (var j = 0; j < bigTasks[i].milestones.length; j++) {
+          var ms = bigTasks[i].milestones[j];
+          if (ms.tasks) {
+            for (var k = 0; k < ms.tasks.length; k++) {
+              if (ms.tasks[k].id === stId && ms.tasks[k].stages) {
+                for (var l = 0; l < ms.tasks[k].stages.length; l++) {
+                  if (ms.tasks[k].stages[l].id === stageId) {
+                    var removed = ms.tasks[k].stages.splice(l, 1)[0];
+                    var entry = { id: stageId, type: 'stage', data: JSON.parse(JSON.stringify(removed)),
+                      parentInfo: { bigTaskId: btId, milestoneId: ms.id, milestoneName: ms.name || '', subtaskId: stId, subtaskName: ms.tasks[k].text || '' },
+                      action: 'deleted', timestamp: Date.now(), pinned: false };
+                    if (addToCache(BIG_TASKS_DELETED_KEY, entry)) {
+                      if (ms.tasks[k].stages.length === 0) { delete ms.tasks[k].stages; ms.tasks[k].completed = false; }
+                      else { ms.tasks[k].completed = ms.tasks[k].stages.every(function(s) { return s.completed; }); }
+                      recalcBigTaskProgress(bigTasks[i]);
+                      saveBigTasks(bigTasks);
+                      deleted++;
+                    }
+                    break;
                   }
-                  if (bigTasks[i].milestones[j].tasks[k].stages.length === 0) delete bigTasks[i].milestones[j].tasks[k].stages;
-                  break;
                 }
+                break;
               }
             }
           }
-          break;
         }
+        break;
       }
-    });
-
-    saveBigTasks(bigTasks);
-  }
+    }
+  });
 
   // 保存数据
   if (needSaveDate && dateData) {

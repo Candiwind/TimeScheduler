@@ -799,6 +799,38 @@
    (3) SW 缓存版本升 v17→v18。
    涉及文件：service-worker.js / js/cloud-sync.js
 
+32. ✅ 代码审查修复（10项）——重构 batch-delete 回收站 + sync-merge 递归合并等：
+    (1) 恢复函数父级检查：restoreBigTaskFromDeletedCache / restorePlanPoolFromCache
+        先检查父任务/父池是否存在再移除缓存，避免资源丢失。
+        涉及文件：js/store.js
+    (2) batchExecuteDelete 接入回收站：大任务删除改用 _extractAndCacheBigTaskItem
+        自动走回收站 + recalcBigTaskProgress；计划池删除改用 _extractAndCachePlanPoolItem
+        自动走回收站；阶段级删除手动 addToCache。
+        涉及文件：js/batch-delete.js
+    (3) sync-merge 递归子条目合并：mergeArrayById 中 block.tasks / item.stages /
+        item.milestones 三个子数组递归调用 mergeArrayById 合并，空桩替换为实际递归。
+        涉及文件：js/sync-merge.js
+    (4) _migratedToday 日期切换清除：切日期时重置 _migratedToday 防止新日期跳过迁移。
+        涉及文件：js/app.js
+    (5) 计划池复选框仅切换完成态（不移除）：勾选/取消勾选仅设 completed 字段，
+        移除原先的 _extractAndCachePlanPoolItem 路径（该路径将任务移出池）。
+        涉及文件：js/render.js
+    (6) invalidateDataCache 注册 storage 事件监听：另一标签页修改 localStorage
+        时自动失效内存缓存，无需手动刷新。
+        涉及文件：js/store.js
+    (7) silentImportCachedData 去重：重构为委托 importCachedData(date, targetDate, silent)，
+        消除 70+ 行重复逻辑。
+        涉及文件：js/store.js
+    (8) 四函数 save/cache 顺序修正：_extractAndCachePlanPoolItem /
+        _mayBeCompleteAndCachePlanPoolItem / _extractAndCacheBigTaskItem /
+        _extractAndCachePrinciple 改为 cache 成功后才 save，缓存满时不丢数据。
+        涉及文件：js/store.js
+    (9) 回收站渲染死代码清理：_renderGenericDeletedCacheList 中 restore 按钮
+        去除无效的三元表达式 '已恢复' + (restored ? '' : '')。
+        涉及文件：js/render.js
+    (10) 移动端批次复选框 22→26px：触摸目标达 ≥26px 规范。
+        涉及文件：css/style.css
+
 ────────────────────────────────────────
 
 【未来计划】

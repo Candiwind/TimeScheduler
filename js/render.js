@@ -1742,15 +1742,11 @@ function renderPlanPoolPanel() {
       var ftId = this.dataset.ftId;
       var stId = this.dataset.stId;
       var checked = this.checked;
-      if (checked) {
-        // 完成 → 移入缓存
-        _extractAndCachePlanPoolItem(cfg.poolKey, cfg.saveFn, ftId, stId || null, 'completed');
+      // 仅切换 completed 标记，不移除到缓存（确保可取消勾选）
+      if (stId) {
+        cfg.editSubFn(ftId, stId, 'completed', checked);
       } else {
-        if (stId) {
-          cfg.editSubFn(ftId, stId, 'completed', checked);
-        } else {
-          cfg.updateFn(ftId, { completed: checked });
-        }
+        cfg.updateFn(ftId, { completed: checked });
       }
       renderPlanPoolPanel();
     });
@@ -2629,7 +2625,9 @@ function _renderGenericDeletedCacheList(listEl, entries, cacheKey, onChanged, re
         restored = restoreFn(this.dataset.cacheId);
       }
       if (restored) {
-        Toast.show('已恢复' + (restored ? '' : ''));
+        Toast.show('已恢复');
+      } else {
+        Toast.show('恢复失败：父级条目不存在，无法恢复。请先恢复父级条目。');
       }
       onChanged();
     });

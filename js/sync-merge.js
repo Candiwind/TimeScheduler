@@ -73,31 +73,59 @@ var SyncMerge = (function() {
       }
     });
 
-    // 递归合并子条目
-    function mergeChildren(parent, key) {
-      if (!parent || !parent[key]) return;
-      // 子条目数组通常已全部展开在合并后的 parent 中，
-      // 这里处理父条目内的子条目递归
+    // 递归合并子条目（递归调用 mergeArrayById 合并子数组）
+    function mergeChildren(parent, childArrLocal, childArrRemote, key) {
+    if (!parent || !parent[key]) {
+      if (childArrRemote && childArrRemote.length > 0) {
+        parent[key] = childArrRemote;
+        }
+	    return;
+      }
+      if (childArrRemote && childArrRemote.length > 0) {
+        parent[key] = mergeArrayById(childArrLocal || parent[key], childArrRemote);
+    }
     }
 
-    // 重建数组
+    // 建立远程/本地的 ID→item 索引
+    var remoteIdx = {};
+    remoteArr.forEach(function(it) { if (it && it.id) remoteIdx[it.id] = it; });
+    var localIdx = {};
+    localArr.forEach(function(it) { if (it && it.id) localIdx[it.id] = it; });
+
+    // 重建数组，逐条目递归合并子数组
     var result = [];
     order.forEach(function(id) {
-      if (merged[id] !== undefined) {
-        var item = merged[id];
-        // 递归合并 block 内的子任务
-        if (item.blockName !== undefined && item.tasks && item.tasks.length > 0) {
-          // block 的子任务：如果远程版有子任务列表，合并
-          // （这里 block 本身的子任务已通过 lwwWinner 处理了 block 对象，不需要额外递归）
-        }
-        // 递归合并阶段
-        if (item.stages && item.stages.length > 0 && childKey === 'stages') {
-          // 父条目已合并，其 stages 也已随父条目一起合并
-          // 不需要额外处理
-        }
-        result.push(item);
-      }
-    });
+    if (merged[id] !== undefined) {
+      var item = merged[id];
+
+	    // 1. block 内的子任务：分别取本地和远程版合并
+	    if (item.blockName !== undefined && item.tasks) {
+	      var localTasks = (localIdx[item.id] && localIdx[item.id].tasks) || [];
+	      var remoteTasks = (remoteIdx[item.id] && remoteIdx[item.id].tasks) || [];
+	      if (localTasks.length > 0 || remoteTasks.length > 0) {
+	        item.tasks = mergeArrayById(localTasks, remoteTasks);
+	      }
+	    }
+	    // 2. 任务/子任务的阶段
+	    if (item.stages || (localIdx[item.id] && localIdx[item.id].stages) || (remoteIdx[item.id] && remoteIdx[item.id].stages)) {
+	      var localStages = (localIdx[item.id] && localIdx[item.id].stages) || [];
+	      var remoteStages = (remoteIdx[item.id] && remoteIdx[item.id].stages) || [];
+	      if (localStages.length > 0 || remoteStages.length > 0) {
+	        item.stages = mergeArrayById(localStages, remoteStages);
+	      }
+	    }
+	    // 3. 里程碑内的子任务（大任务场景）
+	    if (item.milestones && item.milestones.length > 0) {
+	      var localMs = (localIdx[item.id] && localIdx[item.id].milestones) || [];
+	      var remoteMs = (remoteIdx[item.id] && remoteIdx[item.id].milestones) || [];
+	      if (localMs.length > 0 || remoteMs.length > 0) {
+	        item.milestones = mergeArrayById(localMs, remoteMs);
+	      }
+	    }
+
+	    result.push(item);
+	  }
+	});
 
     return result;
   }

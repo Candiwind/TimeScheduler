@@ -309,8 +309,14 @@ function updateSearchResult() {
 var _originalRenderAll = renderAll;
 var _renderTimer = null;
 var _migratedToday = {};
+var _lastRenderedDate = null;
 
 renderAll = function(date) {
+  // 切日期时清除迁移标记，确保新日期重新执行迁移
+  if (date !== _lastRenderedDate) {
+    _migratedToday = {};
+    _lastRenderedDate = date;
+  }
   // migrate 短路：同一天只执行一次各迁移
   if (!_migratedToday[date]) {
     _migratedToday[date] = true;

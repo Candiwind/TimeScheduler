@@ -886,15 +886,21 @@
 
    涉及文件：js/render.js
 
-75. ✅ 手机端排版优化——象限标题 + 顶部 Header 两行布局：
+75. ✅ 手机端排版优化——象限标题 + 顶部 Header + 计划池任务三处两行布局：
    (1) 象限标题（≤600px）：flex-wrap 分为两行——第一行图标+标题+说明，
        第二行功能按钮（＋📦🗑️）+ 任务百分比 badge（右对齐）。
+       覆盖 desktop 的 [id^="btnAddTask-"] margin-left:auto 为 0。
    (2) 顶部 Header（≤600px）：清晰三分区——第一行标题，第二行完成统计 badge，
        第三行起操作按钮均分宽度（flex:1 1 auto + min-width:56px）填满整行，
-       避免末行只有 1~2 个按钮稀疏不均。
-   (3) 回归测试全部通过。
+       避免末行只有 1~2 个按钮稀疏不均。btn-icon 保持固定宽度不拉伸。
+   (3) 计划池任务（≤600px）：.planpool-item / .planpool-subtask-item 新增
+       flex-wrap:wrap——第一行 checkbox+文字（flex:1 1 calc(100%-28px) +
+       pre-wrap 换行），第二行功能按钮（日期/象限/导入/删除等，≥36px触摸目标）。
+   (4) SW 缓存版本升至 v21，index.html 所有资源 ?v=20→?v=21，
+       确保移动端浏览器拿到最新 CSS。
+   (5) 回归测试全部通过。
 
-   涉及文件：css/style.css
+   涉及文件：css/style.css / index.html / service-worker.js
 
 ────────────────────────────────────────
 

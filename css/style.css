@@ -1355,6 +1355,37 @@ kbd {
   .quadrant-add-btn { width: 48px; height: 48px; font-size: 18px; }
   /* task-count 在第二行右侧 */
   .task-count { margin-left: auto; font-size: 10px; min-width: 56px; }
+  /* 手机端计划池任务两行布局：第一行checkbox+文字，第二行功能按钮 */
+  .planpool-item, .planpool-subtask-item {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    column-gap: 4px;
+    padding: 8px 10px;
+  }
+  .planpool-item > .planpool-item-text,
+  .planpool-subtask-item > .planpool-subtask-text {
+    flex: 1 1 calc(100% - 28px);
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-width: 0;
+  }
+  .planpool-item > .planpool-item-date,
+  .planpool-item > .planpool-item-quad,
+  .planpool-item > .planpool-import-btn,
+  .planpool-item > .planpool-delete-btn,
+  .planpool-item > .planpool-split-btn,
+  .planpool-item > .planpool-stages-toggle,
+  .planpool-subtask-item > .planpool-item-date,
+  .planpool-subtask-item > .planpool-item-quad,
+  .planpool-subtask-item > .planpool-import-btn,
+  .planpool-subtask-item > .pp-st-delete-btn,
+  .planpool-subtask-item > .planpool-split-btn,
+  .planpool-subtask-item > .planpool-stages-toggle {
+    flex: 0 0 auto;
+    min-height: 36px;
+    min-width: 36px;
+  }
+  .planpool-checkbox { width: 20px; height: 20px; }
   .timeview-items { max-height: 30vh; }
   .task-item { padding: 10px 12px; font-size: 14px; min-height: 48px; }
   .subtask-item { padding: 8px 10px; font-size: 13px; min-height: 48px; }

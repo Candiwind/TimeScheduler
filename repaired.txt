@@ -867,8 +867,24 @@
    - btnCacheSave 简化：markDateAsCached 内部已检查内容+创建快照，UI 仅判断返回值。
 
    涉及文件：js/store.js（核心重构） / js/cache-ui.js / js/app.js /
-       js/cloud-sync.js / js/sync-merge.js / js/recover-today.js /
-       index.html / service-worker.js
+   js/cloud-sync.js / js/sync-merge.js / js/recover-today.js /
+   index.html / service-worker.js
+
+74. ✅ 任务块/多条目折叠功能——四象限/时间视图/计划池全部支持：
+   (1) 四象限视图：createTaskBlockElement 中为有子任务的块在 header 内添加
+       ▼/▶ 折叠按钮，可折叠 .block-tasks（子任务列表）+ .add-subtask-btn。
+   (2) 时间视图：createParentHeaderEl 中为块级父标题添加折叠按钮，点击时
+       遍历后续兄弟元素隐藏/显示所有缩进子元素（.timeview-indent-1/2/orphan-label）。
+   (3) 计划池：_renderPlanBlockHTML 中在块 header 添加折叠按钮，
+       .planpool-block-tasks 新增 id 便于定位；renderPlanPoolPanel 中新增
+       .planpool-block-toggle 事件绑定，复用已有 planpool-stages-toggle 模式。
+   (4) 持久化：全部复用现有 localStorage key（quadrant_stages_collapsed），
+       使用命名空间前缀区分：block-{id}（象限块）、tv-parent-{slot}-{id}（时间视图）、
+       pp-block-{id}（计划池块）。无需修改 store.js 或 CSS。
+   (5) 回归测试：test-timeview-columns.js / test-timeview-distribution.js /
+       test-timeview-grouping.js 全部通过。
+
+   涉及文件：js/render.js
 
 ────────────────────────────────────────
 

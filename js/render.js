@@ -309,7 +309,8 @@ function renderTimeView(date, preloadedData) {
         slotGroups[sk].unshift({
           item: origEntry.item,
           quadrantKey: origEntry.quadrantKey,
-          _compactParent: true
+          _compactParent: true,
+          parentSlotKey: sk
         });
       });
     });
@@ -394,6 +395,7 @@ function renderTimeView(date, preloadedData) {
     var isBlock = cp.item.blockName !== undefined;
 
     container.appendChild(createParentHeaderEl(cp));
+    var tvParentHeader = container.lastElementChild;
 
     if (isBlock) {
       // Subtasks present in this slot, and this slot's subtask-stages grouped by their subtask
@@ -451,6 +453,39 @@ function renderTimeView(date, preloadedData) {
         container.appendChild(stEl);
       });
     }
+
+    // 应用时间视图块折叠初始状态（直接操作，不走 toggle）
+    if (isBlock && tvParentHeader) {
+      var tvCid = 'tv-parent-' + cp.parentSlotKey + '-' + cp.item.id;
+      if (loadStagesCollapseState()[tvCid]) {
+        tvParentHeader.dataset.tvCollapsed = '1';
+        var nxt = tvParentHeader.nextElementSibling;
+        while (nxt && !nxt.classList.contains('timeview-parent-header')) {
+          nxt.style.display = 'none';
+          nxt = nxt.nextElementSibling;
+        }
+        var tbtn = tvParentHeader.querySelector('.stages-toggle-btn');
+        if (tbtn) { tbtn.innerHTML = '▶'; tbtn.title = '展开子任务'; }
+      }
+    }
+  }
+
+  // 时间视图块折叠辅助：切换父标题后续所有缩进子元素的可见性
+  function _toggleTimeViewBlockChildren(header, collapseId) {
+    if (!header) return;
+    var nowCollapsed = header.dataset.tvCollapsed !== '1';
+    header.dataset.tvCollapsed = nowCollapsed ? '1' : '0';
+    var next = header.nextElementSibling;
+    while (next && !next.classList.contains('timeview-parent-header')) {
+      next.style.display = nowCollapsed ? 'none' : '';
+      next = next.nextElementSibling;
+    }
+    var btn = header.querySelector('.stages-toggle-btn');
+    if (btn) {
+      btn.innerHTML = nowCollapsed ? '▶' : '▼';
+      btn.title = nowCollapsed ? '展开子任务' : '折叠子任务';
+    }
+    setStageCollapsed(collapseId, nowCollapsed);
   }
 
   // Helper: look up big task name by ID (checks active tasks, then the
@@ -515,6 +550,22 @@ function renderTimeView(date, preloadedData) {
     hint.className = 'timeview-parent-hint';
     hint.textContent = totalChildren + '项';
     el.appendChild(hint);
+
+    // 折叠切换按钮：块级父标题可折叠子元素（遍历兄弟节点）
+    if (isBlock) {
+      var tvCollapseId = 'tv-parent-' + cpEntry.parentSlotKey + '-' + item.id;
+      var tvIsCollapsed = loadStagesCollapseState()[tvCollapseId];
+      var tvCollapseBtn = document.createElement('button');
+      tvCollapseBtn.className = 'stages-toggle-btn';
+      tvCollapseBtn.innerHTML = tvIsCollapsed ? '▶' : '▼';
+      tvCollapseBtn.title = tvIsCollapsed ? '展开子任务' : '折叠子任务';
+      tvCollapseBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _toggleTimeViewBlockChildren(el, tvCollapseId);
+      });
+      tvCollapseBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+      el.appendChild(tvCollapseBtn);
+    }
 
     // Delete button
     var delBtn = document.createElement('button');
@@ -856,6 +907,19 @@ function createTaskBlockElement(block, quadrantKey, index) {
   });
   header.appendChild(nameSpan);
 
+  // 折叠切换按钮：有子任务时显示，可折叠/展开 block-tasks
+  var toggleBlockBtn = null;
+  var blockCollapseId = 'block-' + block.id;
+  if (block.tasks && block.tasks.length > 0) {
+    toggleBlockBtn = document.createElement('button');
+    toggleBlockBtn.className = 'stages-toggle-btn';
+    var isBlockCollapsed = loadStagesCollapseState()[blockCollapseId];
+    toggleBlockBtn.innerHTML = isBlockCollapsed ? '▶' : '▼';
+    toggleBlockBtn.title = isBlockCollapsed ? '展开子任务' : '折叠子任务';
+    toggleBlockBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
+    header.appendChild(toggleBlockBtn);
+  }
+
   // Block progress - auto-calculated from subtasks
   var subTotal = (block.tasks && block.tasks.length) || 0;
   var subDone = 0;
@@ -930,6 +994,23 @@ function createTaskBlockElement(block, quadrantKey, index) {
   // Prevent add-subtask button from triggering block drag
   addBtn.addEventListener('dragstart', function(e) { e.preventDefault(); e.stopPropagation(); });
   el.appendChild(addBtn);
+
+  // 应用折叠初始状态并绑定点击事件（toggleBlockBtn 在前面已创建）
+  if (toggleBlockBtn) {
+    if (loadStagesCollapseState()[blockCollapseId]) {
+      tasksContainer.style.display = 'none';
+      addBtn.style.display = 'none';
+    }
+    toggleBlockBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var nowCollapsed = tasksContainer.style.display !== 'none';
+      tasksContainer.style.display = nowCollapsed ? 'none' : '';
+      addBtn.style.display = nowCollapsed ? 'none' : '';
+      toggleBlockBtn.innerHTML = nowCollapsed ? '▶' : '▼';
+      toggleBlockBtn.title = nowCollapsed ? '展开子任务' : '折叠子任务';
+      setStageCollapsed(blockCollapseId, nowCollapsed);
+    });
+  }
 
   // Bind drag handlers directly
   el.addEventListener('dragstart', handleDragStart);
@@ -1977,6 +2058,28 @@ function renderPlanPoolPanel() {
     });
   });
 
+  // 计划池任务块折叠切换（复用 store.js setStageCollapsed 持久化）
+  listEl.querySelectorAll('.planpool-block-toggle').forEach(function(btn) {
+    var collapseId = btn.dataset.collapseId;
+    var tasksEl = document.getElementById(collapseId);
+    var isCollapsed = loadStagesCollapseState()[collapseId];
+    if (isCollapsed && tasksEl) {
+      tasksEl.style.display = 'none';
+      btn.innerHTML = '▶';
+      btn.title = '展开子任务';
+    }
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var el = document.getElementById(this.dataset.collapseId);
+      if (!el) return;
+      var nowHidden = el.style.display !== 'none';
+      el.style.display = nowHidden ? 'none' : '';
+      this.innerHTML = nowHidden ? '▶' : '▼';
+      this.title = nowHidden ? '展开子任务' : '折叠子任务';
+      setStageCollapsed(this.dataset.collapseId, nowHidden);
+    });
+  });
+
   // 渲染计划池回收站
   renderPlanPoolDeletedCache();
 }
@@ -2065,10 +2168,11 @@ function _renderPlanBlockHTML(ft) {
   if (nonCompletedCount > 0) {
     h += '<button class="task-defer-btn pp-block-import-all-btn" data-ft-id="' + ft.id + '" title="一键导入全部子任务（' + nonCompletedCount + ' 条）到今日Q-II" style="width:22px;height:22px;font-size:12px;flex-shrink:0;margin-left:4px;">📥</button>';
   }
+  h += '<button class="stages-toggle-btn planpool-block-toggle" data-collapse-id="pp-block-' + ft.id + '" title="折叠子任务">▼</button>';
   h += '<button class="task-delete-btn planpool-delete-btn" data-ft-id="' + ft.id + '" title="删除">&times;</button>';
   h += '</div>';
 
-  h += '<div class="planpool-block-tasks">';
+  h += '<div class="planpool-block-tasks" id="pp-block-' + ft.id + '">';
   if (ft.tasks && ft.tasks.length > 0) {
     ft.tasks.forEach(function(st) {
       var stDateDisplay = st.scheduledDate || '📅';

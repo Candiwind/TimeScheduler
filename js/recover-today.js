@@ -90,7 +90,7 @@
     }
   }
 
-  // ==== 3. 缓存日期索引 ====
+  // ==== 3. 缓存日期索引（含快照检查） ====
   if (!found) {
     console.log('[recover-today] 🔍 备份中未找到，检查缓存日期索引...');
     var idxRaw = safeGet(CACHE_INDEX_KEY);
@@ -100,6 +100,21 @@
         for (var j = 0; j < entries.length; j++) {
           if (entries[j].date === TODAY) {
             console.log('[recover-today]   缓存索引中有今天条目: id=' + entries[j].id + ' label=' + (entries[j].label || '无'));
+            // 优先检查条目是否自带快照
+            if (entries[j].snapshot) {
+              var snapTotal = 0;
+              ['I','II','III','IV'].forEach(function(k) {
+                if (Array.isArray(entries[j].snapshot[k])) snapTotal += entries[j].snapshot[k].length;
+              });
+              if (snapTotal > 0) {
+                found = entries[j].snapshot;
+                source = '缓存快照 (id=' + entries[j].id + ')';
+                details = 'I:' + (entries[j].snapshot.I||[]).length + ',II:' + (entries[j].snapshot.II||[]).length + ',III:' + (entries[j].snapshot.III||[]).length + ',IV:' + (entries[j].snapshot.IV||[]).length;
+                console.log('[recover-today]   ✅ 从缓存快照找到! ' + details);
+                break;
+              }
+            }
+            // 回退：从备份搜索
             for (var k = 0; k < backupKeys.length; k++) {
               var bRaw2 = safeGet(backupKeys[k]);
               if (!bRaw2) continue;

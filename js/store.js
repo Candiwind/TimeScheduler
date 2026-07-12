@@ -171,7 +171,53 @@ function getAllCachedDates() {
 }
 
 function getCachedDateData(date) {
+  // 优先从快照读取：找到第一个有该日期且有快照的条目
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].date === date && entries[i].snapshot) {
+      return JSON.parse(JSON.stringify(entries[i].snapshot));
+    }
+  }
+  // 回退：从主数据读取
   return loadDateData(date);
+}
+
+// 基于快照条目导入（新架构核心函数）
+function importCachedDataFromSnapshot(entryId, targetDate, silent) {
+  var entry = getCacheEntryById(entryId);
+  if (!entry) {
+    if (!silent) alert('缓存条目不存在');
+    return false;
+  }
+  if (!entry.snapshot) {
+    if (!silent) alert('该缓存条目没有快照数据，请先更新快照');
+    return false;
+  }
+  var all = loadAllData();
+  var sourceData = JSON.parse(JSON.stringify(entry.snapshot));
+  if (entry.date === targetDate) {
+    // 同日期：直接覆盖
+    all[targetDate] = sourceData;
+  } else {
+    // 跨日期：ID 合并
+    var targetData = all[targetDate] || { I: [], II: [], III: [], IV: [] };
+    QUADRANT_KEYS.forEach(function(key) {
+      var existingIds = {};
+      (targetData[key] || []).forEach(function(item) {
+        existingIds[item.id] = true;
+        if (item.tasks) item.tasks.forEach(function(st) { existingIds[st.id] = true; });
+      });
+      (sourceData[key] || []).forEach(function(item) {
+        if (!existingIds[item.id]) {
+          if (!targetData[key]) targetData[key] = [];
+          targetData[key].push(item);
+        }
+      });
+    });
+    all[targetDate] = targetData;
+  }
+  saveAllData(all);
+  return true;
 }
 
 function importCachedData(sourceDate, targetDate, silent) {
@@ -210,11 +256,6 @@ function importCachedData(sourceDate, targetDate, silent) {
   return true;
 }
 
-// 静默版导入（无 alert/confirm），供自动导入使用
-function silentImportCachedData(sourceDate, targetDate) {
-  return importCachedData(sourceDate, targetDate, true);
-}
-
 // ============ Explicit Cache Index (only dates user clicked "缓存当前") ============
 // V4: 条目结构 [{id, date, label, pinned, cachedAt, autoWorkday, autoSaturday, autoSunday}]
 // 同一日期可多次缓存为独立快照，置顶后支持按星期自动导入
@@ -236,6 +277,7 @@ function loadCachedDatesIndex() {
         if (arr[i].autoWorkday === undefined) arr[i].autoWorkday = false;
         if (arr[i].autoSaturday === undefined) arr[i].autoSaturday = false;
         if (arr[i].autoSunday === undefined) arr[i].autoSunday = false;
+        if (arr[i].snapshot === undefined) arr[i].snapshot = null;
       }
     }
     return arr;
@@ -251,11 +293,43 @@ function saveCachedDatesIndex(entries) {
 }
 
 function markDateAsCached(date) {
+  var data = loadDateData(date);
+  // 检查是否有内容
+  var hasContent = false;
+  QUADRANT_KEYS.forEach(function(key) {
+    if (data[key] && data[key].length > 0) hasContent = true;
+  });
+  if (!hasContent) return false;
+  // 深拷贝创建独立快照
+  var snapshot = JSON.parse(JSON.stringify(data));
   var cached = loadCachedDatesIndex();
-  // 同日期允许多次缓存，每次生成独立 ID
-  cached.push({ id: 'cache_' + generateId(), date: date, label: '', pinned: false, cachedAt: Date.now(), autoWorkday: false, autoSaturday: false, autoSunday: false });
+  cached.push({
+    id: 'cache_' + generateId(),
+    date: date,
+    label: '',
+    pinned: false,
+    cachedAt: Date.now(),
+    autoWorkday: false, autoSaturday: false, autoSunday: false,
+    snapshot: snapshot  // ★ 存入完整数据快照
+  });
   cached.sort(function(a, b) { return a.date.localeCompare(b.date); });
   saveCachedDatesIndex(cached);
+  return true;
+}
+
+// 更新已有缓存条目的快照为当前该日期的最新数据
+function updateCacheSnapshot(id) {
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) {
+      var data = loadDateData(entries[i].date);
+      entries[i].snapshot = JSON.parse(JSON.stringify(data));
+      entries[i].cachedAt = Date.now();
+      saveCachedDatesIndex(entries);
+      return true;
+    }
+  }
+  return false;
 }
 
 // 返回去重后的唯一日期列表（供导入逻辑使用）
@@ -270,6 +344,15 @@ function getCachedDates() {
 
 function getCachedDateEntries() {
   return loadCachedDatesIndex();
+}
+
+// 通过条目ID获取缓存条目（含快照）
+function getCacheEntryById(id) {
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].id === id) return entries[i];
+  }
+  return null;
 }
 
 // 通过条目ID更新标签
@@ -324,33 +407,17 @@ function getAutoImportEntriesForDate(dateStr) {
 }
 
 // 静默版导入（无 alert/confirm），供自动导入使用
+// 优先从快照导入，回退到主数据
 function silentImportCachedData(sourceDate, targetDate) {
-  var all = loadAllData();
-  if (!all[sourceDate]) return false;
-  var sourceData = JSON.parse(JSON.stringify(all[sourceDate]));
-  if (sourceDate === targetDate) {
-    all[targetDate] = sourceData;
-  } else {
-    var targetData = all[targetDate] || { I: [], II: [], III: [], IV: [] };
-    QUADRANT_KEYS.forEach(function(key) {
-      var existingIds = {};
-      (targetData[key] || []).forEach(function(item) {
-        existingIds[item.id] = true;
-        if (item.tasks) {
-          item.tasks.forEach(function(st) { existingIds[st.id] = true; });
-        }
-      });
-      (sourceData[key] || []).forEach(function(item) {
-        if (!existingIds[item.id]) {
-          if (!targetData[key]) targetData[key] = [];
-          targetData[key].push(item);
-        }
-      });
-    });
-    all[targetDate] = targetData;
+  // 优先查找有快照的条目
+  var entries = loadCachedDatesIndex();
+  for (var i = 0; i < entries.length; i++) {
+    if (entries[i].date === sourceDate && entries[i].snapshot) {
+      return importCachedDataFromSnapshot(entries[i].id, targetDate, true);
+    }
   }
-  saveAllData(all);
-  return true;
+  // 回退：从主数据读取
+  return importCachedData(sourceDate, targetDate, true);
 }
 
 // 自动导入追踪：记录哪些(entryId, targetDate)已导入过，避免重复导入
@@ -387,7 +454,12 @@ function runAutoImportsForDate(dateStr) {
   var labels = [];
   entries.forEach(function(e) {
     if (!_wasAutoImported(e.id, dateStr)) {
-      if (silentImportCachedData(e.date, dateStr)) {
+      // 优先使用快照导入
+      if (e.snapshot && importCachedDataFromSnapshot(e.id, dateStr, true)) {
+        _markAutoImported(e.id, dateStr);
+        labels.push(e.label || e.date);
+      } else if (silentImportCachedData(e.date, dateStr)) {
+        // 回退：从主数据导入
         _markAutoImported(e.id, dateStr);
         labels.push(e.label || e.date);
       }
@@ -396,17 +468,60 @@ function runAutoImportsForDate(dateStr) {
   return labels;
 }
 
-// One-time migration: seed cache index with all existing dates for backward compat
+// DEPRECATED: 旧版 seed 函数，不再需要。保留空壳以兼容旧调用。
 function seedCacheIndexIfEmpty() {
-  if (loadCachedDatesIndex().length === 0) {
-    var allDates = getAllCachedDates();
-    if (allDates.length > 0) {
-      var now = Date.now();
-      saveCachedDatesIndex(allDates.map(function(d) {
-        return { id: 'cache_' + generateId(), date: d, label: '', pinned: false, cachedAt: now, autoWorkday: false, autoSaturday: false, autoSunday: false };
-      }));
-    }
+  // 已被 migrateCacheIndexToSnapshot() 替代
+}
+
+// 迁移旧缓存条目为快照格式（一次性，通过迁移标记防重）
+function migrateCacheIndexToSnapshot() {
+  var MIGRATION_DONE_KEY = 'quadrant_cache_snapshot_migration_v1';
+  if (localStorage.getItem(MIGRATION_DONE_KEY)) return 0;
+  var entries = loadCachedDatesIndex();
+  if (entries.length === 0) {
+    localStorage.setItem(MIGRATION_DONE_KEY, '1');
+    return 0;
   }
+  var migrated = 0;
+  var allData = loadAllData();
+  entries.forEach(function(e) {
+    if (!e.snapshot && allData[e.date]) {
+      e.snapshot = JSON.parse(JSON.stringify(allData[e.date]));
+      migrated++;
+    }
+  });
+  if (migrated > 0) {
+    saveCachedDatesIndex(entries);
+  }
+  localStorage.setItem(MIGRATION_DONE_KEY, '1');
+  return migrated;
+}
+
+// 清除所有缓存条目（含快照）
+function clearAllCachedDates() {
+  saveCachedDatesIndex([]);
+  try { localStorage.removeItem(AUTO_IMPORT_TRACKER_KEY); } catch(e) {}
+}
+
+// 清理主数据中超过 keepDays 天的旧日期（保留被缓存引用的日期）
+function removeOldDateData(daysToKeep) {
+  var all = loadAllData();
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - (daysToKeep || 30));
+  var cutoffStr = cutoff.toISOString().split('T')[0];
+  // 收集缓存条目引用的日期
+  var cachedDates = {};
+  loadCachedDatesIndex().forEach(function(e) { cachedDates[e.date] = true; });
+  var removed = 0;
+  Object.keys(all).forEach(function(date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return; // 跳过非日期键
+    if (date >= cutoffStr) return; // 保留近期日期
+    if (cachedDates[date]) return; // 保留被缓存引用的日期
+    delete all[date];
+    removed++;
+  });
+  if (removed > 0) saveAllData(all);
+  return removed;
 }
 
 // ============ 通用回收站/删除缓存引擎 ============

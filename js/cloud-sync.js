@@ -611,15 +611,20 @@ var CloudSync = (function() {
 
     var dateCount = 0;
 
-    // 导入缓存日期索引（合并：保留本地独有的日期）
+    // 导入缓存日期索引（ID 去重合并，兼容旧格式的 indexOf 对象比较 bug）
     if (data.cachedDatesIndex && data.cachedDatesIndex.length > 0) {
       try {
         var localIdx = JSON.parse(localStorage.getItem('quadrant_cached_dates_index') || '[]');
+        var localIds = {};
+        localIdx.forEach(function(e) { if (e.id) localIds[e.id] = true; });
         var merged = localIdx.slice();
         data.cachedDatesIndex.forEach(function(d) {
-          if (merged.indexOf(d) === -1) merged.push(d);
+          if (d.id && !localIds[d.id]) {
+            merged.push(d);
+            localIds[d.id] = true;
+          }
         });
-        merged.sort();
+        merged.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
         localStorage.setItem('quadrant_cached_dates_index', JSON.stringify(merged));
       } catch(e) {}
     }

@@ -37,7 +37,10 @@ function initApp() {
     migrateFutureTasks(today);
     migrateWeekTasks(today);
     migrateMonthTasks(today);
-    seedCacheIndexIfEmpty();
+    var migrated = migrateCacheIndexToSnapshot();
+    if (migrated > 0) {
+      console.log('[Migration] 已将 ' + migrated + ' 个缓存条目迁移为快照格式');
+    }
 
     // 大任务自动归档：仅在版本标记不存在时执行一次（ONE-TIME migration）
     if (!localStorage.getItem('quadrant_bigtask_autoarchive_v1')) {

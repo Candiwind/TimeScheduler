@@ -2,20 +2,12 @@
 function setupCacheButtons() {
   document.getElementById('btnCacheSave').addEventListener('click', function() {
     var date = currentDate;
-    var data = loadDateData(date);
-    // Deep-clone to avoid reference issues
-    data = JSON.parse(JSON.stringify(data));
-    var hasContent = false;
-    QUADRANT_KEYS.forEach(function(key) {
-      if (data[key] && data[key].length > 0) hasContent = true;
-    });
-    if (!hasContent) {
-      alert('当前日期没有任务数据');
-      return;
+    // markDateAsCached 内部已检查内容、创建快照并保存
+    if (markDateAsCached(date)) {
+      alert('已缓存快照：' + date + '（可在导入缓存中查看）');
+    } else {
+      alert('当前日期没有任务数据，无法缓存');
     }
-    saveDateData(date, data);
-    markDateAsCached(date);
-    alert('已缓存到日期：' + date + '（可在导入缓存中查看）');
   });
 
   document.getElementById('btnCacheLoad').addEventListener('click', function() {
@@ -55,7 +47,7 @@ function showCacheModal() {
   content.appendChild(title);
 
   var desc = document.createElement('p');
-  desc.textContent = '选择日期导入，将合并到当前日期（' + currentDate + '）。双击名称可重命名，已有任务不会被修改或删除：';
+  desc.textContent = '选择快照导入，将合并到当前日期（' + currentDate + '）。基于ID合并，已有任务不会被修改或删除。双击名称可重命名：';
   desc.style.color = 'var(--text2)';
   content.appendChild(desc);
 
@@ -75,12 +67,12 @@ function showCacheModal() {
     item.className = 'cache-date-item';
     item.title = '点击合并数据到 ' + currentDate + '，已有任务不变';
 
-    var cacheData = allData[cacheDate] || { I: [], II: [], III: [], IV: [] };
+    var snapData = (entry.snapshot || allData[cacheDate]) || { I: [], II: [], III: [], IV: [] };
 
-    // 计算四象限任务数量
+    // 计算四象限任务数量（基于快照）
     var qCounts = { I: 0, II: 0, III: 0, IV: 0 };
     QUADRANT_KEYS.forEach(function(key) {
-      var items = cacheData[key] || [];
+      var items = snapData[key] || [];
       items.forEach(function(it) {
         if (it.blockName !== undefined) {
           qCounts[key] += (it.tasks ? it.tasks.length : 0);
@@ -163,14 +155,29 @@ function showCacheModal() {
     });
     btns.appendChild(renameBtn);
 
-    // 导出JSON按钮
+    // 更新快照按钮
+    var updateSnapBtn = document.createElement('button');
+    updateSnapBtn.className = 'btn btn-sm';
+    updateSnapBtn.textContent = '🔄';
+    updateSnapBtn.title = '更新快照（从当前主数据刷新）';
+    updateSnapBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (updateCacheSnapshot(entryId)) {
+        showCacheModal();
+      } else {
+        alert('更新快照失败：该日期没有数据');
+      }
+    });
+    btns.appendChild(updateSnapBtn);
+
+    // 导出JSON按钮（导出快照数据）
     var exportBtn = document.createElement('button');
     exportBtn.className = 'btn btn-sm btn-info';
     exportBtn.textContent = '📤';
-    exportBtn.title = '导出JSON';
+    exportBtn.title = '导出快照JSON';
     exportBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      var data = getCachedDateData(cacheDate);
+      var data = entry.snapshot || getCachedDateData(cacheDate);
       var json = JSON.stringify(data, null, 2);
       var fileName = 'tasks-' + (label || cacheDate) + '.json';
       var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
@@ -190,7 +197,7 @@ function showCacheModal() {
     delBtn.title = '从缓存列表删除（不删除实际数据）';
     delBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      if (confirm('确定从导入缓存列表中删除 ' + (label || cacheDate) + '？\n（不会删除该日期的实际任务数据，仅移除缓存索引）')) {
+      if (confirm('确定删除缓存"' + (label || cacheDate) + '"？\n（仅删除缓存快照和索引，不影响实际任务数据）')) {
         removeCachedDate(entryId);
         showCacheModal();
       }
@@ -204,21 +211,25 @@ function showCacheModal() {
 
     function doImport(e) {
       e.stopPropagation();
-      if (cacheDate === currentDate) {
-        if (!confirm('源日期与当前日期相同（' + cacheDate + '），是否重新加载？')) return;
-      }
-      if (!importCachedData(cacheDate, currentDate)) {
-        alert('导入失败：无法读取 ' + cacheDate + ' 的数据');
+      if (!entry.snapshot) {
+        alert('该缓存条目没有快照数据，请先点击🔄更新快照');
         return;
       }
-      modal.remove();
+      if (cacheDate === currentDate) {
+        if (!confirm('源日期与当前日期相同（' + cacheDate + '），是否重新加载快照？')) return;
+      }
+      if (!importCachedDataFromSnapshot(entryId, currentDate)) {
+        alert('导入失败：无法读取快照数据');
+        return;
+      }
+      // 导入后不关闭弹窗，以便连续导入多条缓存
       try {
         renderAll(currentDate);
       } catch (e2) {
         alert('数据已导入但渲染失败：' + e2.message + '\n请刷新页面查看。');
         return;
       }
-      alert('已从 ' + (label || cacheDate) + ' 合并数据到 ' + currentDate + '，已有任务保持不变');
+      alert('已从 ' + (label || cacheDate) + ' 导入快照到 ' + currentDate + '，已有任务保持不变');
     }
 
     importBtn.addEventListener('click', doImport);
@@ -257,19 +268,61 @@ function showCacheModal() {
 
     row2.appendChild(btns);
 
+    // 快照预览：显示前几项任务名称
+    var preview = document.createElement('div');
+    preview.className = 'cache-entry-preview';
+    if (entry.snapshot) {
+      var previewParts = [];
+      QUADRANT_KEYS.forEach(function(key) {
+        (entry.snapshot[key] || []).forEach(function(item) {
+          var name = item.blockName || item.text || '';
+          if (name) previewParts.push(QUADRANTS[key].icon + ' ' + name);
+        });
+      });
+      if (previewParts.length > 0) {
+        preview.textContent = previewParts.slice(0, 5).join(' | ') + (previewParts.length > 5 ? ' …' : '');
+        preview.style.cssText = 'font-size:11px; color:var(--text2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;';
+      } else {
+        preview.textContent = '(快照为空)';
+        preview.style.cssText = 'font-size:11px; color:var(--text3); margin-top:2px;';
+      }
+    } else {
+      preview.textContent = '⚠️ 无快照 — 请点击🔄更新';
+      preview.style.cssText = 'font-size:11px; color:var(--warn); margin-top:2px;';
+    }
+
     item.appendChild(row1);
     item.appendChild(row2);
+    item.appendChild(preview);
     list.appendChild(item);
   });
 
   content.appendChild(list);
 
+  // 底部按钮行
+  var footerRow = document.createElement('div');
+  footerRow.style.cssText = 'display:flex; gap:8px; margin-top:15px;';
+
+  var clearAllBtn = document.createElement('button');
+  clearAllBtn.className = 'btn btn-sm btn-cancel';
+  clearAllBtn.textContent = '全部清除';
+  clearAllBtn.title = '清除所有缓存快照（不删除实际任务数据）';
+  clearAllBtn.addEventListener('click', function() {
+    if (confirm('确定删除全部 ' + entries.length + ' 条缓存快照？\n（仅删除缓存快照和索引，不影响实际任务数据）')) {
+      clearAllCachedDates();
+      modal.remove();
+      alert('已清除全部缓存快照');
+    }
+  });
+  footerRow.appendChild(clearAllBtn);
+
   var closeBtn = document.createElement('button');
-  closeBtn.className = 'btn btn-sm btn-cancel';
+  closeBtn.className = 'btn btn-sm';
   closeBtn.textContent = '关闭';
-  closeBtn.style.marginTop = '15px';
   closeBtn.addEventListener('click', function() { modal.remove(); });
-  content.appendChild(closeBtn);
+  footerRow.appendChild(closeBtn);
+
+  content.appendChild(footerRow);
 
   modal.appendChild(content);
   document.body.appendChild(modal);

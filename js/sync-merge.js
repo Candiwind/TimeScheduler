@@ -212,9 +212,23 @@ var SyncMerge = (function() {
     localIdx = localIdx || [];
     remoteIdx = remoteIdx || [];
     var merged = localIdx.slice();
-    remoteIdx.forEach(function(d) {
-      if (merged.indexOf(d) === -1) merged.push(d);
-    });
+    // 向后兼容：字符串条目用 indexOf；对象条目用 ID 去重
+    var isObjectEntry = (merged[0] && typeof merged[0] === 'object') || (remoteIdx[0] && typeof remoteIdx[0] === 'object');
+    if (isObjectEntry) {
+      var localIds = {};
+      merged.forEach(function(e) { if (e.id) localIds[e.id] = true; });
+      remoteIdx.forEach(function(d) {
+        if (d.id && !localIds[d.id]) {
+          merged.push(d);
+          localIds[d.id] = true;
+        }
+      });
+    } else {
+      // 旧格式：纯字符串数组
+      remoteIdx.forEach(function(d) {
+        if (merged.indexOf(d) === -1) merged.push(d);
+      });
+    }
     merged.sort();
     return merged;
   }

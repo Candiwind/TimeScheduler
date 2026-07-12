@@ -833,6 +833,45 @@
 
 ────────────────────────────────────────
 
+【日期缓存系统重构（快照架构）— 2026-07-12】
+
+73. ✅ 日期缓存从引用模型重构为快照模型——15项修改覆盖 store/cache-ui/app/cloud-sync/sync-merge/recover-today：
+   (1) 核心架构：缓存条目新增 snapshot 字段存储完整数据快照（JSON深拷贝），
+      缓存不再是"书签"而是真正的数据存档。删除缓存条目不会丢失主数据，
+      但快照独立于主数据，修改一个不影响另一个。
+   (2) markDateAsCached(date) 重写：内部检查内容→深拷贝快照→存入索引条目，
+      返回 boolean 供 UI 判断成功/失败。
+   (3) 新增 importCachedDataFromSnapshot(entryId, targetDate, silent)：
+      从快照读取数据合并到目标日期，ID 去重。
+   (4) getCachedDateData(date) 重写：优先从快照读取，回退到主数据。
+   (5) 新增 updateCacheSnapshot(entryId)：刷新已有缓存条目的快照为当前最新数据。
+   (6) 新增 clearAllCachedDates()：清空全部缓存快照和自动导入追踪器。
+   (7) 新增 removeOldDateData(daysToKeep)：清理超过N天且未被缓存引用的旧日期数据。
+   (8) 新增 migrateCacheIndexToSnapshot()：一次性将旧格式（无snapshot）条目
+      升级为快照格式，从主数据填充初始快照。通过迁移标记防重复执行。
+   (9) loadCachedDatesIndex 新增 snapshot 字段向后兼容（缺失→null）。
+   (10) seedCacheIndexIfEmpty() 改为空壳（no-op），不再自动填充缓存索引。
+   (11) 删除重复的 silentImportCachedData 死代码（原来定义了两次）。
+   (12) 删除 getAllCachedDates() 命名误导函数（读主数据而非缓存索引）。
+   (13) 修复 cloud-sync.js + sync-merge.js mergeCachedDatesIndex 的 indexOf 对象比较 bug
+       （引用相等永远匹配不上，导致每次同步都重复添加缓存条目，改用 ID 去重）。
+   (14) 修复 recover-today.js 恢复逻辑：优先检查缓存快照条目，有数据直接恢复。
+   (15) 移除 cleanup-cache.js（一次性脚本，已被完整缓存管理功能取代）。
+
+   【缓存 UI 升级】
+   - showCacheModal 重写：象限计数改用 entry.snapshot；新增快照预览（前5条任务名称）；
+     新增🔄更新快照按钮；新增"全部清除"按钮（含确认对话框）；导入改用
+     importCachedDataFromSnapshot，支持无快照条目提示用户先更新；
+     导入后不关闭弹窗（支持连续导入多条）；导出JSON优先从快照读取；
+     删除确认文案优化。
+   - btnCacheSave 简化：markDateAsCached 内部已检查内容+创建快照，UI 仅判断返回值。
+
+   涉及文件：js/store.js（核心重构） / js/cache-ui.js / js/app.js /
+       js/cloud-sync.js / js/sync-merge.js / js/recover-today.js /
+       index.html / service-worker.js
+
+────────────────────────────────────────
+
 【未来计划】
 1. 代码重构：模块化拆分，提升可维护性和运行性能
 2. APP与网页版数据互通

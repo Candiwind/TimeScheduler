@@ -394,6 +394,21 @@
    (6) SW 缓存版本升 v14→v15，确保手机端 PWA 拉取到修复后的 cloud-sync.js。
    涉及文件：js/cloud-sync.js / service-worker.js
 
+29. ✅ Gist 云同步 4 项修复——诊断覆盖正式数据 + 静默失败无感知 + 无重试 + SW缓存过期：
+   (1) Bug 1（致命）：pushToGist() 诊断阶段 diagnoseGistConnection 将测试数据
+       {_test:true} 写入正式文件 SYNC_FILE_NAME（quadrant_tasks_backup.json），
+       若后续真实推送失败（超时/断网），Gist 中残留测试数据（无 _version 字段）。
+       手机端 autoPullFromGist → importAllData 检测不到 _version → 认为数据无效。
+       修复：诊断改用独立测试文件 _sync_test_.json，推送成功后清理（payload.files 设 null）。
+   (2) Bug 2（致命）：autoPullFromGist → pullFromGist(true) 静默模式下，fetch 失败或数据无效
+       仅 console.error 日志，手机端用户完全无感知——看不到数据、不知道失败了。
+       修复：静默模式错误也闪烁 ⚠️ 图标 3 秒；importAllData 无效数据改返回 false（不弹 alert），
+       pullFromGist 根据返回值设置 _lastAutoPullError 标志位。
+   (3) Bug 3（中等）：自动拉取无重试机制，一次网络抖动就永久失败。
+       修复：_autoPullWithRetry 最多重试 2 次，指数退避 2s→4s。
+   (4) SW 缓存版本升 v15→v16，确保手机端 PWA 拉取到修复后的代码。
+   涉及文件：js/cloud-sync.js / service-worker.js
+
 （暂无）
 
 ────────────────────────────────────────

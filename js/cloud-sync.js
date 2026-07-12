@@ -38,7 +38,7 @@ var CloudSync = (function() {
    * 初始化：恢复之前的同步配置
    */
   // 版本标记——用于排查浏览器是否缓存了旧代码
-  var CODE_VERSION = '2026-07-06-sync-icon-indicator';
+  var CODE_VERSION = '2026-07-12-fix-diagnose-corrupts-data';
 
   function init() {
     console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
@@ -410,12 +410,13 @@ var CloudSync = (function() {
     }).then(function(gist) {
       report('✓ Gist 可读取 (' + (gist.description || '无描述') + ')');
 
-      // 检查 4：写入权限（最小测试）
-      report('正在检测 Gist 写入权限（发送空更新）...');
+      // 检查 4：写入权限（最小测试，写入独立测试文件避免覆盖正式数据）
+      report('正在检测 Gist 写入权限（写入测试文件）...');
+      var TEST_FILE_NAME = '_sync_test_.json';
       var testPayload = {
         files: {}
       };
-      testPayload.files[SYNC_FILE_NAME] = {
+      testPayload.files[TEST_FILE_NAME] = {
         content: JSON.stringify({ _test: true, _timestamp: new Date().toISOString() }, null, 2)
       };
 
@@ -430,11 +431,9 @@ var CloudSync = (function() {
         if (!res.ok) throw new Error('HTTP ' + res.status + (res.status === 401 ? ' → Token 无效或权限不足' : res.status === 404 ? ' → Gist 不存在' : ''));
         report('✓ Gist 写入成功 — 一切正常');
 
-        // 写入成功，回写原来的数据
+        // 诊断完成，立即回调让真实数据覆盖测试文件
         report('诊断完成：所有检查通过，现在执行完整推送...');
-        return res.json().then(function() {
-          callback('ok', steps);
-        });
+        callback('ok', steps);
       });
     }).catch(function(err) {
       report('✗ 失败: ' + err.message);
@@ -492,6 +491,8 @@ var CloudSync = (function() {
       payload.files[SYNC_FILE_NAME] = {
         content: JSON.stringify(data, null, 2)
       };
+      // 清理诊断时留下的测试文件
+      payload.files['_sync_test_.json'] = null;
 
       console.log('[云同步] 开始正式推送...');
 
@@ -557,7 +558,15 @@ var CloudSync = (function() {
       }
 
       var data = JSON.parse(file.content);
-      importAllData(data);
+      if (!importAllData(data)) {
+        // importAllData 返回 false 表示数据格式无效
+        if (!silent) {
+          setSyncIcon('error', '云端数据格式不兼容');
+          alert('云端数据格式不兼容，请先在电脑端重新推送一次。');
+        }
+        _lastAutoPullError = true;
+        return null;
+      }
 
       var now = new Date().toISOString();
       syncInfo.lastSync = now;
@@ -569,11 +578,15 @@ var CloudSync = (function() {
 
       return data;
     }).catch(function(err) {
+      _lastAutoPullError = true;
       if (!silent) {
-        setSyncIcon('error', '拉取失败：' + err.message);
-        alert('拉取失败：' + err.message);
+        setSyncIcon('error', '拉取失败：' + (err.message || String(err)));
+        alert('拉取失败：' + (err.message || String(err)));
+      } else {
+        // 静默模式下也闪烁 ⚠️ 3秒，让手机端用户感知
+        setSyncIcon('error', '自动同步失败：' + (err.message || String(err)));
       }
-      console.error('[云同步] 拉取失败:', err.message);
+      console.error('[云同步] 拉取失败:', err.message || err);
       return null;
     });
   }
@@ -585,8 +598,8 @@ var CloudSync = (function() {
    */
   function importAllData(data) {
     if (!data || !data._version) {
-      alert('无效的同步数据文件。');
-      return;
+      console.error('[云同步] 无效的同步数据文件（缺少 _version 字段）。这可能是因为推送过程中断导致测试数据残留。');
+      return false;
     }
 
     var dateCount = 0;
@@ -675,9 +688,30 @@ var CloudSync = (function() {
    * 自动从 Gist 拉取（页面加载时静默调用）
    */
   function autoPullFromGist() {
+    // 自动静默拉取，失败时重试最多 2 次（指数退避：2s → 4s）
+    _autoPullWithRetry(0);
+  }
+
+  var _lastAutoPullError = null;
+
+  // 自动拉取含重试逻辑（最多 2 次重试，指数退避）
+  function _autoPullWithRetry(attempt) {
+    var MAX_RETRIES = 2;
+    _lastAutoPullError = null;
     pullFromGist(true).then(function(data) {
       if (data) {
-        console.log('[云同步] 自动拉取成功');
+        console.log('[云同步] 自动拉取成功（尝试 ' + (attempt + 1) + ' 次）');
+        updateSyncIndicator();
+      } else if (_lastAutoPullError && attempt < MAX_RETRIES) {
+        // 拉取失败，重试
+        var delay = (attempt + 1) * 2000;
+        console.log('[云同步] 自动拉取失败，' + (delay / 1000) + 's 后重试（' + (attempt + 2) + '/' + (MAX_RETRIES + 1) + '）');
+        setTimeout(function() { _autoPullWithRetry(attempt + 1); }, delay);
+      } else if (_lastAutoPullError) {
+        console.log('[云同步] 自动拉取最终失败（已重试 ' + MAX_RETRIES + ' 次）');
+      } else {
+        // data 为 null 但没有错误：Gist 中没有数据文件（首次使用，正常情况）
+        console.log('[云同步] 自动拉取：Gist 中暂无数据文件（首次使用正常）');
       }
     });
   }

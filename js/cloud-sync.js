@@ -38,7 +38,7 @@ var CloudSync = (function() {
    * 初始化：恢复之前的同步配置
    */
   // 版本标记——用于排查浏览器是否缓存了旧代码
-  var CODE_VERSION = '2026-07-12-fix-diagnose-corrupts-data';
+  var CODE_VERSION = '2026-07-12-merge-periodic-pull';
 
   function init() {
     console.log('%c[云同步] 代码版本: ' + CODE_VERSION, 'color:#0969da;font-weight:bold;');
@@ -69,9 +69,10 @@ var CloudSync = (function() {
       restoreFileHandle();
     }
 
-    // 如果有 gist 配置，尝试自动拉取
+    // 如果有 gist 配置，尝试自动拉取 + 启动定时拉取（桌面端长期运行保持同步）
     if (syncInfo.enabled && syncInfo.mode === 'gist' && syncInfo.gistId) {
       autoPullFromGist();
+      startPeriodicPull();
     }
   }
 
@@ -617,8 +618,8 @@ var CloudSync = (function() {
       } catch(e) {}
     }
 
-    // 关键修正：日期数据合并写入 quadrant_task_data 大对象（loadAllData/saveAllData）
-    // 策略：云端有的日期覆盖本地同名日期，本地独有的日期保留
+    // 日期数据：按日期 → 象限 → 任务ID 合并（本地优先，云端补充）
+    // 策略：双方都有的任务保留本地版本，仅云端有的任务追加到本地
     if (data.dateData) {
       var existing = {};
       try {
@@ -627,8 +628,27 @@ var CloudSync = (function() {
       } catch(e) { existing = {}; }
 
       Object.keys(data.dateData).forEach(function(date) {
-        existing[date] = data.dateData[date];
-        dateCount++;
+        var localDate = existing[date] || { I: [], II: [], III: [], IV: [] };
+        var cloudDate = data.dateData[date];
+        ['I', 'II', 'III', 'IV'].forEach(function(qk) {
+          var localTasks = localDate[qk] || [];
+          var cloudTasks = cloudDate[qk] || [];
+          // 构建本地 ID 集合（含 block 子任务）
+          var localIds = {};
+          localTasks.forEach(function(t) {
+            localIds[t.id] = true;
+            if (t.tasks) { t.tasks.forEach(function(st) { localIds[st.id] = true; }); }
+          });
+          // 追加云端独有的任务
+          cloudTasks.forEach(function(ct) {
+            if (!localIds[ct.id]) {
+              localTasks.push(ct);
+              dateCount++;
+            }
+          });
+          localDate[qk] = localTasks;
+        });
+        existing[date] = localDate;
       });
 
       if (typeof saveAllData === 'function') {
@@ -638,12 +658,19 @@ var CloudSync = (function() {
       }
     }
 
-    // 导入未来任务池（key 与 store.js 保持一致：quadrant_*_tasks）
+    // 导入未来任务池（按 ID 合并：本地优先，云端补充）
     var poolKeyMap = { future: 'quadrant_future_tasks', week: 'quadrant_week_tasks', month: 'quadrant_month_tasks' };
     ['future', 'week', 'month'].forEach(function(pool) {
       var key = 'pool_' + pool;
       if (data[key]) {
-        localStorage.setItem(poolKeyMap[pool], JSON.stringify(data[key]));
+        var localPool = [];
+        try { localPool = JSON.parse(localStorage.getItem(poolKeyMap[pool]) || '[]'); } catch(e) {}
+        var localPoolIds = {};
+        localPool.forEach(function(t) { localPoolIds[t.id] = true; });
+        data[key].forEach(function(ct) {
+          if (!localPoolIds[ct.id]) { localPool.push(ct); }
+        });
+        localStorage.setItem(poolKeyMap[pool], JSON.stringify(localPool));
       }
     });
 
@@ -652,14 +679,30 @@ var CloudSync = (function() {
       localStorage.setItem('quadrant_principles', JSON.stringify(data.principles));
     }
 
-    // 导入大任务（走 saveBigTasks 以触发自动归档逻辑）
-    if (data.bigTasks && typeof saveBigTasks === 'function') {
-      saveBigTasks(data.bigTasks);
-    } else if (data.bigTasks) {
-      localStorage.setItem('quadrant_big_tasks', JSON.stringify(data.bigTasks));
+    // 导入大任务（按 ID 合并：本地优先，云端补充）
+    if (data.bigTasks) {
+      var localBig = (typeof loadBigTasks === 'function') ? loadBigTasks() :
+                     JSON.parse(localStorage.getItem('quadrant_big_tasks') || '[]');
+      var localBigIds = {};
+      localBig.forEach(function(t) { localBigIds[t.id] = true; });
+      data.bigTasks.forEach(function(ct) {
+        if (!localBigIds[ct.id]) { localBig.push(ct); }
+      });
+      if (typeof saveBigTasks === 'function') {
+        saveBigTasks(localBig);
+      } else {
+        localStorage.setItem('quadrant_big_tasks', JSON.stringify(localBig));
+      }
     }
     if (data.bigTaskCache) {
-      localStorage.setItem('quadrant_big_tasks_cache', JSON.stringify(data.bigTaskCache));
+      var localCache = [];
+      try { localCache = JSON.parse(localStorage.getItem('quadrant_big_tasks_cache') || '[]'); } catch(e) {}
+      var localCacheIds = {};
+      localCache.forEach(function(t) { localCacheIds[t.id] = true; });
+      data.bigTaskCache.forEach(function(ct) {
+        if (!localCacheIds[ct.id]) { localCache.push(ct); }
+      });
+      localStorage.setItem('quadrant_big_tasks_cache', JSON.stringify(localCache));
     }
 
     console.log('[云同步] 已导入数据，合并 ' + dateCount + ' 个日期');
@@ -714,6 +757,59 @@ var CloudSync = (function() {
         console.log('[云同步] 自动拉取：Gist 中暂无数据文件（首次使用正常）');
       }
     });
+  }
+
+  // ============ 定时自动拉取（桌面端长期运行保持同步） ============
+  var _periodicTimer = null;
+  var PERIODIC_INTERVAL = 60000; // 60 秒
+
+  function startPeriodicPull() {
+    if (_periodicTimer) return;
+    console.log('[云同步] 启动定时自动拉取（每 ' + (PERIODIC_INTERVAL / 1000) + ' 秒）');
+    _periodicTimer = setInterval(function() {
+      if (syncInfo.enabled && syncInfo.mode === 'gist' && syncInfo.gistId) {
+        pullFromGist(true).then(function(data) {
+          if (data) console.log('[云同步] 定时拉取成功');
+        });
+      }
+    }, PERIODIC_INTERVAL);
+
+    // 页面可见性变化：隐藏时停止，显示时立即拉取
+    document.addEventListener('visibilitychange', _onVisibilityChange);
+  }
+
+  function stopPeriodicPull() {
+    if (_periodicTimer) {
+      clearInterval(_periodicTimer);
+      _periodicTimer = null;
+      console.log('[云同步] 已停止定时拉取');
+    }
+    document.removeEventListener('visibilitychange', _onVisibilityChange);
+  }
+
+  function _onVisibilityChange() {
+    if (document.hidden) {
+      // 页面隐藏时暂停定时器（省电省流量）
+      if (_periodicTimer) {
+        clearInterval(_periodicTimer);
+        _periodicTimer = null;
+      }
+    } else {
+      // 页面重新可见时：立即拉取一次 + 恢复定时器
+      if (syncInfo.enabled && syncInfo.mode === 'gist' && syncInfo.gistId) {
+        console.log('[云同步] 页面可见，立即拉取...');
+        pullFromGist(true).then(function(data) {
+          if (data) console.log('[云同步] 页面恢复可见拉取成功');
+        });
+      }
+      if (!_periodicTimer) {
+        _periodicTimer = setInterval(function() {
+          if (syncInfo.enabled && syncInfo.mode === 'gist' && syncInfo.gistId) {
+            pullFromGist(true);
+          }
+        }, PERIODIC_INTERVAL);
+      }
+    }
   }
 
   // 防抖推送定时器
@@ -876,6 +972,9 @@ var CloudSync = (function() {
     syncInfo.gistToken = null;
     syncDirHandle = null;
     fileHandle = null;
+
+    // 停止定时拉取
+    stopPeriodicPull();
 
     localStorage.removeItem(SYNC_ENABLED_KEY);
     localStorage.removeItem('cloudsync_mode');

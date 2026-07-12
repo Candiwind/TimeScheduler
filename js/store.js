@@ -882,19 +882,25 @@ function exportAllDataAsJSON() {
     // Use Capacitor Filesystem API to save to device storage
     try {
       var CapacitorFilesystem = Capacitor.Plugins.Filesystem;
-      CapacitorFilesystem.writeFile({
+      // 同时写入日期文件名（用户可识别）和固定文件名（autoSyncFromDevice 读取）
+      var writeDated = CapacitorFilesystem.writeFile({
         path: 'Documents/' + fileName,
         data: json,
         directory: 'DOCUMENTS'
-      }).then(function() {
+      });
+      var writeSync = CapacitorFilesystem.writeFile({
+        path: 'Documents/' + SYNC_FILENAME,
+        data: json,
+        directory: 'DOCUMENTS'
+      });
+      Promise.all([writeDated, writeSync]).then(function() {
         alert('数据已导出到设备文档文件夹：' + fileName + '\n\n可通过文件管理器找到此文件，在浏览器版中使用"导入JSON"即可同步数据。');
       }).catch(function(e) {
         // Fallback: try Downloads folder
-        CapacitorFilesystem.writeFile({
-          path: fileName,
-          data: json,
-          directory: 'DOWNLOADS'
-        }).then(function() {
+        Promise.all([
+          CapacitorFilesystem.writeFile({ path: fileName, data: json, directory: 'DOWNLOADS' }),
+          CapacitorFilesystem.writeFile({ path: SYNC_FILENAME, data: json, directory: 'DOWNLOADS' })
+        ]).then(function() {
           alert('数据已导出到下载文件夹：' + fileName);
         }).catch(function(e2) {
           alert('导出失败，尝试浏览器下载模式...');
@@ -904,6 +910,8 @@ function exportAllDataAsJSON() {
     } catch (e) {
       fallbackBlobDownload(json, fileName);
     }
+    // 显示可复制文本，便于跨设备粘贴导入（手机端复制 → 电脑端粘贴，或反之）
+    if (typeof showJsonExportModal === 'function') showJsonExportModal(json);
   } else {
     fallbackBlobDownload(json, fileName);
     // 显示可复制文本，便于跨设备粘贴导入（电脑端复制 → 手机端粘贴）

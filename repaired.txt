@@ -733,6 +733,40 @@
     涉及文件：index.html / service-worker.js / js/json-io.js / js/store.js /
         test/test-json-io.js（新增）
 
+72. ✅ 修复手机端无法同步电脑端/云端数据 — 3项根因修复
+
+    【Bug 1：Gist 连接成功后不自动拉取数据（最直接影响手机端）】
+    - `setupGistSync` 连接 Gist 后只保存配置 + 提示"点击拉取"
+    - 用户输入 Gist ID 点连接后，数据并未实际下载，界面仍为空
+    - 直到下次启动 App 时 `autoPullFromGist` 才会拉取
+    - 手机端新用户连上 Gist 后看到空界面，不知还需手动点"拉取"
+    - 修复：新增 `onConnectSuccess` 辅助函数，连接成功后立即调
+      `pullFromGist()` 自动拉取数据并刷新界面
+
+    【Bug 2：Capacitor 导出文件名与 autoSyncFromDevice 不匹配】
+    - `exportAllDataAsJSON` 导出到 Documents/quadrant_tasks_backup_YYYY-MM-DD.json
+    - `autoSyncFromDevice` 读取 Documents/quadrant_tasks_backup.json（固定名）
+    - 两者文件名永远对不上 → autoSyncFromDevice 永远读不到导出文件
+    - 修复：导出时同时写入 dated 文件名和 SYNC_FILENAME 固定名，
+      确保 autoSyncFromDevice 在下次启动时能检测到备份
+
+    【Bug 3：Capacitor 导出不显示可复制 JSON 弹窗】
+    - `showJsonExportModal(json)` 调用仅在浏览器分支（else），
+      Capacitor 分支导出后不显示可复制文本弹窗
+    - 手机端导出后无法复制 JSON 文本发送给另一设备
+    - 修复：将 showJsonExportModal 调用移到 if/else 两个分支都执行
+
+    【缓存版本同步】
+    - SW CACHE_VERSION v29 → v30
+    - index.html 所有资源 ?v=29 → ?v=30
+
+    【测试验证】
+    - test/test-cloudsync-merge.js：25/25 通过
+    - test/test-cloudsync-store-keys.js：通过
+    - test/test-json-io.js：全部通过
+
+    涉及文件：js/cloud-sync.js / js/store.js / service-worker.js / index.html
+
 ────────────────────────────────────────
 
 【未来计划】

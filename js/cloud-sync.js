@@ -156,12 +156,18 @@ var CloudSync = (function() {
 
     var existingToken = (typeof token !== 'undefined' && token !== null) ? token : (syncInfo.gistToken || '');
 
+    // 连接成功后自动拉取数据（不再需要用户手动点"拉取"）
+    function onConnectSuccess(gistId, token, desc) {
+      saveGistConfig(gistId, token, desc);
+      pullFromGist().then(function() {
+        if (fromForm) openSyncSettings();
+      });
+    }
+
     // 已有 Token → 优先用 Token（保留推送能力）
     if (existingToken) {
       fetchGist(gistId, existingToken).then(function() {
-        saveGistConfig(gistId, existingToken, '完整模式（已有Token）');
-        showToast('✅ Gist 已连接（拉取+推送模式）\n点击 📥 拉取可合并云端数据');
-        if (fromForm) openSyncSettings();
+        onConnectSuccess(gistId, existingToken, '完整模式（已有Token）');
       }).catch(function() {
         if (fromForm) {
           // 表单模式：Token 可能不对，提示但不降级（用户可在表单中清除Token重试）
@@ -174,15 +180,13 @@ var CloudSync = (function() {
             '');
           if (newToken) {
             fetchGist(gistId, newToken).then(function() {
-              saveGistConfig(gistId, newToken, '完整模式（新Token）');
-              showToast('✅ Gist 已连接（拉取+推送模式）\n点击 📥 拉取可合并云端数据');
+              onConnectSuccess(gistId, newToken, '完整模式（新Token）');
             }).catch(function(err) {
               alert('连接失败：' + err.message);
             });
           } else {
             fetchGist(gistId, null).then(function() {
-              saveGistConfig(gistId, '', '仅拉取模式（公开Gist，Token已失效）');
-              showToast('⚠️ Token 已清除，当前为仅拉取模式');
+              onConnectSuccess(gistId, '', '仅拉取模式（公开Gist，Token已失效）');
             }).catch(function(err) {
               alert('公开访问也失败：' + err.message);
             });
@@ -192,16 +196,7 @@ var CloudSync = (function() {
     } else {
       // 无 Token → 先试公开访问
       fetchGist(gistId, null).then(function(gistData) {
-        saveGistConfig(gistId, '', '仅拉取模式（公开Gist）');
-        if (fromForm) {
-          showToast('✅ Gist 已连接（仅拉取模式）\n点击 📥 拉取可合并云端数据');
-        } else {
-          showToast('✅ Gist 已连接（仅拉取模式）\n' +
-                    '手机端无需 Token 即可自动同步\n\n' +
-                    '点击 📥 拉取可合并云端数据。\n' +
-                    '如需推送数据，请再次设置并输入 Token。');
-        }
-        if (fromForm) openSyncSettings();
+        onConnectSuccess(gistId, '', '仅拉取模式（公开Gist）');
       }).catch(function() {
         if (fromForm) {
           alert('无法访问该 Gist。\n\n可能原因：\n1. Gist ID 不存在\n2. Gist 为私密，需填写 Token');
@@ -212,8 +207,7 @@ var CloudSync = (function() {
             '');
           if (!newToken) return;
           fetchGist(gistId, newToken).then(function() {
-            saveGistConfig(gistId, newToken, '完整模式（私密Gist）');
-            showToast('✅ Gist 已连接（拉取+推送模式）\n点击 📥 拉取可合并云端数据');
+            onConnectSuccess(gistId, newToken, '完整模式（私密Gist）');
           }).catch(function(err) {
             alert('连接失败：' + err.message);
           });
